@@ -1,0 +1,14 @@
+
+running 9 tests
+test tests::getrandom_system_call_itself_works ... ok
+test tests::fallback_requires_unambiguous_pool_readiness ... ok
+test tests::only_a_missing_or_blocked_call_is_skipped_not_any_failure ... ok
+test tests::produces_distinct_nonzero_output ... ok
+test tests::urandom_fallback_works ... ok
+test tests::the_fallback_waits_for_a_seeded_pool_and_a_running_system_has_one ... ok
+test tests::handles_every_size_including_empty_and_larger_than_one_call ... ok
+test tests::works_from_many_threads ... ok
+test tests::output_looks_uniform ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

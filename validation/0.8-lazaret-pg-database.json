@@ -1,0 +1,10 @@
+{
+  "passed": [
+    "driver-local",
+    "driver-tls",
+    "accounting",
+    "postings",
+    "local-accounting"
+  ],
+  "engine": "PGlite PostgreSQL WASM; Node TLS frontend; all loopback synthetic"
+}

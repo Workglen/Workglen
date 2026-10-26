@@ -1,0 +1,53 @@
+{
+  "scope": "Synthetic local offline checks; no production deployment",
+  "results": [
+    {
+      "check": "unicode-data-regeneration",
+      "exit_code": 0,
+      "seconds": 0.78,
+      "log": "unicode-data-regeneration.txt"
+    },
+    {
+      "check": "mime-data-regeneration",
+      "exit_code": 0,
+      "seconds": 0.05,
+      "log": "mime-data-regeneration.txt"
+    },
+    {
+      "check": "rust-tests",
+      "exit_code": 0,
+      "seconds": 22.1,
+      "log": "rust-tests.txt"
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0,
+      "seconds": 0.23,
+      "log": "clippy.txt"
+    },
+    {
+      "check": "release-build",
+      "exit_code": 0,
+      "seconds": 19.61,
+      "log": "release-build.txt"
+    },
+    {
+      "check": "outbound",
+      "exit_code": 0,
+      "seconds": 67.93,
+      "log": "outbound.txt"
+    },
+    {
+      "check": "mail",
+      "exit_code": 0,
+      "seconds": 50.2,
+      "log": "mail.txt"
+    },
+    {
+      "check": "webmail",
+      "exit_code": 0,
+      "seconds": 2.63,
+      "log": "webmail.txt"
+    }
+  ]
+}

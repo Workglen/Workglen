@@ -1,0 +1,32 @@
+PASS Accounting requires CSRF
+PASS disabled Accounting blocks commands
+PASS enable Accounting in module console
+PASS create book and view empty balanced ledger
+PASS create asset, liability, income and expense accounts
+PASS bank account maps to ledger
+PASS statement preview does not post ledger
+PASS statement commit and duplicate warnings
+PASS explicit posting from review
+PASS mobile banking layout
+PASS posted amount appears in balanced trial balance
+PASS edit bank-matched posting with explicit unmatch
+Accounting response 400 {"error":"Date is within a locked period"}
+PASS locked posting correction rejected without closing editor
+PASS privileged period reopening
+PASS void removes financial effect and keeps visible record
+PASS deleted posting remains accessible with immutable audit snapshots
+PASS create a balanced manual journal in the browser
+PASS Xero preview and explicit cutover commit
+PASS disable/re-enable retains ledger
+PASS no browser JavaScript errors
+PASS SimpleFIN rejects non-provider insecure destination
+PASS Accounting ready after browser lifecycle
+PASS scoped accountant/viewer browser and owner navigation after role switch
+PASS accountant sees assigned books only
+PASS ordinary accountant cannot reopen periods
+PASS cross-book posting access denied
+PASS assigned accountant can edit ordinary postings
+PASS audit retains named external actor
+PASS read-only users cannot correct postings
+PASS assigned accounting administrator can reopen periods
+PASS CLI sees browser-created books

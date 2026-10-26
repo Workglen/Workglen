@@ -1,0 +1,13 @@
+{
+  "passed": 8,
+  "checks": [
+    "empty install explains missing destination and prevents premature advance",
+    "Microsoft MX discovery fills a reviewable hostname",
+    "failed test retains inputs, explains outbound SMTP and prevents save",
+    "successful test saves and selects a destination without JSON editing",
+    "recipient draft survives returning to Mail flow",
+    "domain destination and recipient save together and continue to Detection",
+    "guided destination setup fits a narrow viewport",
+    "no browser script errors"
+  ]
+}

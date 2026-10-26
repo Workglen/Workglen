@@ -1,0 +1,17 @@
+{
+  "stage": "anyhow",
+  "before_registry": 174,
+  "after_registry": 173,
+  "before_external": 175,
+  "after_external": 174,
+  "removed_packages": [
+    {
+      "name": "anyhow",
+      "version": "1.0.104"
+    }
+  ],
+  "added_registry_packages": [],
+  "retained_checksums_unchanged": true,
+  "before_lock_sha256": "e6e0aa7a50e8114a9dba0c3ec70d16be834329ae17fb860172e3898c2814ab2b",
+  "after_lock_sha256": "50c01c3fa30e0e7d5c4861b92eee827dca0ddcce93b255844a1cd691c82c0bb4"
+}

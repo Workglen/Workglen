@@ -1,0 +1,34 @@
+PASS Webmail is disabled by default
+PASS Webmail enables independently
+PASS Mailbox API requires its own session
+PASS Administrator cookie is not a mailbox session
+PASS Mailbox cookie is secure and protected
+PASS Webmail enforces Origin
+PASS Webmail enforces Host
+PASS Webmail enforces CSRF on mailbox actions
+PASS Mailbox session cannot reach administration APIs
+PASS Folders are scoped to authenticated mailbox
+PASS One send stores local mail and Sent atomically
+PASS Lost-response retry returns the same receipt
+PASS Changed replay is rejected
+PASS Unicode text and attachment name survive MIME
+PASS Attachments download as inert binary
+PASS Stale UIDVALIDITY is rejected
+PASS Caller cannot choose another mailbox
+PASS Folder traversal is rejected
+PASS Seen and star flags persist
+PASS Move to Trash preserves body and clears old UID
+PASS Trash can be restored
+PASS Other recipient receives its own copy
+PASS Invalid recipient rolls back Sent and all delivery
+PASS Unconfigured outbound delivery refuses before acceptance
+PASS Header injection refuses before storage
+PASS Self-delivery counts both Inbox and Sent against quota
+PASS Webmail sends DKIM-signed MIME through shared storage
+PASS Bounded pagination has no overlapping messages
+PASS Disabling Webmail blocks existing sessions
+PASS Mail remains available when Webmail is disabled
+PASS Disabling Mail also pauses Webmail
+PASS Module lifecycle retains mailbox data
+PASS Password reset revokes Webmail session
+PASS Logout invalidates Bob session

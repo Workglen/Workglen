@@ -1,0 +1,14 @@
+{
+  "passed": 9,
+  "checks": [
+    "selected Microsoft route shows tenant scope and truthful unverified status",
+    "commands require explicit tenant and dedicated-address review",
+    "private source addresses cannot generate a plan",
+    "staged commands, filtering, rollout and positive/negative evidence are guided separately",
+    "editing inputs invalidates generated commands and review",
+    "go-live preserves the unverified status without a circular activation gate",
+    "guide and commands fit a narrow viewport",
+    "switching gateways clears the tenant-specific draft",
+    "guide never mutates a tenant, sends mail, loads external code or raises browser errors"
+  ]
+}

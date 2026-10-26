@@ -1,0 +1,2059 @@
+diff --git a/src/data/macros.rs b/src/data/macros.rs
+new file mode 100644
+--- /dev/null
++++ b/src/data/macros.rs
+@@ -0,0 +1,27 @@
++/// Explicit field order and optional omission predicates for a record.
++#[macro_export]
++macro_rules! data_encode {
++ ($ty:ty {$($field:ident $(=> $skip:expr)?),* $(,)?})=>{
++ impl $crate::data::Encode for $ty {
++ fn encode(&self)->Result<$crate::data::Node,$crate::data::Error>{
++  let Self{$($field:_),*}=self; // Adding a field requires an explicit wire decision.
++  let mut fields=Vec::new();
++  $($crate::data_encode!(@field fields,self,$field $(,$skip)?);)*
++  Ok($crate::data::Node::new($crate::data::Kind::Object(fields)))
++ }} };
++ (@field $out:ident,$this:ident,$f:ident)=>{$out.push((stringify!($f).trim_start_matches("r#").to_owned(),$crate::data::Encode::encode(&$this.$f)?));};
++ (@field $out:ident,$this:ident,$f:ident,$skip:expr)=>{if !($skip)(&$this.$f){$out.push((stringify!($f).trim_start_matches("r#").to_owned(),$crate::data::Encode::encode(&$this.$f)?));}};
++}
++/// Decode a named record with explicit defaults and unknown-field policy.
++#[macro_export]
++macro_rules! data_decode {
++ ($ty:ty, deny_unknown=$deny:expr, {$($field:ident $(= $default:expr)?),* $(,)?})=>{
++ impl $crate::data::Decode for $ty {
++ fn decode(node:$crate::data::Node)->Result<Self,$crate::data::Error>{
++  let mut fields=$crate::data::Fields::new(node,$deny)?;
++  let value=Self{$($field:$crate::data_decode!(@field fields,$field $(,$default)?)),*};
++  fields.finish()?;Ok(value)
++ }} };
++ (@field $fields:ident,$f:ident)=>{$fields.field(stringify!($f).trim_start_matches("r#"))?};
++ (@field $fields:ident,$f:ident,$default:expr)=>{$fields.field_or(stringify!($f).trim_start_matches("r#"),||$default)?};
++}
+diff --git a/src/data/mod.rs b/src/data/mod.rs
+new file mode 100644
+--- /dev/null
++++ b/src/data/mod.rs
+@@ -0,0 +1,527 @@
++//! First-party typed data contracts. No derive engine or third-party serialization code.
++//! Nodes preserve record order, duplicate input fields and TOML source offsets.
++use std::{
++    collections::{BTreeMap, BTreeSet, HashMap},
++    fmt,
++    hash::Hash,
++    net::{IpAddr, SocketAddr},
++    path::PathBuf,
++};
++mod macros;
++#[derive(Clone, Debug, PartialEq)]
++pub struct Node {
++    pub kind: Kind,
++    pub offset: usize,
++    pub format: Format,
++}
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum Format {
++    Data,
++    Json,
++    Toml,
++}
++#[derive(Clone, Debug, PartialEq)]
++pub enum Kind {
++    Null,
++    Bool(bool),
++    Number(String),
++    Float(f64),
++    String(String),
++    Datetime(String),
++    Array(Vec<Node>),
++    Object(Vec<(String, Node)>),
++}
++impl Node {
++    pub fn new(kind: Kind) -> Self {
++        Self {
++            kind,
++            offset: 0,
++            format: Format::Data,
++        }
++    }
++}
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct Error {
++    pub message: String,
++    pub offset: usize,
++    pub path: Vec<String>,
++}
++impl Error {
++    pub fn new(message: impl Into<String>) -> Self {
++        Self {
++            message: message.into(),
++            offset: 0,
++            path: Vec::new(),
++        }
++    }
++    pub fn at(mut self, offset: usize) -> Self {
++        if self.offset == 0 {
++            self.offset = offset;
++        }
++        self
++    }
++    pub fn field(mut self, key: impl Into<String>) -> Self {
++        self.path.insert(0, key.into());
++        self
++    }
++}
++impl fmt::Display for Error {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        write!(f, "{} at byte {}", self.message, self.offset)?;
++        if !self.path.is_empty() {
++            write!(f, " ({})", self.path.join("."))?;
++        }
++        Ok(())
++    }
++}
++impl std::error::Error for Error {}
++pub trait Encode {
++    fn encode(&self) -> Result<Node, Error>;
++}
++pub trait Decode: Sized {
++    fn decode(node: Node) -> Result<Self, Error>;
++    fn missing() -> Result<Self, Error> {
++        Err(Error::new("missing required field"))
++    }
++}
++pub struct Fields {
++    members: Vec<(String, Node)>,
++    sequence: Option<std::collections::VecDeque<Node>>,
++    offset: usize,
++    deny: bool,
++}
++impl Fields {
++    pub fn new(node: Node, deny: bool) -> Result<Self, Error> {
++        match node.kind {
++            Kind::Object(members) => Ok(Self {
++                members,
++                sequence: None,
++                offset: node.offset,
++                deny,
++            }),
++            Kind::Array(a) => Ok(Self {
++                members: Vec::new(),
++                sequence: Some(a.into()),
++                offset: node.offset,
++                deny,
++            }),
++            _ => Err(Error::new("expected object").at(node.offset)),
++        }
++    }
++    fn take(&mut self, key: &str) -> Result<Option<Node>, Error> {
++        if let Some(a) = &mut self.sequence {
++            return Ok(a.pop_front());
++        }
++        let mut value = None;
++        let mut i = 0;
++        while i < self.members.len() {
++            if self.members[i].0 == key {
++                let (_, node) = self.members.remove(i);
++                if value.is_some() {
++                    return Err(Error::new("duplicate field").at(node.offset).field(key));
++                }
++                value = Some(node);
++            } else {
++                i += 1;
++            }
++        }
++        Ok(value)
++    }
++    pub fn field<T: Decode>(&mut self, key: &str) -> Result<T, Error> {
++        let result = match self.take(key)? {
++            Some(n) => {
++                let at = n.offset;
++                T::decode(n).map_err(|e| e.at(at))
++            }
++            None => {
++                if self.sequence.is_some() {
++                    Err(Error::new("missing sequence field"))
++                } else {
++                    T::missing()
++                }
++            }
++        };
++        result.map_err(|e| e.at(self.offset).field(key))
++    }
++    pub fn field_or<T: Decode>(
++        &mut self,
++        key: &str,
++        default: impl FnOnce() -> T,
++    ) -> Result<T, Error> {
++        match self.take(key)? {
++            Some(n) => {
++                let at = n.offset;
++                T::decode(n).map_err(|e| e.at(at).field(key))
++            }
++            None => Ok(default()),
++        }
++    }
++    pub fn finish(self) -> Result<(), Error> {
++        if self.sequence.as_ref().is_some_and(|a| !a.is_empty()) {
++            return Err(Error::new("too many sequence fields").at(self.offset));
++        }
++        if self.deny {
++            if let Some((k, v)) = self.members.first() {
++                return Err(Error::new("unknown field").at(v.offset).field(k));
++            }
++        }
++        Ok(())
++    }
++}
++impl<T: Encode + ?Sized> Encode for &T {
++    fn encode(&self) -> Result<Node, Error> {
++        (*self).encode()
++    }
++}
++impl Encode for Node {
++    fn encode(&self) -> Result<Node, Error> {
++        Ok(self.clone())
++    }
++}
++impl Decode for Node {
++    fn decode(node: Node) -> Result<Self, Error> {
++        Ok(node)
++    }
++}
++impl Encode for str {
++    fn encode(&self) -> Result<Node, Error> {
++        Ok(Node::new(Kind::String(self.into())))
++    }
++}
++impl Encode for String {
++    fn encode(&self) -> Result<Node, Error> {
++        self.as_str().encode()
++    }
++}
++impl Decode for String {
++    fn decode(n: Node) -> Result<Self, Error> {
++        match n.kind {
++            Kind::String(s) => Ok(s),
++            _ => Err(Error::new("expected string").at(n.offset)),
++        }
++    }
++}
++impl Encode for bool {
++    fn encode(&self) -> Result<Node, Error> {
++        Ok(Node::new(Kind::Bool(*self)))
++    }
++}
++impl Decode for bool {
++    fn decode(n: Node) -> Result<Self, Error> {
++        match n.kind {
++            Kind::Bool(v) => Ok(v),
++            _ => Err(Error::new("expected boolean").at(n.offset)),
++        }
++    }
++}
++impl Encode for () {
++    fn encode(&self) -> Result<Node, Error> {
++        Ok(Node::new(Kind::Null))
++    }
++}
++impl Decode for () {
++    fn decode(n: Node) -> Result<Self, Error> {
++        if matches!(n.kind, Kind::Null) {
++            Ok(())
++        } else {
++            Err(Error::new("expected null").at(n.offset))
++        }
++    }
++}
++macro_rules! integers {($($ty:ty),*)=>{$(impl Encode for $ty {fn encode(&self)->Result<Node,Error>{Ok(Node::new(Kind::Number(self.to_string())))}}impl Decode for $ty {fn decode(n:Node)->Result<Self,Error>{if let Kind::Number(s)=n.kind {if !s.contains(['.','e','E']) && (s!="-0"||std::mem::size_of::<$ty>()==16) {return s.parse().map_err(|_|Error::new("integer out of range").at(n.offset));}}Err(Error::new("expected integer").at(n.offset))}})*}}
++integers!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
++impl Encode for f64 {
++    fn encode(&self) -> Result<Node, Error> {
++        Ok(Node::new(Kind::Float(*self)))
++    }
++}
++impl Decode for f64 {
++    fn decode(n: Node) -> Result<Self, Error> {
++        match n.kind {
++            Kind::Float(v) => Ok(v),
++            Kind::Number(s) => s
++                .parse::<f64>()
++                .ok()
++                .filter(|v| v.is_finite())
++                .ok_or_else(|| Error::new("float out of range").at(n.offset)),
++            _ => Err(Error::new("expected number").at(n.offset)),
++        }
++    }
++}
++impl Encode for f32 {
++    fn encode(&self) -> Result<Node, Error> {
++        if self.is_finite() {
++            Ok(Node::new(Kind::Number(format_float32(*self))))
++        } else {
++            ().encode()
++        }
++    }
++}
++impl Decode for f32 {
++    fn decode(n: Node) -> Result<Self, Error> {
++        Ok(f64::decode(n)? as f32)
++    }
++}
++pub(crate) fn format_float64(v: f64) -> String {
++    format_float(format!("{v:?}"), v, -5, 16)
++}
++fn format_float32(v: f32) -> String {
++    format_float(format!("{v:?}"), f64::from(v), -6, 13)
++}
++// std supplies a shortest round-tripping decimal. Resolve exact halfway choices
++// to an even final decimal digit, then apply the application's established JSON
++// fixed/scientific thresholds. No external formatter tables or code are used.
++fn format_float(s: String, v: f64, lower: i32, upper: i32) -> String {
++    let negative = s.starts_with('-');
++    let s = s.trim_start_matches('-');
++    let (mantissa, exponent) = s.split_once('e').map_or((s, 0), |(m, e)| {
++        (m, e.parse::<i32>().expect("Rust float exponent"))
++    });
++    let fractional = mantissa.split_once('.').map_or(0, |(_, f)| f.len() as i32);
++    let digits = mantissa.replace('.', "");
++    let mut coefficient = digits.parse::<u64>().expect("shortest float coefficient");
++    if coefficient == 0 {
++        return if negative { "-0.0" } else { "0.0" }.into();
++    }
++    let mut power = exponent - fractional;
++    while coefficient % 10 == 0 {
++        coefficient /= 10;
++        power += 1;
++    }
++    if coefficient % 2 == 1 {
++        if midpoint(v, coefficient * 2 - 1, power) {
++            coefficient -= 1;
++        } else if midpoint(v, coefficient * 2 + 1, power) {
++            coefficient += 1;
++        }
++    }
++    while coefficient % 10 == 0 {
++        coefficient /= 10;
++        power += 1;
++    }
++    let digits = coefficient.to_string();
++    let scientific = power + digits.len() as i32 - 1;
++    let mut out = if negative {
++        "-".to_owned()
++    } else {
++        String::new()
++    };
++    if scientific < lower || scientific >= upper {
++        out.push_str(&digits[..1]);
++        if digits.len() > 1 {
++            out.push('.');
++            out.push_str(&digits[1..]);
++        }
++        out.push('e');
++        if scientific >= 0 {
++            out.push('+');
++        }
++        out.push_str(&scientific.to_string());
++    } else {
++        let point = digits.len() as i32 + power;
++        if point <= 0 {
++            out.push_str("0.");
++            out.extend(std::iter::repeat_n('0', (-point) as usize));
++            out.push_str(&digits);
++        } else if point >= digits.len() as i32 {
++            out.push_str(&digits);
++            out.extend(std::iter::repeat_n(
++                '0',
++                (point - digits.len() as i32) as usize,
++            ));
++            out.push_str(".0");
++        } else {
++            out.push_str(&digits[..point as usize]);
++            out.push('.');
++            out.push_str(&digits[point as usize..]);
++        }
++    }
++    out
++}
++fn midpoint(v: f64, odd: u64, power: i32) -> bool {
++    let bits = v.to_bits() & 0x7fff_ffff_ffff_ffff;
++    let biased = (bits >> 52) as i32;
++    let mut mantissa = (bits & ((1u64 << 52) - 1)) | if biased == 0 { 0 } else { 1u64 << 52 };
++    let mut exponent = if biased == 0 {
++        -1074
++    } else {
++        biased - 1023 - 52
++    };
++    let shift = mantissa.trailing_zeros();
++    mantissa >>= shift;
++    exponent += shift as i32;
++    if power >= 0 {
++        if power > 22 {
++            return false;
++        }
++        let Some(n) = odd.checked_mul(5u64.pow(power as u32)) else {
++            return false;
++        };
++        mantissa == n && exponent == power - 1
++    } else {
++        let count = -power;
++        if count > 24 {
++            return false;
++        }
++        let Some(divisor) = 5u64.checked_pow(count as u32) else {
++            return false;
++        };
++        odd.is_multiple_of(divisor) && mantissa == odd / divisor && exponent == power - 1
++    }
++}
++impl<T: Encode> Encode for Option<T> {
++    fn encode(&self) -> Result<Node, Error> {
++        match self {
++            Some(v) => v.encode(),
++            None => ().encode(),
++        }
++    }
++}
++impl<T: Decode> Decode for Option<T> {
++    fn decode(n: Node) -> Result<Self, Error> {
++        if matches!(n.kind, Kind::Null) {
++            Ok(None)
++        } else {
++            T::decode(n).map(Some)
++        }
++    }
++    fn missing() -> Result<Self, Error> {
++        Ok(None)
++    }
++}
++impl<T: Encode> Encode for [T] {
++    fn encode(&self) -> Result<Node, Error> {
++        Ok(Node::new(Kind::Array(
++            self.iter().map(Encode::encode).collect::<Result<_, _>>()?,
++        )))
++    }
++}
++impl<T: Encode> Encode for Vec<T> {
++    fn encode(&self) -> Result<Node, Error> {
++        self.as_slice().encode()
++    }
++}
++impl<T: Encode, const N: usize> Encode for [T; N] {
++    fn encode(&self) -> Result<Node, Error> {
++        self.as_slice().encode()
++    }
++}
++impl<T: Decode> Decode for Vec<T> {
++    fn decode(n: Node) -> Result<Self, Error> {
++        if let Kind::Array(a) = n.kind {
++            a.into_iter()
++                .enumerate()
++                .map(|(i, n)| {
++                    let at = n.offset;
++                    T::decode(n).map_err(|e| e.at(at).field(i.to_string()))
++                })
++                .collect()
++        } else {
++            Err(Error::new("expected array").at(n.offset))
++        }
++    }
++}
++impl<T: Decode, const N: usize> Decode for [T; N] {
++    fn decode(n: Node) -> Result<Self, Error> {
++        Vec::<T>::decode(n)?
++            .try_into()
++            .map_err(|_| Error::new("array length mismatch"))
++    }
++}
++impl<T: Encode> Encode for BTreeSet<T> {
++    fn encode(&self) -> Result<Node, Error> {
++        Ok(Node::new(Kind::Array(
++            self.iter().map(Encode::encode).collect::<Result<_, _>>()?,
++        )))
++    }
++}
++impl<T: Decode + Ord> Decode for BTreeSet<T> {
++    fn decode(n: Node) -> Result<Self, Error> {
++        Ok(Vec::<T>::decode(n)?.into_iter().collect())
++    }
++}
++impl<K: Encode + Ord, V: Encode> Encode for BTreeMap<K, V> {
++    fn encode(&self) -> Result<Node, Error> {
++        let mut out = Vec::with_capacity(self.len());
++        for (k, v) in self {
++            let key = map_key(k.encode()?)?;
++            out.push((key, v.encode()?));
++        }
++        Ok(Node::new(Kind::Object(out)))
++    }
++}
++fn map_key(n: Node) -> Result<String, Error> {
++    match n.kind {
++        Kind::String(s) | Kind::Number(s) => Ok(s),
++        Kind::Bool(v) => Ok(v.to_string()),
++        _ => Err(Error::new("invalid object key")),
++    }
++}
++impl<T: Decode> Decode for BTreeMap<String, T> {
++    fn decode(n: Node) -> Result<Self, Error> {
++        if let Kind::Object(a) = n.kind {
++            let mut out = Self::new();
++            for (k, n) in a {
++                let at = n.offset;
++                let v = T::decode(n).map_err(|e| e.at(at).field(k.clone()))?;
++                out.insert(k, v);
++            }
++            Ok(out)
++        } else {
++            Err(Error::new("expected object").at(n.offset))
++        }
++    }
++}
++impl<K: Encode + Eq + Hash, V: Encode> Encode for HashMap<K, V> {
++    fn encode(&self) -> Result<Node, Error> {
++        let mut out = Vec::with_capacity(self.len());
++        for (k, v) in self {
++            out.push((map_key(k.encode()?)?, v.encode()?));
++        }
++        Ok(Node::new(Kind::Object(out)))
++    }
++}
++macro_rules! text_type {($($t:ty),*)=>{$(impl Encode for $t{fn encode(&self)->Result<Node,Error>{self.to_string().encode()}}impl Decode for $t{fn decode(n:Node)->Result<Self,Error>{let at=n.offset;String::decode(n)?.parse().map_err(|_|Error::new("invalid address").at(at))}})*}}
++text_type!(SocketAddr, IpAddr);
++impl Encode for PathBuf {
++    fn encode(&self) -> Result<Node, Error> {
++        self.to_str()
++            .ok_or_else(|| Error::new("path is not UTF-8"))?
++            .encode()
++    }
++}
++impl Decode for PathBuf {
++    fn decode(n: Node) -> Result<Self, Error> {
++        Ok(String::decode(n)?.into())
++    }
++}
++macro_rules! tuple {($($T:ident:$i:tt),+)=>{impl<$($T:Encode),+> Encode for ($($T,)+){fn encode(&self)->Result<Node,Error>{Ok(Node::new(Kind::Array(vec![$(self.$i.encode()?),+])))}}impl<$($T:Decode),+> Decode for ($($T,)+){fn decode(n:Node)->Result<Self,Error>{let toml=n.format==Format::Toml;let mut a=Vec::<Node>::decode(n)?.into_iter();let v=($($T::decode(a.next().ok_or_else(||Error::new("missing tuple element"))?)?,)+);if !toml&&a.next().is_some(){return Err(Error::new("too many tuple elements"));}Ok(v)}}}}
++tuple!(A:0,B:1);
++tuple!(A:0,B:1,C:2);
++tuple!(A:0,B:1,C:2,D:3);
++impl<T: ToOwned + Encode + ?Sized> Encode for std::borrow::Cow<'_, T> {
++    fn encode(&self) -> Result<Node, Error> {
++        self.as_ref().encode()
++    }
++}
++
++/// Decode a unit enum's human-readable name without erasing format distinctions.
++pub fn unit_variant(n: Node) -> Result<String, Error> {
++    match n.kind {
++        Kind::String(s) => Ok(s),
++        Kind::Object(mut a) if a.len() == 1 => {
++            let (k, v) = a.pop().unwrap();
++            let valid = if n.format == Format::Toml {
++                matches!(v.kind,Kind::Object(ref a)if a.is_empty())
++            } else {
++                matches!(v.kind, Kind::Null)
++            };
++            if valid {
++                Ok(k)
++            } else {
++                Err(Error::new("invalid unit variant payload").at(n.offset))
++            }
++        }
++        _ => Err(Error::new("expected enum name or single-entry object").at(n.offset)),
++    }
++}
+diff --git a/src/json.rs b/src/json.rs
+--- a/src/json.rs
++++ b/src/json.rs
+@@ -96,6 +96,9 @@
+ 
+ impl Number {
+     /// The characters of the number, as they were in the input.
++    pub(crate) fn into_text(self) -> String {
++        self.text
++    }
+     pub fn text(&self) -> &str {
+         &self.text
+     }
+@@ -122,15 +125,21 @@
+     }
+ }
+ 
+-/// The members of an object, in the order they were written; no name occurs twice.
++/// Object members in input order. Public parsers/constructors enforce unique names.
++/// The private typed-data bridge temporarily retains duplicates for schema checks.
+ #[derive(Clone, Debug, PartialEq, Eq, Default)]
+ pub struct Object {
+     members: Vec<(String, Value)>,
+ }
+ 
+ impl Object {
++    pub(crate) fn into_members(self) -> Vec<(String, Value)> {
++        self.members
++    }
+     pub fn new() -> Object {
+-        Object { members: Vec::new() }
++        Object {
++            members: Vec::new(),
++        }
+     }
+ 
+     /// Adds a member. Panics if the name is already there (a program error, not an input error).
+@@ -175,7 +184,9 @@
+ 
+     /// An integer value.
+     pub fn int(n: i64) -> Value {
+-        Value::Number(Number { text: n.to_string() })
++        Value::Number(Number {
++            text: n.to_string(),
++        })
+     }
+ 
+     /// The member of an object, if this is one that has it.
+@@ -271,14 +282,45 @@
+ /// Reads exactly one JSON value, allowing at most `max_depth` levels of arrays and objects
+ /// (at most [`HARD_MAX_DEPTH`]).
+ pub fn parse_with_depth(input: &[u8], max_depth: usize) -> Result<Value, Error> {
++    parse_internal(input, max_depth, usize::MAX, true)
++}
++// Only json_value consumes this internal result; signed-JSON callers keep strict policy.
++pub(crate) fn parse_for_data(
++    input: &[u8],
++    max_depth: usize,
++    max_nodes: usize,
++) -> Result<Value, Error> {
++    parse_internal(input, max_depth, max_nodes, false)
++}
++fn parse_internal(
++    input: &[u8],
++    max_depth: usize,
++    max_nodes: usize,
++    reject_duplicates: bool,
++) -> Result<Value, Error> {
+     let text = match std::str::from_utf8(input) {
+         Ok(t) => t,
+-        Err(e) => return Err(Error { offset: e.valid_up_to(), kind: ErrorKind::Utf8 }),
++        Err(e) => {
++            return Err(Error {
++                offset: e.valid_up_to(),
++                kind: ErrorKind::Utf8,
++            })
++        }
+     };
+     if text.starts_with('\u{feff}') {
+-        return Err(Error { offset: 0, kind: ErrorKind::Utf8 });
+-    }
+-    let mut p = Parser { s: text.as_bytes(), text, pos: 0, max_depth: max_depth.min(HARD_MAX_DEPTH) };
++        return Err(Error {
++            offset: 0,
++            kind: ErrorKind::Utf8,
++        });
++    }
++    let mut p = Parser {
++        s: text.as_bytes(),
++        text,
++        pos: 0,
++        max_depth: max_depth.min(HARD_MAX_DEPTH),
++        nodes_left: max_nodes,
++        reject_duplicates,
++    };
+     p.skip_ws();
+     let v = p.value(0)?;
+     p.skip_ws();
+@@ -293,11 +335,16 @@
+     text: &'a str,
+     pos: usize,
+     max_depth: usize,
++    nodes_left: usize,
++    reject_duplicates: bool,
+ }
+ 
+ impl Parser<'_> {
+     fn err(&self, kind: ErrorKind) -> Error {
+-        Error { offset: self.pos, kind }
++        Error {
++            offset: self.pos,
++            kind,
++        }
+     }
+ 
+     fn skip_ws(&mut self) {
+@@ -307,7 +354,10 @@
+     }
+ 
+     fn peek(&self) -> Result<u8, Error> {
+-        self.s.get(self.pos).copied().ok_or_else(|| self.err(ErrorKind::Eof))
++        self.s
++            .get(self.pos)
++            .copied()
++            .ok_or_else(|| self.err(ErrorKind::Eof))
+     }
+ 
+     fn literal(&mut self, word: &[u8], v: Value) -> Result<Value, Error> {
+@@ -322,6 +372,10 @@
+     }
+ 
+     fn value(&mut self, depth: usize) -> Result<Value, Error> {
++        if self.nodes_left == 0 {
++            return Err(self.err(ErrorKind::Depth));
++        }
++        self.nodes_left -= 1;
+         match self.peek()? {
+             b'{' => self.object(depth),
+             b'[' => self.array(depth),
+@@ -399,15 +453,21 @@
+         // no name twice: sort the names (cheap for the small objects there are, and n log n for a hostile one)
+         let mut order: Vec<usize> = (0..members.len()).collect();
+         order.sort_by(|&a, &b| members[a].0.cmp(&members[b].0));
+-        if order.windows(2).any(|w| members[w[0]].0 == members[w[1]].0) {
+-            return Err(Error { offset: start_of_members, kind: ErrorKind::DuplicateName });
++        if self.reject_duplicates && order.windows(2).any(|w| members[w[0]].0 == members[w[1]].0) {
++            return Err(Error {
++                offset: start_of_members,
++                kind: ErrorKind::DuplicateName,
++            });
+         }
+         Ok(Value::Object(Object { members }))
+     }
+ 
+     fn number(&mut self) -> Result<Value, Error> {
+         let start = self.pos;
+-        let bad = |p: &Parser| Error { offset: p.pos, kind: ErrorKind::Number };
++        let bad = |p: &Parser| Error {
++            offset: p.pos,
++            kind: ErrorKind::Number,
++        };
+         if self.s[self.pos] == b'-' {
+             self.pos += 1;
+         }
+@@ -448,10 +508,15 @@
+             }
+         }
+         // the number must end here: `1x`, `01`, `1.5.2` and the like are not numbers followed by something
+-        if matches!(self.s.get(self.pos), Some(b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-')) {
++        if matches!(
++            self.s.get(self.pos),
++            Some(b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-')
++        ) {
+             return Err(bad(self));
+         }
+-        Ok(Value::Number(Number { text: self.text[start..self.pos].to_string() }))
++        Ok(Value::Number(Number {
++            text: self.text[start..self.pos].to_string(),
++        }))
+     }
+ 
+     fn hex4(&mut self) -> Result<u32, Error> {
+@@ -507,7 +572,9 @@
+                             let ch = match hi {
+                                 0xD800..=0xDBFF => {
+                                     // must be followed by an escaped low surrogate
+-                                    if self.s.get(self.pos) != Some(&b'\\') || self.s.get(self.pos + 1) != Some(&b'u') {
++                                    if self.s.get(self.pos) != Some(&b'\\')
++                                        || self.s.get(self.pos + 1) != Some(&b'u')
++                                    {
+                                         return Err(self.err(ErrorKind::String));
+                                     }
+                                     self.pos += 2;
+@@ -558,10 +625,17 @@
+         Value::Bool(true) => out.extend_from_slice(b"true"),
+         Value::Bool(false) => out.extend_from_slice(b"false"),
+         Value::Number(n) => match n.as_i64() {
+-            Some(i) if (-SAFE_INT..=SAFE_INT).contains(&i) => out.extend_from_slice(i.to_string().as_bytes()),
++            Some(i) if (-SAFE_INT..=SAFE_INT).contains(&i) => {
++                out.extend_from_slice(i.to_string().as_bytes())
++            }
+             // ECMAScript writes minus zero as `0`, so RFC 8785 does
+             None if n.text == "-0" => out.push(b'0'),
+-            _ => return Err(Error { offset: 0, kind: ErrorKind::NotCanonical }),
++            _ => {
++                return Err(Error {
++                    offset: 0,
++                    kind: ErrorKind::NotCanonical,
++                })
++            }
+         },
+         Value::String(s) => write_string(s, out),
+         Value::Array(a) => {
+@@ -592,7 +666,7 @@
+     Ok(())
+ }
+ 
+-fn write_string(s: &str, out: &mut Vec<u8>) {
++pub(crate) fn write_string(s: &str, out: &mut Vec<u8>) {
+     out.push(b'"');
+     for c in s.chars() {
+         match c {
+@@ -603,7 +677,9 @@
+             '\n' => out.extend_from_slice(b"\\n"),
+             '\u{c}' => out.extend_from_slice(b"\\f"),
+             '\r' => out.extend_from_slice(b"\\r"),
+-            c if (c as u32) < 0x20 => out.extend_from_slice(format!("\\u{:04x}", c as u32).as_bytes()),
++            c if (c as u32) < 0x20 => {
++                out.extend_from_slice(format!("\\u{:04x}", c as u32).as_bytes())
++            }
+             c => {
+                 let mut buf = [0u8; 4];
+                 out.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+@@ -636,7 +712,10 @@
+         assert_eq!(ok("{}"), Value::Object(Object::new()));
+         assert_eq!(ok("[]"), Value::Array(vec![]));
+         let v = ok(r#"{"a":{"b":[true,null,"x"]},"c":-12}"#);
+-        assert_eq!(v.get("a").unwrap().get("b").unwrap().as_array().unwrap()[2].as_str(), Some("x"));
++        assert_eq!(
++            v.get("a").unwrap().get("b").unwrap().as_array().unwrap()[2].as_str(),
++            Some("x")
++        );
+         assert_eq!(v.get("c").unwrap().as_int64(), Some(-12));
+         assert_eq!(v.get("zz"), None);
+         // members stay in the order written
+@@ -648,11 +727,57 @@
+     #[test]
+     fn the_grammar_is_rfc_8259_and_nothing_else() {
+         for s in [
+-            "", " ", "nul", "nulL", "True", "TRUE", "NaN", "Infinity", "-Infinity", "undefined", "'a'", "[1,]", "[,1]", "[1 2]", "{\"a\":1,}", "{,}", "{\"a\"}", "{\"a\":}", "{a:1}",
+-            "{'a':1}", "[1}", "{\"a\":1]", "[", "{", "]", "}", "\"", "\"abc", "// c\n1", "/* c */1", "1 // c", "[1]]", "1 2", "{} {}", "\u{a0}1", "\u{b}1", "\u{c}1", "1\u{0}",
++            "",
++            " ",
++            "nul",
++            "nulL",
++            "True",
++            "TRUE",
++            "NaN",
++            "Infinity",
++            "-Infinity",
++            "undefined",
++            "'a'",
++            "[1,]",
++            "[,1]",
++            "[1 2]",
++            "{\"a\":1,}",
++            "{,}",
++            "{\"a\"}",
++            "{\"a\":}",
++            "{a:1}",
++            "{'a':1}",
++            "[1}",
++            "{\"a\":1]",
++            "[",
++            "{",
++            "]",
++            "}",
++            "\"",
++            "\"abc",
++            "// c\n1",
++            "/* c */1",
++            "1 // c",
++            "[1]]",
++            "1 2",
++            "{} {}",
++            "\u{a0}1",
++            "\u{b}1",
++            "\u{c}1",
++            "1\u{0}",
+         ] {
+             let k = bad(s);
+-            assert!(matches!(k, ErrorKind::Eof | ErrorKind::Syntax | ErrorKind::TrailingData | ErrorKind::Number | ErrorKind::String), "{s:?} {k:?}");
++            assert!(
++                matches!(
++                    k,
++                    ErrorKind::Eof
++                        | ErrorKind::Syntax
++                        | ErrorKind::TrailingData
++                        | ErrorKind::Number
++                        | ErrorKind::String
++                ),
++                "{s:?} {k:?}"
++            );
+         }
+         assert_eq!(bad("1 2"), ErrorKind::TrailingData);
+         assert_eq!(bad("[1]]"), ErrorKind::TrailingData);
+@@ -660,16 +785,37 @@
+         assert_eq!(bad("tru"), ErrorKind::Eof);
+         assert_eq!(bad("\u{feff}1"), ErrorKind::Utf8);
+         // white space is these four and no others
+-        assert_eq!(ok(" \t\n\r1\r\n\t "), Value::Number(Number { text: "1".into() }));
++        assert_eq!(
++            ok(" \t\n\r1\r\n\t "),
++            Value::Number(Number { text: "1".into() })
++        );
+     }
+ 
+     #[test]
+     fn numbers_are_the_grammar_and_exact() {
+-        for s in ["0", "-0", "1", "-1", "10", "123456789012345678901234567890", "0.5", "-0.5", "1e5", "1E+5", "1e-5", "0e0", "1.5E3", "0.0", "-0.0e-0"] {
++        for s in [
++            "0",
++            "-0",
++            "1",
++            "-1",
++            "10",
++            "123456789012345678901234567890",
++            "0.5",
++            "-0.5",
++            "1e5",
++            "1E+5",
++            "1e-5",
++            "0e0",
++            "1.5E3",
++            "0.0",
++            "-0.0e-0",
++        ] {
+             ok(s);
+         }
+         for s in [
+-            "01", "-01", "00", "+1", "1.", ".5", "-.5", "1.e5", "1e", "1e+", "1e-", "--1", "-", "0x10", "1_0", "1,0", "0b1", "٣", "1.5.2", "1e5e5", "0.5e", "Infinity", "-NaN", "1f", "1d", "1L", "- 1", "1 .5",
++            "01", "-01", "00", "+1", "1.", ".5", "-.5", "1.e5", "1e", "1e+", "1e-", "--1", "-",
++            "0x10", "1_0", "1,0", "0b1", "٣", "1.5.2", "1e5e5", "0.5e", "Infinity", "-NaN", "1f",
++            "1d", "1L", "- 1", "1 .5",
+         ] {
+             bad(s);
+         }
+@@ -682,7 +828,10 @@
+         assert_eq!(n("9223372036854775807").as_i64(), Some(i64::MAX));
+         assert_eq!(n("-9223372036854775808").as_i64(), Some(i64::MIN));
+         assert_eq!(n("9223372036854775808").as_i64(), None);
+-        assert_eq!(n("9223372036854775808").as_u64(), Some(9_223_372_036_854_775_808));
++        assert_eq!(
++            n("9223372036854775808").as_u64(),
++            Some(9_223_372_036_854_775_808)
++        );
+         assert_eq!(n("18446744073709551615").as_u64(), Some(u64::MAX));
+         assert_eq!(n("18446744073709551616").as_u64(), None);
+         assert_eq!(n("-1").as_u64(), None);
+@@ -699,17 +848,44 @@
+ 
+     #[test]
+     fn protobuf_json_writes_64_bit_integers_as_decimal_strings() {
+-        let v = ok(r#"{"s":"3075544565","n":3075544565,"neg":"-5","big":"9223372036854775808","bigu":"18446744073709551615"}"#);
++        let v = ok(
++            r#"{"s":"3075544565","n":3075544565,"neg":"-5","big":"9223372036854775808","bigu":"18446744073709551615"}"#,
++        );
+         assert_eq!(v.get("s").unwrap().as_int64(), Some(3_075_544_565));
+         assert_eq!(v.get("n").unwrap().as_int64(), Some(3_075_544_565));
+         assert_eq!(v.get("neg").unwrap().as_int64(), Some(-5));
+         assert_eq!(v.get("big").unwrap().as_int64(), None);
+-        assert_eq!(v.get("big").unwrap().as_uint64(), Some(9_223_372_036_854_775_808));
++        assert_eq!(
++            v.get("big").unwrap().as_uint64(),
++            Some(9_223_372_036_854_775_808)
++        );
+         assert_eq!(v.get("bigu").unwrap().as_uint64(), Some(u64::MAX));
+-        for s in ["", "+1", "01", "00", "-0", " 1", "1 ", "1.0", "1e3", "0x1", "١", "-", "--1", "-01", "1_000", "9223372036854775808", "-9223372036854775809", "NaN"] {
++        for s in [
++            "",
++            "+1",
++            "01",
++            "00",
++            "-0",
++            " 1",
++            "1 ",
++            "1.0",
++            "1e3",
++            "0x1",
++            "١",
++            "-",
++            "--1",
++            "-01",
++            "1_000",
++            "9223372036854775808",
++            "-9223372036854775809",
++            "NaN",
++        ] {
+             assert_eq!(Value::string(s).as_int64(), None, "{s:?}");
+         }
+-        assert_eq!(Value::string("-9223372036854775808").as_int64(), Some(i64::MIN));
++        assert_eq!(
++            Value::string("-9223372036854775808").as_int64(),
++            Some(i64::MIN)
++        );
+         assert_eq!(Value::string("0").as_int64(), Some(0));
+         assert_eq!(Value::Null.as_int64(), None);
+         assert_eq!(Value::Bool(true).as_uint64(), None);
+@@ -717,23 +893,61 @@
+ 
+     #[test]
+     fn strings_escapes_and_surrogates() {
+-        assert_eq!(ok(r#""a\"b\\c\/d\b\f\n\r\t""#).as_str(), Some("a\"b\\c/d\u{8}\u{c}\n\r\t"));
+-        assert_eq!(ok(r#""\u0041\u00e9\u20AC""#).as_str(), Some("A\u{e9}\u{20ac}"));
++        assert_eq!(
++            ok(r#""a\"b\\c\/d\b\f\n\r\t""#).as_str(),
++            Some("a\"b\\c/d\u{8}\u{c}\n\r\t")
++        );
++        assert_eq!(
++            ok(r#""\u0041\u00e9\u20AC""#).as_str(),
++            Some("A\u{e9}\u{20ac}")
++        );
+         assert_eq!(ok(r#""\ud83d\ude00""#).as_str(), Some("\u{1f600}"));
+         assert_eq!(ok(r#""\uD83D\uDE00""#).as_str(), Some("\u{1f600}"));
+-        assert_eq!(ok("\"\u{1f600} \u{e9} \u{20ac}\"").as_str(), Some("\u{1f600} \u{e9} \u{20ac}"));
++        assert_eq!(
++            ok("\"\u{1f600} \u{e9} \u{20ac}\"").as_str(),
++            Some("\u{1f600} \u{e9} \u{20ac}")
++        );
+         assert_eq!(ok(r#""\u0000""#).as_str(), Some("\0"));
+         assert_eq!(ok(r#""\uffff \ufffe""#).as_str(), Some("\u{ffff} \u{fffe}"));
+         // lone and misordered surrogates are refused, however they are written
+         for s in [
+-            r#""\ud800""#, r#""\udbff""#, r#""\udc00""#, r#""\udfff""#, r#""\ud800a""#, r#""\ud800\u0041""#, r#""\ud800\ud800""#, r#""\udc00\ud800""#, r#""\ud800\\udc00""#, r#""\ud800 \udc00""#, r#""\ud800\n""#,
++            r#""\ud800""#,
++            r#""\udbff""#,
++            r#""\udc00""#,
++            r#""\udfff""#,
++            r#""\ud800a""#,
++            r#""\ud800\u0041""#,
++            r#""\ud800\ud800""#,
++            r#""\udc00\ud800""#,
++            r#""\ud800\\udc00""#,
++            r#""\ud800 \udc00""#,
++            r#""\ud800\n""#,
+             r#""\udc00\udc00""#,
+         ] {
+             assert_eq!(bad(s), ErrorKind::String, "{s}");
+         }
+         // bad escapes, control characters, bad hex
+-        for s in [r#""\x41""#, r#""\a""#, r#""\u12""#, r#""\u12G4""#, r#""\u""#, r#""\ ""#, r#""\'""#, r#""\U0041""#, "\"\\u+041\"", "\"a\u{1}b\"", "\"a\nb\"", "\"a\tb\"", "\"\u{0}\"", "\"\u{1f}\"", "\"\\"] {
+-            assert!(matches!(bad(s), ErrorKind::String | ErrorKind::Eof), "{s:?}");
++        for s in [
++            r#""\x41""#,
++            r#""\a""#,
++            r#""\u12""#,
++            r#""\u12G4""#,
++            r#""\u""#,
++            r#""\ ""#,
++            r#""\'""#,
++            r#""\U0041""#,
++            "\"\\u+041\"",
++            "\"a\u{1}b\"",
++            "\"a\nb\"",
++            "\"a\tb\"",
++            "\"\u{0}\"",
++            "\"\u{1f}\"",
++            "\"\\",
++        ] {
++            assert!(
++                matches!(bad(s), ErrorKind::String | ErrorKind::Eof),
++                "{s:?}"
++            );
+         }
+         // DEL and other printable-ish characters are fine
+         assert_eq!(ok("\"\u{7f}\"").as_str(), Some("\u{7f}"));
+@@ -743,18 +957,18 @@
+     fn the_input_must_be_utf_8() {
+         for bytes in [
+             &b"\"\xff\""[..],
+-            b"\"\xc0\xaf\"",      // overlong '/'
+-            b"\"\xc1\x81\"",      // overlong 'A'
+-            b"\"\xe0\x80\xaf\"",  // overlong
+-            b"\"\xed\xa0\x80\"",  // an encoded surrogate
+-            b"\"\xed\xbf\xbf\"",  // an encoded surrogate
++            b"\"\xc0\xaf\"",         // overlong '/'
++            b"\"\xc1\x81\"",         // overlong 'A'
++            b"\"\xe0\x80\xaf\"",     // overlong
++            b"\"\xed\xa0\x80\"",     // an encoded surrogate
++            b"\"\xed\xbf\xbf\"",     // an encoded surrogate
+             b"\"\xf4\x90\x80\x80\"", // beyond U+10FFFF
+             b"\"\xf8\x88\x80\x80\x80\"",
+             b"\"\x80\"",
+             b"\"\xe2\x82\"",
+             b"\"abc\xe2\"",
+-            b"\xef\xbb\xbf1",     // a byte order mark
+-            b"\xff\xfe1\x00",      // UTF-16
++            b"\xef\xbb\xbf1", // a byte order mark
++            b"\xff\xfe1\x00", // UTF-16
+         ] {
+             let e = parse(bytes).unwrap_err();
+             assert_eq!(e.kind, ErrorKind::Utf8, "{bytes:?}");
+@@ -766,8 +980,17 @@
+     #[test]
+     fn an_object_may_not_name_a_member_twice() {
+         for s in [
+-            r#"{"a":1,"a":2}"#, r#"{"a":1,"a":1}"#, r#"{"a":1,"b":2,"a":3}"#, r#"{"a":1,"\u0061":2}"#, r#"{"\u0061":1,"a":2}"#, r#"{"a":{"b":1,"b":2}}"#, r#"[{"a":1,"a":2}]"#,
+-            r#"{"é":1,"\u00e9":2}"#, r#"{"\ud83d\ude00":1,"😀":2}"#, r#"{"":1,"":2}"#, r#"{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6,"g":7,"h":8,"i":9,"a":10}"#,
++            r#"{"a":1,"a":2}"#,
++            r#"{"a":1,"a":1}"#,
++            r#"{"a":1,"b":2,"a":3}"#,
++            r#"{"a":1,"\u0061":2}"#,
++            r#"{"\u0061":1,"a":2}"#,
++            r#"{"a":{"b":1,"b":2}}"#,
++            r#"[{"a":1,"a":2}]"#,
++            r#"{"é":1,"\u00e9":2}"#,
++            r#"{"\ud83d\ude00":1,"😀":2}"#,
++            r#"{"":1,"":2}"#,
++            r#"{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6,"g":7,"h":8,"i":9,"a":10}"#,
+         ] {
+             assert_eq!(bad(s), ErrorKind::DuplicateName, "{s}");
+         }
+@@ -798,12 +1021,23 @@
+         assert_eq!(bad(&s), ErrorKind::Depth);
+         // a caller can ask for more or less, up to a hard limit
+         assert!(parse_with_depth(nest(64).as_bytes(), 64).is_ok());
+-        assert_eq!(parse_with_depth(nest(5).as_bytes(), 4).unwrap_err().kind, ErrorKind::Depth);
++        assert_eq!(
++            parse_with_depth(nest(5).as_bytes(), 4).unwrap_err().kind,
++            ErrorKind::Depth
++        );
+         assert!(parse_with_depth(nest(256).as_bytes(), 100_000).is_ok());
+-        assert_eq!(parse_with_depth(nest(257).as_bytes(), 100_000).unwrap_err().kind, ErrorKind::Depth);
++        assert_eq!(
++            parse_with_depth(nest(257).as_bytes(), 100_000)
++                .unwrap_err()
++                .kind,
++            ErrorKind::Depth
++        );
+         // a million levels do not overflow the stack
+         assert_eq!(bad(&"[".repeat(1_000_000)), ErrorKind::Depth);
+-        assert_eq!(bad(&format!("{}1", "{\"a\":".repeat(1_000_000))), ErrorKind::Depth);
++        assert_eq!(
++            bad(&format!("{}1", "{\"a\":".repeat(1_000_000))),
++            ErrorKind::Depth
++        );
+     }
+ 
+     #[test]
+@@ -820,18 +1054,44 @@
+     fn canonical_form_is_rfc_8785() {
+         let c = |s: &str| String::from_utf8(canonical(&ok(s)).unwrap()).unwrap();
+         // the example of RFC 8785 section 3.2.3 (sorting), with numbers that are integers
+-        assert_eq!(c(r#"{ "b" : [ 1 , 2 ] , "a" : "x" , "" : null }"#), r#"{"":null,"a":"x","b":[1,2]}"#);
++        assert_eq!(
++            c(r#"{ "b" : [ 1 , 2 ] , "a" : "x" , "" : null }"#),
++            r#"{"":null,"a":"x","b":[1,2]}"#
++        );
+         // sorted by UTF-16 code units, not by code points or UTF-8 bytes: U+20AC (€) before U+1F600 (a surrogate pair d83d)
+-        assert_eq!(c("{\"\u{1f600}\":1,\"\u{20ac}\":2,\"\u{ffff}\":3,\"a\":4}"), "{\"a\":4,\"\u{20ac}\":2,\"\u{1f600}\":1,\"\u{ffff}\":3}");
++        assert_eq!(
++            c("{\"\u{1f600}\":1,\"\u{20ac}\":2,\"\u{ffff}\":3,\"a\":4}"),
++            "{\"a\":4,\"\u{20ac}\":2,\"\u{1f600}\":1,\"\u{ffff}\":3}"
++        );
+         // escapes
+-        assert_eq!(c(r#""\u0041\/\u00e9\u0001\u001f\u007f\"\\\b\f\n\r\t""#), "\"A/\u{e9}\\u0001\\u001f\u{7f}\\\"\\\\\\b\\f\\n\\r\\t\"");
++        assert_eq!(
++            c(r#""\u0041\/\u00e9\u0001\u001f\u007f\"\\\b\f\n\r\t""#),
++            "\"A/\u{e9}\\u0001\\u001f\u{7f}\\\"\\\\\\b\\f\\n\\r\\t\""
++        );
+         assert_eq!(c("\"\u{2028}\u{2029}\""), "\"\u{2028}\u{2029}\""); // written as they are
+-        assert_eq!(c("[true,false,null,0,-1,9007199254740991,-9007199254740991]"), "[true,false,null,0,-1,9007199254740991,-9007199254740991]");
+-        assert_eq!(c("{\"a\":{\"c\":1,\"b\":2},\"0\":[ ]}"), "{\"0\":[],\"a\":{\"b\":2,\"c\":1}}");
++        assert_eq!(
++            c("[true,false,null,0,-1,9007199254740991,-9007199254740991]"),
++            "[true,false,null,0,-1,9007199254740991,-9007199254740991]"
++        );
++        assert_eq!(
++            c("{\"a\":{\"c\":1,\"b\":2},\"0\":[ ]}"),
++            "{\"0\":[],\"a\":{\"b\":2,\"c\":1}}"
++        );
+         // numbers outside what is written exactly are refused
+         assert_eq!(c("-0"), "0");
+-        for s in ["1.5", "1e3", "1.0", "9007199254740992", "-9007199254740992", "18446744073709551615"] {
+-            assert_eq!(canonical(&ok(s)).unwrap_err().kind, ErrorKind::NotCanonical, "{s}");
++        for s in [
++            "1.5",
++            "1e3",
++            "1.0",
++            "9007199254740992",
++            "-9007199254740992",
++            "18446744073709551615",
++        ] {
++            assert_eq!(
++                canonical(&ok(s)).unwrap_err().kind,
++                ErrorKind::NotCanonical,
++                "{s}"
++            );
+         }
+         // writing and reading again gives the same bytes
+         let v = ok(r#"{"z":[1,{"y":"\u00e9\ud83d\ude00","x":null}],"a":"\n"}"#);
+@@ -845,7 +1105,10 @@
+         let mut o = Object::new();
+         o.insert("logIndex", Value::int(8_668_626));
+         o.insert("integratedTime", Value::int(1_670_516_322));
+-        o.insert("logID", Value::string("c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d"));
++        o.insert(
++            "logID",
++            Value::string("c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d"),
++        );
+         o.insert("body", Value::string("eyJhcGk="));
+         assert_eq!(
+             String::from_utf8(canonical(&Value::Object(o)).unwrap()).unwrap(),
+@@ -854,7 +1117,9 @@
+     }
+ 
+     fn unhex(s: &str) -> Vec<u8> {
+-        (0..s.len() / 2).map(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap()).collect()
++        (0..s.len() / 2)
++            .map(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap())
++            .collect()
+     }
+ 
+     /// 2,762 texts (tests/data/json_vectors.txt, made by tools/gen_json_vectors.py): valid and damaged ones, with
+@@ -863,30 +1128,54 @@
+     #[test]
+     fn agrees_with_python_and_rfc8785() {
+         let (mut accepted, mut refused, mut canon) = (0, 0, 0);
+-        for line in include_str!("../tests/data/json_vectors.txt").lines().filter(|l| !l.starts_with('#') && !l.is_empty()) {
++        for line in include_str!("../tests/data/json_vectors.txt")
++            .lines()
++            .filter(|l| !l.starts_with('#') && !l.is_empty())
++        {
+             let f: Vec<&str> = line.split(' ').collect();
+             assert_eq!(f[0], "case");
+             let text = unhex(f[1]);
+             let mine = parse(&text);
+             match f[2] {
+                 "bad" => {
+-                    assert!(mine.is_err(), "Python refuses {:?}, this reader accepts", String::from_utf8_lossy(&text));
++                    assert!(
++                        mine.is_err(),
++                        "Python refuses {:?}, this reader accepts",
++                        String::from_utf8_lossy(&text)
++                    );
+                     refused += 1;
+                 }
+                 _ => {
+-                    let v = mine.unwrap_or_else(|e| panic!("Python accepts {:?}, this reader refuses: {e}", String::from_utf8_lossy(&text)));
++                    let v = mine.unwrap_or_else(|e| {
++                        panic!(
++                            "Python accepts {:?}, this reader refuses: {e}",
++                            String::from_utf8_lossy(&text)
++                        )
++                    });
+                     accepted += 1;
+                     match f[3] {
+-                        "-" => assert!(canonical(&v).is_err(), "{:?}", String::from_utf8_lossy(&text)),
++                        "-" => assert!(
++                            canonical(&v).is_err(),
++                            "{:?}",
++                            String::from_utf8_lossy(&text)
++                        ),
+                         want => {
+-                            assert_eq!(hex(&canonical(&v).unwrap()), want, "{:?}", String::from_utf8_lossy(&text));
++                            assert_eq!(
++                                hex(&canonical(&v).unwrap()),
++                                want,
++                                "{:?}",
++                                String::from_utf8_lossy(&text)
++                            );
+                             canon += 1;
+                         }
+                     }
+                 }
+             }
+         }
+-        assert!(accepted > 600 && refused > 1500 && canon > 400, "{accepted} {refused} {canon}");
++        assert!(
++            accepted > 600 && refused > 1500 && canon > 400,
++            "{accepted} {refused} {canon}"
++        );
+     }
+ 
+     fn hex(b: &[u8]) -> String {
+@@ -897,7 +1186,10 @@
+     struct Rng(u64);
+     impl Rng {
+         fn next(&mut self) -> u64 {
+-            self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
++            self.0 = self
++                .0
++                .wrapping_mul(6364136223846793005)
++                .wrapping_add(1442695040888963407);
+             self.0 >> 33
+         }
+         fn below(&mut self, n: u64) -> u64 {
+@@ -906,14 +1198,31 @@
+     }
+ 
+     fn gen(rng: &mut Rng, depth: u32, out: &mut String) {
+-        match if depth > 3 { rng.below(5) } else { rng.below(7) } {
++        match if depth > 3 {
++            rng.below(5)
++        } else {
++            rng.below(7)
++        } {
+             0 => out.push_str("null"),
+             1 => out.push_str(if rng.below(2) == 0 { "true" } else { "false" }),
+             2 => out.push_str(&format!("{}", rng.next() as i64 - (1 << 30))),
+             3 => {
+                 out.push('"');
+                 for _ in 0..rng.below(8) {
+-                    out.push_str(["a", "b", "\\n", "\\u00e9", "\\ud83d\\ude00", "é", "😀", "\\\"", " ", "\\/"][rng.below(10) as usize]);
++                    out.push_str(
++                        [
++                            "a",
++                            "b",
++                            "\\n",
++                            "\\u00e9",
++                            "\\ud83d\\ude00",
++                            "é",
++                            "😀",
++                            "\\\"",
++                            " ",
++                            "\\/",
++                        ][rng.below(10) as usize],
++                    );
+                 }
+                 out.push('"');
+             }
+diff --git a/src/json_value.rs b/src/json_value.rs
+new file mode 100644
+--- /dev/null
++++ b/src/json_value.rs
+@@ -0,0 +1,541 @@
++//! General JSON values and typed encoding for application records.
++//! Uses Pratique's JSON grammar and string escaping. The existing signed-data
++//! parser/canonical writer retain their separate, stricter duplicate/number policy.
++use crate::data::{self, Decode, Encode, Kind, Node};
++pub use crate::data_json as json;
++pub use data::Error;
++use std::{
++    collections::BTreeMap,
++    fmt,
++    ops::{Index, IndexMut},
++    str::FromStr,
++};
++pub type Map<K, V> = BTreeMap<K, V>;
++#[derive(Clone, Copy, Debug)]
++pub struct Limits {
++    pub input_bytes: usize,
++    pub output_bytes: usize,
++    pub depth: usize,
++    pub nodes: usize,
++}
++impl Default for Limits {
++    fn default() -> Self {
++        Self {
++            input_bytes: 256 * 1024 * 1024,
++            output_bytes: 256 * 1024 * 1024,
++            depth: 127,
++            nodes: 2_000_000,
++        }
++    }
++}
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct Number(String);
++impl Number {
++    pub fn as_str(&self) -> &str {
++        &self.0
++    }
++    pub fn as_i64(&self) -> Option<i64> {
++        self.0.parse().ok()
++    }
++    pub fn as_u64(&self) -> Option<u64> {
++        self.0.parse().ok()
++    }
++    pub fn as_f64(&self) -> Option<f64> {
++        self.0.parse::<f64>().ok().filter(|v| v.is_finite())
++    }
++    pub fn is_i64(&self) -> bool {
++        self.as_i64().is_some()
++    }
++    pub fn is_u64(&self) -> bool {
++        self.as_u64().is_some()
++    }
++    pub fn is_f64(&self) -> bool {
++        self.0.contains(['.', 'e', 'E']) && self.as_f64().is_some()
++    }
++    pub fn from_f64(v: f64) -> Option<Self> {
++        v.is_finite().then(|| Self(data::format_float64(v)))
++    }
++}
++impl FromStr for Number {
++    type Err = Error;
++    fn from_str(s: &str) -> Result<Self, Error> {
++        match crate::json::parse(s.as_bytes()) {
++            Ok(crate::json::Value::Number(n)) => Ok(Self(normalize_number(n.into_text()))),
++            _ => Err(Error::new("invalid JSON number")),
++        }
++    }
++}
++fn normalize_number(s: String) -> String {
++    if let Some((m, e)) = s.split_once(['e', 'E']) {
++        format!(
++            "{m}e{}{e}",
++            if e.starts_with(['+', '-']) { "" } else { "+" }
++        )
++    } else {
++        s
++    }
++}
++impl fmt::Display for Number {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        f.write_str(&self.0)
++    }
++}
++#[derive(Clone, Debug, PartialEq, Eq, Default)]
++pub enum Value {
++    #[default]
++    Null,
++    Bool(bool),
++    Number(Number),
++    String(String),
++    Array(Vec<Value>),
++    Object(Map<String, Value>),
++}
++impl Value {
++    pub fn as_str(&self) -> Option<&str> {
++        if let Self::String(v) = self {
++            Some(v)
++        } else {
++            None
++        }
++    }
++    pub fn as_bool(&self) -> Option<bool> {
++        if let Self::Bool(v) = self {
++            Some(*v)
++        } else {
++            None
++        }
++    }
++    pub fn as_number(&self) -> Option<&Number> {
++        if let Self::Number(v) = self {
++            Some(v)
++        } else {
++            None
++        }
++    }
++    pub fn as_i64(&self) -> Option<i64> {
++        self.as_number()?.as_i64()
++    }
++    pub fn as_u64(&self) -> Option<u64> {
++        self.as_number()?.as_u64()
++    }
++    pub fn as_f64(&self) -> Option<f64> {
++        self.as_number()?.as_f64()
++    }
++    pub fn as_array(&self) -> Option<&Vec<Value>> {
++        if let Self::Array(v) = self {
++            Some(v)
++        } else {
++            None
++        }
++    }
++    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
++        if let Self::Array(v) = self {
++            Some(v)
++        } else {
++            None
++        }
++    }
++    pub fn as_object(&self) -> Option<&Map<String, Value>> {
++        if let Self::Object(v) = self {
++            Some(v)
++        } else {
++            None
++        }
++    }
++    pub fn as_object_mut(&mut self) -> Option<&mut Map<String, Value>> {
++        if let Self::Object(v) = self {
++            Some(v)
++        } else {
++            None
++        }
++    }
++    pub fn is_null(&self) -> bool {
++        matches!(self, Self::Null)
++    }
++    pub fn is_object(&self) -> bool {
++        matches!(self, Self::Object(_))
++    }
++    pub fn is_array(&self) -> bool {
++        matches!(self, Self::Array(_))
++    }
++    pub fn is_string(&self) -> bool {
++        matches!(self, Self::String(_))
++    }
++    pub fn is_number(&self) -> bool {
++        matches!(self, Self::Number(_))
++    }
++    pub fn is_u64(&self) -> bool {
++        self.as_u64().is_some()
++    }
++    pub fn is_i64(&self) -> bool {
++        self.as_i64().is_some()
++    }
++    pub fn is_f64(&self) -> bool {
++        self.as_number().is_some_and(Number::is_f64)
++    }
++    pub fn is_boolean(&self) -> bool {
++        matches!(self, Self::Bool(_))
++    }
++    pub fn get<I: ValueIndex>(&self, key: I) -> Option<&Value> {
++        key.get(self)
++    }
++    pub fn get_mut<I: ValueIndex>(&mut self, key: I) -> Option<&mut Value> {
++        key.get_mut(self)
++    }
++    pub fn take(&mut self) -> Self {
++        std::mem::take(self)
++    }
++}
++pub trait ValueIndex {
++    fn get(self, v: &Value) -> Option<&Value>;
++    fn get_mut(self, v: &mut Value) -> Option<&mut Value>;
++    fn insert(self, v: &mut Value) -> &mut Value;
++}
++impl ValueIndex for &str {
++    fn get(self, v: &Value) -> Option<&Value> {
++        v.as_object()?.get(self)
++    }
++    fn get_mut(self, v: &mut Value) -> Option<&mut Value> {
++        v.as_object_mut()?.get_mut(self)
++    }
++    fn insert(self, v: &mut Value) -> &mut Value {
++        if v.is_null() {
++            *v = Value::Object(Map::new());
++        }
++        v.as_object_mut()
++            .expect("JSON string index on non-object")
++            .entry(self.into())
++            .or_default()
++    }
++}
++impl ValueIndex for &String {
++    fn get(self, v: &Value) -> Option<&Value> {
++        ValueIndex::get(self.as_str(), v)
++    }
++    fn get_mut(self, v: &mut Value) -> Option<&mut Value> {
++        ValueIndex::get_mut(self.as_str(), v)
++    }
++    fn insert(self, v: &mut Value) -> &mut Value {
++        ValueIndex::insert(self.as_str(), v)
++    }
++}
++impl ValueIndex for String {
++    fn get(self, v: &Value) -> Option<&Value> {
++        v.as_object()?.get(&self)
++    }
++    fn get_mut(self, v: &mut Value) -> Option<&mut Value> {
++        v.as_object_mut()?.get_mut(&self)
++    }
++    fn insert(self, v: &mut Value) -> &mut Value {
++        if v.is_null() {
++            *v = Value::Object(Map::new());
++        }
++        v.as_object_mut()
++            .expect("JSON string index on non-object")
++            .entry(self)
++            .or_default()
++    }
++}
++impl ValueIndex for usize {
++    fn get(self, v: &Value) -> Option<&Value> {
++        v.as_array()?.get(self)
++    }
++    fn get_mut(self, v: &mut Value) -> Option<&mut Value> {
++        v.as_array_mut()?.get_mut(self)
++    }
++    fn insert(self, v: &mut Value) -> &mut Value {
++        &mut v.as_array_mut().expect("JSON numeric index on non-array")[self]
++    }
++}
++impl<I: ValueIndex> Index<I> for Value {
++    type Output = Value;
++    fn index(&self, key: I) -> &Value {
++        key.get(self).unwrap_or(&Value::Null)
++    }
++}
++impl<I: ValueIndex> IndexMut<I> for Value {
++    fn index_mut(&mut self, key: I) -> &mut Value {
++        key.insert(self)
++    }
++}
++impl From<&str> for Value {
++    fn from(v: &str) -> Self {
++        Self::String(v.into())
++    }
++}
++impl From<String> for Value {
++    fn from(v: String) -> Self {
++        Self::String(v)
++    }
++}
++impl From<bool> for Value {
++    fn from(v: bool) -> Self {
++        Self::Bool(v)
++    }
++}
++impl From<Number> for Value {
++    fn from(v: Number) -> Self {
++        Self::Number(v)
++    }
++}
++impl From<f64> for Value {
++    fn from(v: f64) -> Self {
++        Number::from_f64(v).map(Self::Number).unwrap_or(Self::Null)
++    }
++}
++macro_rules! ints {($($t:ty),*)=>{$(impl From<$t> for Number{fn from(v:$t)->Self{Self(v.to_string())}}impl From<$t> for Value{fn from(v:$t)->Self{Self::Number(v.into())}}impl PartialEq<$t> for Value{fn eq(&self,v:&$t)->bool{self==&Self::from(*v)}})*}}
++ints!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
++impl PartialEq<str> for Value {
++    fn eq(&self, v: &str) -> bool {
++        self.as_str() == Some(v)
++    }
++}
++impl PartialEq<&str> for Value {
++    fn eq(&self, v: &&str) -> bool {
++        self.as_str() == Some(*v)
++    }
++}
++impl PartialEq<String> for Value {
++    fn eq(&self, v: &String) -> bool {
++        self.as_str() == Some(v)
++    }
++}
++impl PartialEq<bool> for Value {
++    fn eq(&self, v: &bool) -> bool {
++        self.as_bool() == Some(*v)
++    }
++}
++impl fmt::Display for Value {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        let s = if f.alternate() {
++            to_string_pretty(self)
++        } else {
++            to_string(self)
++        };
++        f.write_str(&s.map_err(|_| fmt::Error)?)
++    }
++}
++impl Encode for Number {
++    fn encode(&self) -> Result<Node, Error> {
++        Ok(Node::new(Kind::Number(self.0.clone())))
++    }
++}
++impl Encode for Value {
++    fn encode(&self) -> Result<Node, Error> {
++        match self {
++            Self::Null => ().encode(),
++            Self::Bool(v) => v.encode(),
++            Self::Number(v) => v.encode(),
++            Self::String(v) => v.encode(),
++            Self::Array(v) => v.encode(),
++            Self::Object(v) => v.encode(),
++        }
++    }
++}
++impl Decode for Value {
++    fn decode(n: Node) -> Result<Self, Error> {
++        Ok(match n.kind {
++            Kind::Null => Self::Null,
++            Kind::Bool(v) => Self::Bool(v),
++            Kind::Number(v) => Self::Number(v.parse()?),
++            Kind::Float(v) => v.into(),
++            Kind::String(v) | Kind::Datetime(v) => Self::String(v),
++            Kind::Array(v) => {
++                Self::Array(v.into_iter().map(Self::decode).collect::<Result<_, _>>()?)
++            }
++            Kind::Object(v) => Self::Object(
++                v.into_iter()
++                    .map(|(k, v)| Ok((k, Self::decode(v)?)))
++                    .collect::<Result<_, Error>>()?,
++            ),
++        })
++    }
++}
++fn from_parsed(v: crate::json::Value) -> Node {
++    use crate::json::Value as V;
++    let mut node = Node::new(match v {
++        V::Null => Kind::Null,
++        V::Bool(v) => Kind::Bool(v),
++        V::Number(n) => Kind::Number(n.into_text()),
++        V::String(v) => Kind::String(v),
++        V::Array(v) => Kind::Array(v.into_iter().map(from_parsed).collect()),
++        V::Object(v) => Kind::Object(
++            v.into_members()
++                .into_iter()
++                .map(|(k, v)| (k, from_parsed(v)))
++                .collect(),
++        ),
++    });
++    node.format = data::Format::Json;
++    node
++}
++pub fn from_slice_with_limits<T: Decode>(bytes: &[u8], limits: Limits) -> Result<T, Error> {
++    if bytes.len() > limits.input_bytes
++        || limits.depth == 0
++        || limits.depth > 128
++        || limits.nodes == 0
++    {
++        return Err(Error::new("JSON resource limit"));
++    }
++    let v = crate::json::parse_for_data(bytes, limits.depth, limits.nodes)
++        .map_err(|e| Error::new(e.to_string()).at(e.offset))?;
++    T::decode(from_parsed(v))
++}
++pub fn from_slice<T: Decode>(bytes: &[u8]) -> Result<T, Error> {
++    from_slice_with_limits(bytes, Limits::default())
++}
++pub fn from_str<T: Decode>(s: &str) -> Result<T, Error> {
++    from_slice(s.as_bytes())
++}
++pub fn from_value<T: Decode>(v: Value) -> Result<T, Error> {
++    T::decode(v.encode()?)
++}
++pub fn to_value<T: Encode>(v: T) -> Result<Value, Error> {
++    Value::decode(v.encode()?)
++}
++pub fn to_vec<T: Encode + ?Sized>(v: &T) -> Result<Vec<u8>, Error> {
++    write(v, false, Limits::default())
++}
++/// Bound the emitted JSON; the caller's Encode implementation owns its node construction.
++pub fn to_vec_with_limits<T: Encode + ?Sized>(v: &T, limits: Limits) -> Result<Vec<u8>, Error> {
++    write(v, false, limits)
++}
++pub fn to_vec_pretty<T: Encode + ?Sized>(v: &T) -> Result<Vec<u8>, Error> {
++    write(v, true, Limits::default())
++}
++pub fn to_string<T: Encode + ?Sized>(v: &T) -> Result<String, Error> {
++    String::from_utf8(to_vec(v)?).map_err(|_| Error::new("invalid UTF-8 output"))
++}
++pub fn to_string_pretty<T: Encode + ?Sized>(v: &T) -> Result<String, Error> {
++    String::from_utf8(to_vec_pretty(v)?).map_err(|_| Error::new("invalid UTF-8 output"))
++}
++fn write<T: Encode + ?Sized>(v: &T, pretty: bool, limits: Limits) -> Result<Vec<u8>, Error> {
++    let node = v.encode()?;
++    let mut w = Writer {
++        out: Vec::new(),
++        limits,
++        pretty,
++        nodes: 0,
++    };
++    w.node(&node, 0)?;
++    Ok(w.out)
++}
++struct Writer {
++    out: Vec<u8>,
++    limits: Limits,
++    pretty: bool,
++    nodes: usize,
++}
++impl Writer {
++    fn bytes(&mut self, b: &[u8]) -> Result<(), Error> {
++        if b.len() > self.limits.output_bytes.saturating_sub(self.out.len()) {
++            return Err(Error::new("JSON output limit"));
++        }
++        self.out.extend_from_slice(b);
++        Ok(())
++    }
++    fn string(&mut self, s: &str) -> Result<(), Error> {
++        let mut n = 2usize;
++        for b in s.bytes() {
++            n = n
++                .checked_add(match b {
++                    b'"' | b'\\' | 8 | 9 | 10 | 12 | 13 => 2,
++                    0..=31 => 6,
++                    _ => 1,
++                })
++                .ok_or_else(|| Error::new("JSON output limit"))?;
++        }
++        if n > self.limits.output_bytes.saturating_sub(self.out.len()) {
++            return Err(Error::new("JSON output limit"));
++        }
++        crate::json::write_string(s, &mut self.out);
++        Ok(())
++    }
++    fn newline(&mut self, depth: usize) -> Result<(), Error> {
++        if self.pretty {
++            self.bytes(b"\n")?;
++            for _ in 0..depth {
++                self.bytes(b"  ")?;
++            }
++        }
++        Ok(())
++    }
++    fn node(&mut self, n: &Node, depth: usize) -> Result<(), Error> {
++        self.nodes += 1;
++        if depth > self.limits.depth || self.nodes > self.limits.nodes {
++            return Err(Error::new("JSON output resource limit"));
++        }
++        match &n.kind {
++            Kind::Null => self.bytes(b"null"),
++            Kind::Bool(b) => self.bytes(if *b { b"true" } else { b"false" }),
++            Kind::Number(s) => {
++                let _: Number = s.parse()?;
++                self.bytes(s.as_bytes())
++            }
++            Kind::Float(v) => {
++                if v.is_finite() {
++                    self.bytes(data::format_float64(*v).as_bytes())
++                } else {
++                    self.bytes(b"null")
++                }
++            }
++            Kind::String(v) | Kind::Datetime(v) => self.string(v),
++            Kind::Array(a) => {
++                self.bytes(b"[")?;
++                for (i, v) in a.iter().enumerate() {
++                    if i > 0 {
++                        self.bytes(b",")?;
++                    }
++                    self.newline(depth + 1)?;
++                    self.node(v, depth + 1)?;
++                }
++                if !a.is_empty() {
++                    self.newline(depth)?;
++                }
++                self.bytes(b"]")
++            }
++            Kind::Object(a) => {
++                self.bytes(b"{")?;
++                for (i, (k, v)) in a.iter().enumerate() {
++                    if i > 0 {
++                        self.bytes(b",")?;
++                    }
++                    self.newline(depth + 1)?;
++                    self.string(k)?;
++                    self.bytes(if self.pretty { b": " } else { b":" })?;
++                    self.node(v, depth + 1)?;
++                }
++                if !a.is_empty() {
++                    self.newline(depth)?;
++                }
++                self.bytes(b"}")
++            }
++        }
++    }
++}
++#[macro_export]
++macro_rules! data_json {
++ (null)=>{$crate::json_value::Value::Null};
++ ([$($items:tt)*])=>{{let mut items=Vec::new();$crate::data_json!(@array items; $($items)*);$crate::json_value::Value::Array(items)}};
++ ({$($items:tt)*})=>{{let mut items=$crate::json_value::Map::new();$crate::data_json!(@object items; $($items)*);$crate::json_value::Value::Object(items)}};
++ ($v:expr)=>{$crate::json_value::to_value(&$v).expect("JSON value encoding failed")};
++ (@array $out:ident;)=>{};
++ (@array $out:ident;null $(,$($tail:tt)*)?)=>{{$out.push($crate::data_json!(null));$crate::data_json!(@array $out; $($($tail)*)?);}};
++ (@array $out:ident;[$($v:tt)*] $(,$($tail:tt)*)?)=>{{$out.push($crate::data_json!([$($v)*]));$crate::data_json!(@array $out; $($($tail)*)?);}};
++ (@array $out:ident;{$($v:tt)*} $(,$($tail:tt)*)?)=>{{$out.push($crate::data_json!({$($v)*}));$crate::data_json!(@array $out; $($($tail)*)?);}};
++ (@array $out:ident;$v:expr $(,$($tail:tt)*)?)=>{{$out.push($crate::data_json!($v));$crate::data_json!(@array $out; $($($tail)*)?);}};
++ (@object $out:ident;)=>{};
++ (@object $out:ident;$key:tt:null $(,$($tail:tt)*)?)=>{{$out.insert(($key).into(),$crate::data_json!(null));$crate::data_json!(@object $out; $($($tail)*)?);}};
++ (@object $out:ident;$key:tt:[$($v:tt)*] $(,$($tail:tt)*)?)=>{{$out.insert(($key).into(),$crate::data_json!([$($v)*]));$crate::data_json!(@object $out; $($($tail)*)?);}};
++ (@object $out:ident;$key:tt:{$($v:tt)*} $(,$($tail:tt)*)?)=>{{$out.insert(($key).into(),$crate::data_json!({$($v)*}));$crate::data_json!(@object $out; $($($tail)*)?);}};
++ (@object $out:ident;$key:tt:$v:expr $(,$($tail:tt)*)?)=>{{$out.insert(($key).into(),$crate::data_json!($v));$crate::data_json!(@object $out; $($($tail)*)?);}};
++}
++
++#[cfg(feature = "net")] // net seam: writing to caller-supplied I/O belongs to the I/O feature.
++pub fn to_writer<W: std::io::Write, T: Encode + ?Sized>(
++    mut out: W,
++    value: &T,
++) -> Result<(), Error> {
++    out.write_all(&to_vec(value)?)
++        .map_err(|e| Error::new(e.to_string()))
++}
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -46,13 +46,15 @@
+ pub mod cms;
+ pub mod crypto;
+ pub mod ct;
++pub mod data;
++#[cfg(test)]
++mod fuzz;
+ pub mod idna;
+ pub mod inflate;
+ pub mod json;
++pub mod json_value;
+ #[cfg(feature = "mozilla-roots")]
+ pub mod mozilla_roots;
+-#[cfg(test)]
+-mod fuzz;
+ pub mod note;
+ pub mod pem;
+ pub mod revocation;
+@@ -119,9 +121,17 @@
+         assert_send_sync::<crate::tls::ClientConnection>();
+         // the futures of the async client can be moved to another thread (spawned on a runtime)
+         fn is_send<F: std::future::Future + Send>(_: &F) {}
+-        let client = crate::Client::with_tls_config(crate::tls::ClientConfig::new(crate::x509::TrustStore::empty())).into_async();
++        let client = crate::Client::with_tls_config(crate::tls::ClientConfig::new(
++            crate::x509::TrustStore::empty(),
++        ))
++        .into_async();
+         is_send(&client.get("https://example.com/"));
+-        is_send(&client.request("POST", "https://example.com/").body("x").send());
++        is_send(
++            &client
++                .request("POST", "https://example.com/")
++                .body("x")
++                .send(),
++        );
+         assert_send_sync::<crate::asyncio::BlockingTask<crate::error::Result<crate::Response>>>();
+     }
+ }
+diff --git a/tests/data_json.rs b/tests/data_json.rs
+new file mode 100644
+--- /dev/null
++++ b/tests/data_json.rs
+@@ -0,0 +1,172 @@
++use pratique::{
++    data::{Decode, Encode, Format, Kind, Node},
++    json_value::{self as json, Limits, Value},
++};
++
++#[derive(Debug, PartialEq)]
++struct Record {
++    z: u64,
++    a: String,
++    optional: Option<String>,
++    items: Vec<i16>,
++    disabled: bool,
++}
++pratique::data_encode!(Record { z, a, optional, items, disabled => std::ops::Not::not });
++pratique::data_decode!(Record, deny_unknown=true, { z, a, optional, items=Vec::new(), disabled=false });
++
++#[test]
++fn record_order_defaults_and_sequence() {
++    let v: Record = json::from_str(r#"{"a":"x","z":42}"#).unwrap();
++    assert_eq!(
++        json::to_string(&v).unwrap(),
++        r#"{"z":42,"a":"x","optional":null,"items":[]}"#
++    );
++    assert_eq!(json::from_str::<Record>(r#"[42,"x",null]"#).unwrap(), v);
++    assert!(json::from_str::<Record>(r#"[42,"x"]"#).is_err());
++    for raw in [
++        r#"{"z":42,"a":"x","extra":0}"#,
++        r#"{"z":42,"a":"x","z":42}"#,
++        r#"{"z":-1,"a":"x"}"#,
++        r#"{"z":42,"a":null}"#,
++    ] {
++        assert!(json::from_str::<Record>(raw).is_err(), "{raw}");
++    }
++}
++
++#[test]
++fn generic_duplicates_and_signed_json_policy() {
++    let raw = br#"{"z":1,"a":2,"z":3}"#;
++    let value: Value = json::from_slice(raw).unwrap();
++    assert_eq!(json::to_string(&value).unwrap(), r#"{"a":2,"z":3}"#);
++    assert!(pratique::json::parse(raw).is_err());
++    assert!(pratique::json::parse(br#"{"a":2,"z":3}"#).is_ok());
++}
++
++#[test]
++fn input_limits_invalid_utf8_and_surrogates() {
++    let base = Limits::default();
++    assert!(json::from_slice_with_limits::<Value>(
++        b"null",
++        Limits {
++            input_bytes: 3,
++            ..base
++        }
++    )
++    .is_err());
++    assert!(json::from_slice_with_limits::<Value>(b"[0,1]", Limits { nodes: 2, ..base }).is_err());
++    assert!(json::from_slice_with_limits::<Value>(b"[[0]]", Limits { depth: 1, ..base }).is_err());
++    assert!(json::from_slice_with_limits::<Value>(b"[0,1]", Limits { nodes: 3, ..base }).is_ok());
++    for raw in [
++        b"\"\xff\"".as_slice(),
++        br#""\ud800""#,
++        br#""\udc00""#,
++        br#""\ud800\u0041""#,
++    ] {
++        assert!(json::from_slice::<Value>(raw).is_err());
++    }
++    assert_eq!(json::from_str::<String>(r#""\ud83d\ude00""#).unwrap(), "😀");
++}
++
++#[test]
++fn output_limits_include_escaping_and_nodes() {
++    let base = Limits::default();
++    assert!(json::to_vec_with_limits(
++        &"\0",
++        Limits {
++            output_bytes: 7,
++            ..base
++        }
++    )
++    .is_err());
++    assert_eq!(
++        json::to_vec_with_limits(
++            &"\0",
++            Limits {
++                output_bytes: 8,
++                ..base
++            }
++        )
++        .unwrap(),
++        br#""\u0000""#
++    );
++    assert!(json::to_vec_with_limits(&vec![0, 1], Limits { nodes: 2, ..base }).is_err());
++    assert!(json::to_vec_with_limits(&vec![vec![0]], Limits { depth: 1, ..base }).is_err());
++}
++
++#[test]
++fn precise_numbers_and_private_names() {
++    let value: Value = json::from_str("1234567890123456789012345678901234567890").unwrap();
++    assert_eq!(
++        json::to_string(&value).unwrap(),
++        "1234567890123456789012345678901234567890"
++    );
++    assert_eq!(
++        json::from_str::<u128>(&u128::MAX.to_string()).unwrap(),
++        u128::MAX
++    );
++    assert!(json::from_str::<u64>("18446744073709551616").is_err());
++    let marker = r#"{"$serde_json::private::Number":"bad"}"#;
++    assert_eq!(
++        json::to_string(&json::from_str::<Value>(marker).unwrap()).unwrap(),
++        marker
++    );
++}
++
++#[test]
++fn float_boundaries_rounding_and_nonfinite() {
++    for (number, expected) in [
++        (0.0, "0.0"),
++        (-0.0, "-0.0"),
++        (1e-6, "1e-6"),
++        (1e-5, "0.00001"),
++        (1e16, "1e+16"),
++        (f64::MAX, "1.7976931348623157e+308"),
++        (f64::from_bits(1), "5e-324"),
++    ] {
++        assert_eq!(json::to_string(&number).unwrap(), expected);
++        assert_eq!(
++            json::from_str::<f64>(expected).unwrap().to_bits(),
++            number.to_bits()
++        );
++    }
++    assert_eq!(json::to_string(&f64::INFINITY).unwrap(), "null");
++    assert_eq!(json::to_string(&f32::NAN).unwrap(), "null");
++    assert!(json::from_str::<f64>("1e999").is_err());
++}
++
++#[test]
++fn format_distinctions_and_error_locations() {
++    let node = Node {
++        kind: Kind::Datetime("2026-10-25".into()),
++        offset: 17,
++        format: Format::Toml,
++    };
++    assert_eq!(String::decode(node).unwrap_err().offset, 17);
++    let mut node = Node::new(Kind::Object(vec![(
++        "Variant".into(),
++        Node::new(Kind::Object(vec![])),
++    )]));
++    assert!(pratique::data::unit_variant(node.clone()).is_err());
++    node.format = Format::Toml;
++    assert_eq!(pratique::data::unit_variant(node).unwrap(), "Variant");
++    let node = Node::new(Kind::Object(vec![("Variant".into(), ().encode().unwrap())]));
++    assert_eq!(pratique::data::unit_variant(node).unwrap(), "Variant");
++}
++
++#[test]
++fn values_macros_and_mutation() {
++    let mut value = json::json!({"x": [true, null, {"s": "a\n\"\\"}]});
++    value["new"]["nested"] = Value::from(3);
++    assert_eq!(value["new"]["nested"].take(), 3);
++    assert!(value["missing"].is_null());
++    let bytes = json::to_vec_pretty(&value).unwrap();
++    assert_eq!(json::from_slice::<Value>(&bytes).unwrap(), value);
++}
++
++#[test]
++fn toml_tuple_compatibility_keeps_format_boundary() {
++    let mut node = vec![1u8, 2, 3].encode().unwrap();
++    assert!(<(u8, u8)>::decode(node.clone()).is_err());
++    node.format = Format::Toml;
++    assert_eq!(<(u8, u8)>::decode(node).unwrap(), (1, 2));
++}

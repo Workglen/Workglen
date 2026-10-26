@@ -1,0 +1,45 @@
+[package]
+name = "workglen-mail"
+version = "0.8.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+description = "Modular Linux mail and accounting server using Pratique, redb and BYO PostgreSQL"
+
+[[bin]]
+name = "workglen"
+path = "src/main.rs"
+
+[features]
+arc = []
+
+[dependencies]
+# Vendored from 9efaab9c010a2ca7f5ffaaf46b3b82eb50e20be4
+pratique = { path = "vendor/pratique", features = ["server"] }
+redb = "3"
+workglen-mime = { path = "crates/native-mime" }
+workglen-dns = { path = "crates/native-dns" }
+workglen-toml = { path = "crates/native-toml" }
+workglen-idna = { path = "crates/native-idna" }
+argon2 = { version = "0.5", default-features = false, features = ["alloc", "password-hash"] }
+subtle = "2"
+
+lazaret-pg = { path = "vendor/lazaret-pg", features = ["with-json"] }
+
+[profile.release]
+# Keep source builds practical on small hosts. The installer also uses one job.
+opt-level = 1
+lto = "off"
+codegen-units = 16
+debug = 0
+incremental = false
+strip = true
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[workspace]
+members = ["vendor/lazaret-pg", "crates/native-dns", "crates/native-idna", "crates/native-mime", "crates/native-toml"]
+default-members = [".", "vendor/lazaret-pg"]
+exclude = ["vendor/pratique"]
+resolver = "3"

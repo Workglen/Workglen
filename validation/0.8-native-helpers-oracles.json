@@ -1,0 +1,20 @@
+{
+  "former_source_version": 27,
+  "former_source_zip_sha256": "fe39b17899a4fb8fc1d5c52bf427889baa68736aa2f0ec7533d3c1d1237312e9",
+  "former_anyhow": "1.0.104",
+  "former_chrono": "0.4.45",
+  "rust": "1.99.1",
+  "scope": "Synthetic local differential comparisons, not an independent audit",
+  "error_cases": 150,
+  "date_cases": 433652,
+  "breakdown": {
+    "gregorian": 313698,
+    "timestamp_formats": 90148,
+    "date_imap_parser": 19134,
+    "rfc2822_parser": 10672
+  },
+  "oracles": {
+    "error-compat.rs": "9ccc02200dcaa00da05946d6e9f4a7b39e7db8cf6a4b2129a3d5226d12e8473c",
+    "date-compat.rs": "e75a0c882acc3c1609977100d9475c0ddffe265fbb4338d8e20d556f218209e1"
+  }
+}

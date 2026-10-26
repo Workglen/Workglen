@@ -1,0 +1,59 @@
+{
+  "upstream_files_verified": 66,
+  "upstream_crate_checksum": "8505122ba86e1f4adeb664196c1e787c3f29bb6e7c128e4a366d47d209911440",
+  "patch_reapplies_exactly": true,
+  "modified_or_added": [
+    {
+      "file": "Cargo.toml",
+      "sha256": "a934272be5b447b4dd781aea24e691ff3c3627b52bda7d089b87739d5b2e1335"
+    },
+    {
+      "file": "src/common/auth_results.rs",
+      "sha256": "d012d77c8092ad96afeb48ec6da985e0e44c7e70185af63d07e157ff153dd5f7"
+    },
+    {
+      "file": "src/common/crypto/mod.rs",
+      "sha256": "5f18efa9e31997e148bff6dfbdeea20423d6d89763044e0ca0ca32884f314e4e"
+    },
+    {
+      "file": "src/common/crypto/pratique_impl.rs",
+      "sha256": "65b8bbe9bb85c8eaf0e23764f73254fb017b516e86b79384773686142f1c3e50"
+    },
+    {
+      "file": "src/common/encoding.rs",
+      "sha256": "58d90b620f045e06563652dd9ea11047c720f6008af2f1311995d8ba3611afe5"
+    },
+    {
+      "file": "src/common/headers.rs",
+      "sha256": "1120bca272c4c18061d8047bd92eca304a5dbcc9cdddd50f99157e5f74dd2418"
+    },
+    {
+      "file": "src/common/mod.rs",
+      "sha256": "f7f4cb002af2329afda1b31126c238b51e323af27043ff61df8e8d464733d94c"
+    },
+    {
+      "file": "src/common/resolver.rs",
+      "sha256": "cc1bc25922b4cadc3edc0df07b3f5e72f0158574ee02fdea1c0ab1fdb516990a"
+    },
+    {
+      "file": "src/dkim2/mod.rs",
+      "sha256": "9081d24fc3008d380498bbdefaa3d553a45be1209eda92359040857db8f4357e"
+    },
+    {
+      "file": "src/dkim2/native_diff.rs",
+      "sha256": "0075bdfe39e37d0914961c7e578489ed344ae59d48049827a93a3a1e61dc97e4"
+    },
+    {
+      "file": "src/dkim2/recipe.rs",
+      "sha256": "a5019fe20d5ab3a09f23532fdffa2836e6395c41f75bce688232e854282643ee"
+    },
+    {
+      "file": "src/dkim2/recipe_serializer.rs",
+      "sha256": "af3e804a41d183f1fdaac765ca9e25735e2624945a6de063c90083ece1a66a05"
+    },
+    {
+      "file": "src/lib.rs",
+      "sha256": "611da3c8962f8c04c29630f26b12e975e959dda60e47f6daf90202347ee917d2"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "stage": "mailbuilder",
+  "before_registry": 177,
+  "after_registry": 176,
+  "before_external": 178,
+  "after_external": 177,
+  "removed_packages": [
+    {
+      "name": "mail-builder",
+      "version": "1.0.0"
+    }
+  ],
+  "added_registry_packages": [],
+  "retained_checksums_unchanged": true,
+  "before_lock_sha256": "c28ecea49b831e7a7ac4caa801b314baa33d6ff3cefd85d6c96a34e7648e6fbb",
+  "after_lock_sha256": "6eddf83ba8aa4c9bca7278c2ab7b4b021348573b525aeaa11008a395668a109a"
+}

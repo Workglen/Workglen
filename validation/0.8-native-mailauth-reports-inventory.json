@@ -1,0 +1,37 @@
+{
+  "stage": "mailauth-reports",
+  "before_registry": 187,
+  "after_registry": 181,
+  "before_external": 188,
+  "after_external": 182,
+  "removed_packages": [
+    {
+      "name": "adler2",
+      "version": "2.0.1"
+    },
+    {
+      "name": "crc32fast",
+      "version": "1.5.3"
+    },
+    {
+      "name": "flate2",
+      "version": "1.1.10"
+    },
+    {
+      "name": "miniz_oxide",
+      "version": "0.9.1"
+    },
+    {
+      "name": "simd-adler32",
+      "version": "0.3.10"
+    },
+    {
+      "name": "zlib-rs",
+      "version": "0.6.8"
+    }
+  ],
+  "added_registry_packages": [],
+  "retained_checksums_unchanged": true,
+  "before_lock_sha256": "793bd393b225a996566750de31efbe50a34706e8c8d316f636772777ddfdc50f",
+  "after_lock_sha256": "c3cde47baa72910ab214263883527a5e14096e1aee60e6135ce3dca395606a4f"
+}

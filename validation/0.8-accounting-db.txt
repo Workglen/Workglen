@@ -1,0 +1,24 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests/accounting_db.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/accounting_db-0b6bfaeb3bb83097)
+
+running 1 test
+test accounting_transactions_and_banking ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.66s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running tests/posting_corrections.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/posting_corrections-012918553dda1aa1)
+
+running 1 test
+test posting_corrections_locks_sources_and_audit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.61s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running tests/local_postgres.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/local_postgres-381fb1ffa564d5c4)
+
+running 1 test
+test accounting_initializes_and_reopens_over_explicit_local_transport ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

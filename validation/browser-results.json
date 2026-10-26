@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "checks": [
+    "capacity and configured limits",
+    "Workglen branding",
+    "module roadmap",
+    "cancel disable",
+    "disable and re-enable Mail",
+    "navigation follows module state",
+    "Core with Mail disabled",
+    "standby module read-only",
+    "HTTPS login",
+    "account creation",
+    "password confirmation and reset",
+    "security rules",
+    "queue empty state",
+    "backup creation",
+    "deployment guide",
+    "mobile without overflow",
+    "logout",
+    "standby read-only"
+  ],
+  "errors": []
+}

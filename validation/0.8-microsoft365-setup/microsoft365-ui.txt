@@ -1,0 +1,9 @@
+PASS selected Microsoft route shows tenant scope and truthful unverified status
+PASS commands require explicit tenant and dedicated-address review
+PASS private source addresses cannot generate a plan
+PASS staged commands, filtering, rollout and positive/negative evidence are guided separately
+PASS editing inputs invalidates generated commands and review
+PASS go-live preserves the unverified status without a circular activation gate
+PASS guide and commands fit a narrow viewport
+PASS switching gateways clears the tenant-specific draft
+PASS guide never mutates a tenant, sends mail, loads external code or raises browser errors

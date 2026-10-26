@@ -1,0 +1,10 @@
+[package]
+name = "workglen-toml"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Bounded first-party TOML configuration parser with first-party typed decoding"
+[dependencies]
+pratique = { path = "../../vendor/pratique", default-features = false }
+[lints.rust]
+unsafe_code = "forbid"

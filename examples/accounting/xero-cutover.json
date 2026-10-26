@@ -1,0 +1,91 @@
+{
+  "source_org": "Xero demo organization",
+  "as_of": "2026-09-30",
+  "currency": "USD",
+  "receivable_account": "1100",
+  "payable_account": "2100",
+  "source_frozen": true,
+  "credit_notes": [],
+  "prepayments": [],
+  "overpayments": [],
+  "accounts": [
+    {
+      "AccountID": "account-1000",
+      "Code": "1000",
+      "Name": "Checking",
+      "Type": "BANK"
+    },
+    {
+      "AccountID": "account-1100",
+      "Code": "1100",
+      "Name": "Accounts receivable",
+      "Type": "CURRENT"
+    },
+    {
+      "AccountID": "account-2100",
+      "Code": "2100",
+      "Name": "Accounts payable",
+      "Type": "CURRLIAB"
+    },
+    {
+      "AccountID": "account-3000",
+      "Code": "3000",
+      "Name": "Opening equity",
+      "Type": "EQUITY"
+    },
+    {
+      "AccountID": "account-4000",
+      "Code": "4000",
+      "Name": "Sales",
+      "Type": "REVENUE"
+    },
+    {
+      "AccountID": "account-5000",
+      "Code": "5000",
+      "Name": "Office expenses",
+      "Type": "EXPENSE"
+    }
+  ],
+  "contacts": [
+    {
+      "ContactID": "customer-1",
+      "Name": "Demo customer",
+      "EmailAddress": "customer@example.test"
+    },
+    {
+      "ContactID": "vendor-1",
+      "Name": "Demo vendor"
+    }
+  ],
+  "invoices": [
+    {
+      "InvoiceID": "invoice-1",
+      "Type": "ACCREC",
+      "Status": "AUTHORISED",
+      "InvoiceNumber": "INV-001",
+      "Contact": {
+        "ContactID": "customer-1"
+      },
+      "CurrencyCode": "USD",
+      "DateString": "2026-09-20",
+      "DueDateString": "2026-10-20",
+      "Total": 150,
+      "AmountDue": 120
+    },
+    {
+      "InvoiceID": "bill-1",
+      "Type": "ACCPAY",
+      "Status": "AUTHORISED",
+      "InvoiceNumber": "BILL-001",
+      "Contact": {
+        "ContactID": "vendor-1"
+      },
+      "CurrencyCode": "USD",
+      "DateString": "2026-09-25",
+      "DueDateString": "2026-10-25",
+      "Total": 50,
+      "AmountDue": 50
+    }
+  ],
+  "trial_balance_csv": "AccountCode,Debit,Credit\n1000,1000.00,0.00\n1100,120.00,0.00\n2100,0.00,50.00\n3000,0.00,1070.00\n"
+}

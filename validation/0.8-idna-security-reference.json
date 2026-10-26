@@ -1,0 +1,37 @@
+{
+  "reference": "Python idna 3.19",
+  "unicode_data": "17.0.0",
+  "scope": "Selected stable policy examples only; native UTS #46 uses Unicode 18, so this is not a complete Unicode-version comparison",
+  "cases": [
+    {
+      "input": "a\u00b7b.test",
+      "ascii": null,
+      "error": "InvalidCodepointContext"
+    },
+    {
+      "input": "l\u00b7l.test",
+      "ascii": "xn--ll-0ea.test",
+      "error": null
+    },
+    {
+      "input": "\ud83d\ude00.test",
+      "ascii": null,
+      "error": "InvalidCodepoint"
+    },
+    {
+      "input": "\u0440\u0430ypal.com",
+      "ascii": "xn--ypal-43d9g.com",
+      "error": null
+    },
+    {
+      "input": "fa\u00df.de",
+      "ascii": "xn--fa-hia.de",
+      "error": null
+    },
+    {
+      "input": "a\u200db.test",
+      "ascii": null,
+      "error": "InvalidCodepointContext"
+    }
+  ]
+}

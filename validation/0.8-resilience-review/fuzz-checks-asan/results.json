@@ -1,0 +1,58 @@
+{
+  "scope": "Memory-only local ASan and coverage-guided fuzzing; bounded campaign, not a security certification",
+  "nightly": "nightly",
+  "seconds_per_target": 30,
+  "leak_detection": false,
+  "fuzz_lock_sha256": "52544b6fe1a8a37355b2c5765c8d29746434848edbc48052b21cb91e1d8fd712",
+  "results": [
+    {
+      "check": "fuzzer-version",
+      "exit_code": 0,
+      "seconds": 0.04,
+      "executed_inputs": null,
+      "log": "fuzzer-version.txt"
+    },
+    {
+      "check": "seed-replay",
+      "exit_code": 0,
+      "seconds": 0.05,
+      "executed_inputs": null,
+      "log": "seed-replay.txt"
+    },
+    {
+      "check": "fuzz-build",
+      "exit_code": 0,
+      "seconds": 77.5,
+      "executed_inputs": null,
+      "log": "fuzz-build.txt"
+    },
+    {
+      "check": "tls_client",
+      "exit_code": 0,
+      "seconds": 31.92,
+      "executed_inputs": 21722,
+      "log": "tls_client.txt"
+    },
+    {
+      "check": "tls_server",
+      "exit_code": 0,
+      "seconds": 31.19,
+      "executed_inputs": 100030,
+      "log": "tls_server.txt"
+    },
+    {
+      "check": "h2",
+      "exit_code": 0,
+      "seconds": 31.15,
+      "executed_inputs": 112344,
+      "log": "h2.txt"
+    },
+    {
+      "check": "x509",
+      "exit_code": 0,
+      "seconds": 31.16,
+      "executed_inputs": 72219,
+      "log": "x509.txt"
+    }
+  ]
+}

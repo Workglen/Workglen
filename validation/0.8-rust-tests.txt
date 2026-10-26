@@ -1,0 +1,154 @@
+   Compiling pratique v0.1.0 (/workspace/scratch/4eac8ae55074/workglen-08/vendor/pratique)
+   Compiling workglen-mail v0.8.0 (/workspace/scratch/4eac8ae55074/workglen-08)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 41.31s
+     Running unittests src/lib.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/workglen_mail-2af16ba53a341d6c)
+
+running 86 tests
+test accounting::bank_files::tests::ofx_sgml ... ok
+test accounting::db::transport_tests::local_transport_never_falls_back_to_a_remote_endpoint ... ok
+test accounting::bank_files::tests::chase_csv_exact_and_duplicates ... ok
+test accounting::bank_files::tests::hostile_and_precision ... ok
+test accounting::feeds::tests::v2_scopes_pending_and_partial_errors ... ok
+test accounting::feeds::tests::encrypted_scoped_tokens ... ok
+test accounting::db::transport_tests::verified_tls_remains_the_default_and_overrides_dsn_downgrades ... ok
+test accounting::xero::tests::exact_money ... ok
+test certificates::tests::configuration_is_explicit_and_covers_every_service_name ... ok
+test accounting::xero::tests::mismatch_blocks ... ok
+test accounting::xero::tests::fixture_reconciles ... ok
+test accounting::xero::tests::credit_card_and_foreign_bank_migration ... ok
+test accounting::feeds::tests::restrict_destinations ... ok
+test certificates::tests::state_is_private_exclusive_and_rejects_links ... ok
+test dkim::tests::weak_keys_are_rejected ... ok
+test encrypted_store::tests::ciphertext_cannot_be_transplanted_between_databases ... ok
+test accounting::tls::tests::channel_binding_uses_the_certificate_hash_and_refuses_undefined_algorithms ... ok
+test certificates::tests::fallback_tracks_certificate_lifetime_including_short_certificates ... ok
+test encrypted_store::tests::generated_and_supplied_keys_are_private_and_not_overwritten ... ok
+test encrypted_store::tests::exclusive_lock_and_bounds_fail_closed ... ok
+test encrypted_store::tests::encrypted_redb_roundtrip_hides_keys_values_and_headers ... ok
+test encrypted_store::tests::recovery_uses_a_fresh_nonce_when_rewriting_an_aborted_sequence ... ok
+test encrypted_store::tests::restart_discards_unsynced_and_partially_written_tail ... ok
+test encrypted_store::tests::unsafe_key_files_are_rejected ... ok
+test rbac::tests::finance_roles_are_scoped_and_deny_unknown_actions ... ok
+test rbac::tests::posting_corrections_and_period_control_are_separate ... ok
+test rbac::tests::role_domains_do_not_imply_each_other ... ok
+test relay::tests::signed_message_transfer_never_rewrites_octets ... ok
+test relay::tests::smtp_replies_are_framed_and_bounded ... ok
+test routing::tests::rejects_internal_and_special_destinations ... ok
+test accounting::tls::tests::postgres_adapter_verifies_chain_hostname_expiry_and_moves_records ... ok
+test security::tests::ai_override_is_admin_only ... ok
+test security::tests::arbitrary_spam_rule_cannot_disable_attachment_guard ... ok
+test encrypted_store::tests::wrong_key_corruption_and_plaintext_are_rejected_without_replacement ... ok
+test security::tests::activation_requires_test_confirmation_and_expected_revision ... ok
+test security::tests::benign_zip_fully_inspected ... ok
+test security::tests::binary_unscanned_coverage_is_not_antivirus_claim ... ok
+test security::tests::archive_mutation_corpus_never_panics ... ok
+test security::tests::command_idempotency_and_collision ... ok
+test security::tests::discussing_ai_without_instructions_is_not_blocked ... ok
+test security::tests::audit_chain_verifies_and_detects_corruption ... ok
+test security::tests::gzip_crc_and_expansion_limits ... ok
+test security::tests::domain_and_mailbox_permissions_both_required ... ok
+test accounting::tls::tests::postgres_scram_plus_authenticates_with_required_channel_binding ... ok
+test security::tests::digest_frozen_and_recipient_scoped ... ok
+test security::tests::independent_deflated_zip_and_ustar_fixtures ... ok
+test security::tests::inherited_dependencies_do_not_expand ... ok
+test security::tests::management_signature_nonce_and_audience ... ok
+test security::tests::holds_override_expiry_and_discard ... ok
+test security::tests::misleading_zip_name_still_inspected ... ok
+test security::tests::nested_archive_depth_is_bounded ... ok
+test security::tests::nested_zip_executable_blocked ... ok
+test security::tests::normalized_ai_obfuscation ... ok
+test security::tests::ordinary_message_delivers ... ok
+test security::tests::learning_requires_permission_and_deduplicates_content ... ok
+test security::tests::pdf_active_and_ole_blocked ... ok
+test security::tests::renamed_executable_blocked ... ok
+test security::tests::mandatory_attachment_release_prevented_even_for_owner ... ok
+test security::tests::retention_removes_unheld_expired_blob_but_keeps_audit ... ok
+test security::tests::restart_marks_inflight_operation_uncertain ... ok
+test security::tests::shell_script_blocked ... ok
+test security::tests::spam_remains_releasable ... ok
+test security::tests::truncated_and_unsupported_archives_blocked ... ok
+test security::tests::unknown_rules_and_bad_values_rejected ... ok
+test security::tests::xml_dtd_wrong_nesting_and_duplicates_rejected ... ok
+test security::tests::xml_namespace_and_entities ... ok
+test security::tests::zip_checksum_failure_blocked ... ok
+test security::tests::zip_conflicting_header_blocked ... ok
+test security::tests::zip_encryption_blocked ... ok
+test security::tests::zip_prefixed_blocked ... ok
+test security::tests::zip_traversal_blocked ... ok
+test security_remote::tests::unknown_and_removal_permissions_are_separate ... ok
+test security::tests::release_is_durable_and_cancel_restores_quarantine ... ok
+test web::tests::login_limits_isolate_sources_and_expire ... ok
+test web::tests::login_source_table_has_a_fixed_bound_without_evicting_active_buckets ... ok
+test web::tests::origin_is_exact_not_a_substring ... ok
+test setup::tests::local_chain_is_verified_private_and_never_replaced ... ok
+test webmail::tests::compose_preserves_unicode_and_hides_bcc ... ok
+test webmail::tests::compose_rejects_injected_headers_and_large_payloads ... ok
+test web::tests::sessions_expire_and_have_a_fixed_bound ... ok
+test security::tests::rules_test_has_no_delivery_or_removal_effect ... ok
+test security::tests::identity_changes_invalidate_sessions_revision ... ok
+test encrypted_store::tests::random_access_and_resize_match_a_plain_file_without_persisting_plaintext ... ok
+test encrypted_store::tests::automatic_compaction_preserves_durable_contents_and_uses_a_new_file_key ... ok
+test certificates::tests::native_issuance_retry_live_reload_and_cached_restart ... ok
+test dkim::tests::key_protection_and_signature_shape ... ok
+
+test result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.77s
+
+     Running unittests src/main.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/workglen-f92cab8f093ffcd3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/accounting_db.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/accounting_db-72e5025192b553bd)
+
+running 1 test
+test accounting_transactions_and_banking ... ignored, requires WORKGLEN_TEST_DSN_FILE and WORKGLEN_TEST_CA_FILE; disposable DB
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/core.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/core-9dbbe42001ac22c9)
+
+running 12 tests
+test address_and_header_injection_are_rejected ... ok
+test imap_quoted_and_section_grammar_and_reversed_uid_sets ... ok
+test smtp_ehlo_accepts_address_literals_without_injection ... ok
+test acceptance_rejects_mime_floods_and_shapes_that_imap_cannot_render ... ok
+test witness_never_overlaps_leases_and_waits_after_restart ... ok
+test quota_failure_does_not_commit_body_or_sequence ... ok
+test gc_preserves_shared_message_body ... ok
+test missing_deployment_marker_cannot_allow_an_unfenced_writer ... ok
+test uid_state_survives_restart_and_changes_on_promotion ... ok
+test deployment_transitions_require_seeded_data_and_explicit_demotion ... ok
+test journal_replay_is_atomic_and_rejects_gaps ... ok
+test backup_has_consistent_metadata_and_read_only_export ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/local_postgres.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/local_postgres-c134286717cbb31d)
+
+running 1 test
+test accounting_initializes_and_reopens_over_explicit_local_transport ... ignored, requires disposable WORKGLEN_LOCAL_TEST_DSN_FILE
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/posting_corrections.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/posting_corrections-3713896cdef452d0)
+
+running 1 test
+test posting_corrections_locks_sources_and_audit ... ignored, requires disposable WORKGLEN_TEST_DSN_FILE and WORKGLEN_TEST_CA_FILE
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pratique_crypto.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/pratique_crypto-26fc4dd7b3013637)
+
+running 2 tests
+test hmac_sha256_rfc4231_case_one ... ok
+test aes256_gcm_known_answer_and_authentication_failure ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests workglen_mail
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

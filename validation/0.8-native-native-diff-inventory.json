@@ -1,0 +1,21 @@
+{
+  "stage": "native-diff",
+  "before_registry": 176,
+  "after_registry": 174,
+  "before_external": 177,
+  "after_external": 175,
+  "removed_packages": [
+    {
+      "name": "bstr",
+      "version": "1.13.1"
+    },
+    {
+      "name": "similar",
+      "version": "3.2.0"
+    }
+  ],
+  "added_registry_packages": [],
+  "retained_checksums_unchanged": true,
+  "before_lock_sha256": "6eddf83ba8aa4c9bca7278c2ab7b4b021348573b525aeaa11008a395668a109a",
+  "after_lock_sha256": "e6e0aa7a50e8114a9dba0c3ec70d16be834329ae17fb860172e3898c2814ab2b"
+}

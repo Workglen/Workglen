@@ -1,0 +1,17 @@
+{
+  "passed": 12,
+  "checks": [
+    "Accounting requires CSRF",
+    "disabled Accounting blocks commands",
+    "SimpleFIN rejects non-provider insecure destination",
+    "Accounting ready after browser lifecycle",
+    "accountant sees assigned books only",
+    "ordinary accountant cannot reopen periods",
+    "cross-book posting access denied",
+    "assigned accountant can edit ordinary postings",
+    "audit retains named external actor",
+    "read-only users cannot correct postings",
+    "assigned accounting administrator can reopen periods",
+    "CLI sees browser-created books"
+  ]
+}

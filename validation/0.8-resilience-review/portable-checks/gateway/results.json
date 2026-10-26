@@ -1,0 +1,43 @@
+{
+  "scope": "Synthetic local tests only; no live Microsoft tenant, DNS changes or real mail",
+  "build_checks_skipped": true,
+  "browser_requested": true,
+  "results": [
+    {
+      "check": "first-party-dependencies",
+      "exit_code": 0,
+      "seconds": 0.1,
+      "log": "first-party-dependencies.txt"
+    },
+    {
+      "check": "microsoft365-plan",
+      "exit_code": 0,
+      "seconds": 0.07,
+      "log": "microsoft365-plan.txt"
+    },
+    {
+      "check": "microsoft365-ui",
+      "exit_code": 0,
+      "seconds": 2.6,
+      "log": "microsoft365-ui.txt"
+    },
+    {
+      "check": "destinations-ui",
+      "exit_code": 0,
+      "seconds": 6.93,
+      "log": "destinations-ui.txt"
+    },
+    {
+      "check": "directory-ui",
+      "exit_code": 0,
+      "seconds": 5.83,
+      "log": "directory-ui.txt"
+    },
+    {
+      "check": "native-network",
+      "exit_code": 0,
+      "seconds": 10.17,
+      "log": "native-network.txt"
+    }
+  ]
+}

@@ -1,0 +1,247 @@
+PASS single mode serves without any witness or peer
+PASS CLI disables Mail in single-node mode
+PASS single-mode restart preserves transaction sequence
+PASS module disabled state survives restart
+PASS primary lease and initial database snapshot
+PASS single-to-dual transition preserves mailbox data
+PASS module catalog requires administrator login
+PASS catalog distinguishes available Mail/Webmail/Accounting from planned modules
+PASS module changes require CSRF token
+PASS standby rejects module mutations
+PASS reject unavailable or foundational module: core
+PASS reject unavailable or foundational module: sales
+PASS reject unavailable or foundational module: unknown
+PASS disable refuses in-flight external delivery until queue bookkeeping finishes
+PASS web disables Mail
+PASS DATA started before disable cannot commit after disable
+PASS disabled module state replicates to standby
+PASS disabled SMTP returns temporary unavailable
+PASS disabled IMAP rejects connections
+PASS existing IMAP session stops on next command
+PASS disabled module blocks mail API and CLI
+PASS disabled module blocks mailbox mutations
+PASS disabling preserves messages and accounts
+PASS Core backup and admin remain available with all optional modules off
+PASS stale module revision is rejected
+PASS CLI re-enables Mail and web sees same setting
+PASS mailbox access resumes after re-enable
+PASS Webmail enable setting replicates independently
+PASS web protects account metadata before login
+PASS web denies unexpected Host
+PASS web login rejects missing or foreign origin
+PASS web login rejects invalid credentials
+PASS web login cookie is Secure HttpOnly SameSite Strict
+PASS web sends no-store and restrictive CSP
+PASS web session restores CSRF token
+PASS web CSRF guard blocks writes
+PASS web rejects wrong mailbox domain
+PASS web rejects short mailbox passwords
+PASS web creates mailbox account
+PASS web creation rejects duplicate accounts
+PASS web account summaries omit credentials
+PASS web-created account can log in over IMAP
+PASS CLI sees account created in web UI
+PASS web resets mailbox password
+PASS new web-set password authenticates IMAP
+PASS web and CLI show same policy
+PASS web queue view available
+PASS web creates consistent backup
+PASS web lists completed backups
+PASS standby permits web login and inspection
+PASS standby rejects web account mutations
+PASS web logout invalidates server session
+PASS open relay refused
+PASS unknown local account refused
+PASS Pratique SMTP STARTTLS
+PASS SPF aligned pass accepted
+PASS DMARC reject enforced
+PASS SPF softfail without DMARC policy accepted
+PASS DNS temporary errors defer
+PASS DKIM pass rescues SPF fail through aligned DMARC
+PASS tampered DKIM and failed SPF rejected
+PASS review F-1: MX rejects MIME boundary flood before delivery
+PASS review F-1: MX also rejects excessive BODYSTRUCTURE nesting
+PASS review F-1: authenticated submission rejects MIME boundary flood
+PASS review F-1: IMAP APPEND uses the same acceptance guard
+PASS review F-1: mailbox SEARCH remains usable
+PASS review F-1: bulk BODYSTRUCTURE remains usable
+PASS review F-1: rejected messages never enter mailbox storage
+PASS review F-3: oversized SMTP command gets explicit 500 response
+PASS review F-3: oversized line is closed without parsing its suffix
+PASS review F-3: SMTP remains responsive after oversized command
+PASS review F-2: one source receives its own attempt budget
+PASS review F-2: excessive attempts are throttled with Retry-After
+PASS review F-2: forwarding headers cannot bypass source throttling
+PASS review F-2: another client can sign in during attacker lockout
+PASS review F-2: malformed credentials do not consume password budget
+PASS review F-2: valid login works after malformed requests
+PASS IMAP login and folder listing
+PASS SELECT INBOX
+PASS SEARCH returns accepted messages
+PASS IMAP metadata, envelope, MIME structure, header preview
+PASS IMAP partial body fetch
+PASS IMAP flags
+PASS SEARCH UNSEEN
+PASS CREATE folder
+PASS COPY message
+PASS APPEND sent mail
+PASS MOVE message
+PASS authenticated submission queues external mail
+PASS TLS authenticated outbound relay delivered
+PASS outbound DKIM remains enabled with relay and replicated mail
+PASS IMAP IDLE announces new mail
+PASS consistent backup and read-only message export
+PASS accounts, folders, flags and queue transactions replicated
+PASS primary accepts mail while replica is offline
+PASS missed transactions catch up after peer returns
+PASS promoted node retains Webmail enable setting
+PASS promoted node inherits disabled Mail setting
+PASS standby automatically promotes after lease expiry
+PASS promoted node accepts mail
+PASS replicated account works after promotion
+PASS old primary rejoins as replica without taking leadership
+PASS empty replacement node receives database snapshot
+PASS replacement snapshot includes Webmail setting
+PASS replacement snapshot includes disabled module setting
+PASS 9 MB APPEND
+PASS ten replicated accounts authenticate on promoted node
+PASS mailbox isolation between accounts
+PASS two concurrent large fetches with ten idle sessions
+PASS web inspection remains responsive during concurrent mail load
+PASS mail processes stay below 512 MB RSS in tested load
+PASS witness outage fences mail acceptance after lease expiry
+PASS config-only dual-to-single downgrade is refused
+PASS demotion requires explicit peer-fencing assertion
+PASS explicit demotion creates a backup first
+PASS dual-to-single conversion runs with witness stopped
+PASS demotion preserves account, folders and mail
+PASS web UI remains available in single mode after demotion
+PASS offline demotion refuses a live locked database
+{
+  "passed": [
+    "single mode serves without any witness or peer",
+    "CLI disables Mail in single-node mode",
+    "single-mode restart preserves transaction sequence",
+    "module disabled state survives restart",
+    "primary lease and initial database snapshot",
+    "single-to-dual transition preserves mailbox data",
+    "module catalog requires administrator login",
+    "catalog distinguishes available Mail/Webmail/Accounting from planned modules",
+    "module changes require CSRF token",
+    "standby rejects module mutations",
+    "reject unavailable or foundational module: core",
+    "reject unavailable or foundational module: sales",
+    "reject unavailable or foundational module: unknown",
+    "disable refuses in-flight external delivery until queue bookkeeping finishes",
+    "web disables Mail",
+    "DATA started before disable cannot commit after disable",
+    "disabled module state replicates to standby",
+    "disabled SMTP returns temporary unavailable",
+    "disabled IMAP rejects connections",
+    "existing IMAP session stops on next command",
+    "disabled module blocks mail API and CLI",
+    "disabled module blocks mailbox mutations",
+    "disabling preserves messages and accounts",
+    "Core backup and admin remain available with all optional modules off",
+    "stale module revision is rejected",
+    "CLI re-enables Mail and web sees same setting",
+    "mailbox access resumes after re-enable",
+    "Webmail enable setting replicates independently",
+    "web protects account metadata before login",
+    "web denies unexpected Host",
+    "web login rejects missing or foreign origin",
+    "web login rejects invalid credentials",
+    "web login cookie is Secure HttpOnly SameSite Strict",
+    "web sends no-store and restrictive CSP",
+    "web session restores CSRF token",
+    "web CSRF guard blocks writes",
+    "web rejects wrong mailbox domain",
+    "web rejects short mailbox passwords",
+    "web creates mailbox account",
+    "web creation rejects duplicate accounts",
+    "web account summaries omit credentials",
+    "web-created account can log in over IMAP",
+    "CLI sees account created in web UI",
+    "web resets mailbox password",
+    "new web-set password authenticates IMAP",
+    "web and CLI show same policy",
+    "web queue view available",
+    "web creates consistent backup",
+    "web lists completed backups",
+    "standby permits web login and inspection",
+    "standby rejects web account mutations",
+    "web logout invalidates server session",
+    "open relay refused",
+    "unknown local account refused",
+    "Pratique SMTP STARTTLS",
+    "SPF aligned pass accepted",
+    "DMARC reject enforced",
+    "SPF softfail without DMARC policy accepted",
+    "DNS temporary errors defer",
+    "DKIM pass rescues SPF fail through aligned DMARC",
+    "tampered DKIM and failed SPF rejected",
+    "review F-1: MX rejects MIME boundary flood before delivery",
+    "review F-1: MX also rejects excessive BODYSTRUCTURE nesting",
+    "review F-1: authenticated submission rejects MIME boundary flood",
+    "review F-1: IMAP APPEND uses the same acceptance guard",
+    "review F-1: mailbox SEARCH remains usable",
+    "review F-1: bulk BODYSTRUCTURE remains usable",
+    "review F-1: rejected messages never enter mailbox storage",
+    "review F-3: oversized SMTP command gets explicit 500 response",
+    "review F-3: oversized line is closed without parsing its suffix",
+    "review F-3: SMTP remains responsive after oversized command",
+    "review F-2: one source receives its own attempt budget",
+    "review F-2: excessive attempts are throttled with Retry-After",
+    "review F-2: forwarding headers cannot bypass source throttling",
+    "review F-2: another client can sign in during attacker lockout",
+    "review F-2: malformed credentials do not consume password budget",
+    "review F-2: valid login works after malformed requests",
+    "IMAP login and folder listing",
+    "SELECT INBOX",
+    "SEARCH returns accepted messages",
+    "IMAP metadata, envelope, MIME structure, header preview",
+    "IMAP partial body fetch",
+    "IMAP flags",
+    "SEARCH UNSEEN",
+    "CREATE folder",
+    "COPY message",
+    "APPEND sent mail",
+    "MOVE message",
+    "authenticated submission queues external mail",
+    "TLS authenticated outbound relay delivered",
+    "outbound DKIM remains enabled with relay and replicated mail",
+    "IMAP IDLE announces new mail",
+    "consistent backup and read-only message export",
+    "accounts, folders, flags and queue transactions replicated",
+    "primary accepts mail while replica is offline",
+    "missed transactions catch up after peer returns",
+    "promoted node retains Webmail enable setting",
+    "promoted node inherits disabled Mail setting",
+    "standby automatically promotes after lease expiry",
+    "promoted node accepts mail",
+    "replicated account works after promotion",
+    "old primary rejoins as replica without taking leadership",
+    "empty replacement node receives database snapshot",
+    "replacement snapshot includes Webmail setting",
+    "replacement snapshot includes disabled module setting",
+    "9 MB APPEND",
+    "ten replicated accounts authenticate on promoted node",
+    "mailbox isolation between accounts",
+    "two concurrent large fetches with ten idle sessions",
+    "web inspection remains responsive during concurrent mail load",
+    "mail processes stay below 512 MB RSS in tested load",
+    "witness outage fences mail acceptance after lease expiry",
+    "config-only dual-to-single downgrade is refused",
+    "demotion requires explicit peer-fencing assertion",
+    "explicit demotion creates a backup first",
+    "dual-to-single conversion runs with witness stopped",
+    "demotion preserves account, folders and mail",
+    "web UI remains available in single mode after demotion",
+    "offline demotion refuses a live locked database"
+  ],
+  "checks": 119,
+  "peak_rss_kib_by_node": {
+    "node1": 44244,
+    "node2": 327300
+  }
+}

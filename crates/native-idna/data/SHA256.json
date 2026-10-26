@@ -1,0 +1,12 @@
+{
+  "unicode_version": "18.0.0",
+  "sources": {
+    "DerivedBidiClass.txt": "d9e23222522551348ea1ccfbb4f62efbf98982afb95840f8959c08ed992c5607",
+    "DerivedJoiningType.txt": "e2408ff2c92b175b0f7bf62c989bbb54c7b077528fe31f8d69b96fa09e7d61ed",
+    "DerivedNormalizationProps.txt": "98ac7f67d985fe781e317f6182e885e94cabb0c314769e6dd73e48b226931ccd",
+    "IdnaMappingTable.txt": "a03b1eb38032268c696406a83f0972d6a815acd2c8d4151d42ec0fda70ffced1",
+    "IdnaTestV2.txt": "0236b75c5b20dfd857b3b5cf75509887959d6ab00d6c7bda9b7dc3df518c1fde",
+    "NormalizationTest.txt": "25a50d816764b04abfb4a646d3eb2b2a803284c3873d9a06757b94fe4513dde3",
+    "UnicodeData.txt": "0736451de439ae7baf1425136617da495e09ee5afbe6e394374db7009ea08950"
+  }
+}

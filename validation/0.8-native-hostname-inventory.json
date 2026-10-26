@@ -1,0 +1,29 @@
+{
+  "stage": "hostname",
+  "before_registry": 181,
+  "after_registry": 177,
+  "before_external": 182,
+  "after_external": 178,
+  "removed_packages": [
+    {
+      "name": "errno",
+      "version": "0.3.14"
+    },
+    {
+      "name": "gethostname",
+      "version": "1.1.0"
+    },
+    {
+      "name": "linux-raw-sys",
+      "version": "0.12.1"
+    },
+    {
+      "name": "rustix",
+      "version": "1.1.5"
+    }
+  ],
+  "added_registry_packages": [],
+  "retained_checksums_unchanged": true,
+  "before_lock_sha256": "c3cde47baa72910ab214263883527a5e14096e1aee60e6135ce3dca395606a4f",
+  "after_lock_sha256": "c28ecea49b831e7a7ac4caa801b314baa33d6ff3cefd85d6c96a34e7648e6fbb"
+}

@@ -1,0 +1,46 @@
+[package]
+name = "workglen-security-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+# Fuzzer tooling only. This workspace is separate from the application and all
+# reusable libraries; no libFuzzer code enters a Workglen release executable.
+libfuzzer-sys = "=0.4.12"
+pratique = { path = "../vendor/pratique", features = ["server"] }
+
+[workspace]
+members = ["."]
+exclude = ["../vendor/pratique"]
+
+[[bin]]
+name = "tls_client"
+path = "fuzz_targets/tls_client.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tls_server"
+path = "fuzz_targets/tls_server.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "h2"
+path = "fuzz_targets/h2.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "x509"
+path = "fuzz_targets/x509.rs"
+test = false
+doc = false
+bench = false

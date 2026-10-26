@@ -1,0 +1,8 @@
+
+running 1 test
+5000 message pairs; 20000 canonical reconstruction checks; bidirectional JSON compatibility passed
+Generated recipe JSON: 1396 byte-identical, 3604 different valid scripts
+test generated_recipes_interoperate_with_previous_implementation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+

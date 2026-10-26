@@ -1,0 +1,4 @@
+    Checking workglen-dns v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-dns)
+    Checking mail-auth v0.13.3 (/workspace/scratch/00e4cff63970/source/workglen/vendor/mail-auth)
+    Checking workglen-mail v0.8.0 (/workspace/scratch/00e4cff63970/source/workglen)
+    Finished `release` profile [optimized] target(s) in 7.82s

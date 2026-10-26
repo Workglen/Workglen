@@ -1,0 +1,59 @@
+{
+  "scope": "Synthetic local offline checks; no production deployment",
+  "results": [
+    {
+      "check": "unicode-data-regeneration",
+      "exit_code": 0,
+      "seconds": 0.6,
+      "log": "unicode-data-regeneration.txt"
+    },
+    {
+      "check": "mime-data-regeneration",
+      "exit_code": 0,
+      "seconds": 0.08,
+      "log": "mime-data-regeneration.txt"
+    },
+    {
+      "check": "toml-fixture-regeneration",
+      "exit_code": 0,
+      "seconds": 0.18,
+      "log": "toml-fixture-regeneration.txt"
+    },
+    {
+      "check": "pratique-source-tracking",
+      "exit_code": 0,
+      "seconds": 0.07,
+      "log": "pratique-source-tracking.txt"
+    },
+    {
+      "check": "rust-tests",
+      "exit_code": 0,
+      "seconds": 52.47,
+      "log": "rust-tests.txt"
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0,
+      "seconds": 17.51,
+      "log": "clippy.txt"
+    },
+    {
+      "check": "release-build",
+      "exit_code": 0,
+      "seconds": 31.94,
+      "log": "release-build.txt"
+    },
+    {
+      "check": "outbound",
+      "exit_code": 0,
+      "seconds": 68.55,
+      "log": "outbound.txt"
+    },
+    {
+      "check": "mail",
+      "exit_code": 1,
+      "seconds": 44.03,
+      "log": "mail.txt"
+    }
+  ]
+}

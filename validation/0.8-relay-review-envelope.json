@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "host": "127.0.0.1",
+  "port": 46711,
+  "data_sent": false,
+  "results": [
+    {
+      "address": "127.0.0.1",
+      "checks": [
+        "plaintext external recipient refused",
+        "STARTTLS certificate and hostname verified",
+        "gateway SMTP AUTH unavailable",
+        "known configured recipient accepted without submitting mail",
+        "RSET clears envelope state",
+        "external sender: external recipient refused",
+        "external sender: unknown local recipient refused",
+        "claimed local sender: external recipient refused",
+        "claimed local sender: unknown local recipient refused",
+        "null sender: external recipient refused",
+        "null sender: unknown local recipient refused",
+        "unconfigured percent, bang and source-route forms refused"
+      ]
+    }
+  ],
+  "scope": "SMTP envelope refusal checks only; not a host compromise or firewall audit"
+}

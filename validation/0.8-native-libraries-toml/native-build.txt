@@ -1,0 +1,5 @@
+   Compiling pratique v0.1.0 (/workspace/scratch/00e4cff63970/serde-reduction/toml-oracle-passed/pratique-source)
+   Compiling workglen-toml v0.1.0 (/workspace/scratch/00e4cff63970/serde-reduction/toml-oracle-passed/toml-source)
+   Compiling toml-reference v0.0.0 (/workspace/scratch/00e4cff63970/serde-reduction/toml-oracle-passed/native)
+    Finished `release` profile [optimized] target(s) in 15.14s
+     Running `/workspace/scratch/00e4cff63970/serde-reduction/toml-oracle-passed/target/release/toml-reference`

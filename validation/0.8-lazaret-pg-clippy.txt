@@ -1,0 +1,2 @@
+    Checking lazaret-pg v0.1.0 (/tmp/workglen-memory-validation-08466ao5/source/vendor/lazaret-pg)
+    Finished `release` profile [optimized] target(s) in 0.65s

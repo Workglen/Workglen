@@ -1,0 +1,14 @@
+   Compiling workglen-mail v0.8.0 (/workspace/scratch/00e4cff63970/source/workglen)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.58s
+     Running tests/native_mailauth.rs (target/debug/deps/native_mailauth-a34491d51a1edf98)
+
+running 6 tests
+test spf_candidate_rejects_malformed_policies ... ok
+test spf_recursive_limits_qualifiers_and_null_sender ... ok
+test spf_text_mechanisms_match_reference ... ok
+test dmarc_alignment_tree_and_policy ... ok
+test independent_dkim_messages_and_mutations ... ok
+test native_signing_verified_independently ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+

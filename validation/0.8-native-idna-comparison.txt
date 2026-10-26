@@ -1,0 +1,35 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling stable_deref_trait v1.2.1
+   Compiling litemap v0.8.3
+   Compiling writeable v0.6.4
+   Compiling icu_properties_data v2.4.0
+   Compiling utf8_iter v1.0.4
+   Compiling icu_normalizer_data v2.4.0
+   Compiling smallvec v1.16.4
+   Compiling pratique v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/vendor/pratique)
+   Compiling syn v3.0.9
+   Compiling synstructure v0.14.0
+   Compiling zerovec-derive v0.11.7
+   Compiling displaydoc v0.2.7
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling workglen-idna v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-idna)
+   Compiling zerofrom v0.1.8
+   Compiling yoke v0.8.4
+   Compiling zerotrie v0.2.5
+   Compiling zerovec v0.11.9
+   Compiling tinystr v0.8.5
+   Compiling potential_utf v0.1.6
+   Compiling icu_collections v2.4.0
+   Compiling icu_locale_core v2.4.0
+   Compiling icu_provider v2.4.0
+   Compiling icu_normalizer v2.4.0
+   Compiling icu_properties v2.4.0
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling workglen-reference-oracle v0.0.0 (/workspace/scratch/00e4cff63970/portable-idna-oracle/harness)
+    Finished `release` profile [optimized] target(s) in 19.98s
+     Running `/workspace/scratch/00e4cff63970/portable-idna-oracle/target/release/workglen-reference-oracle`
+3456617 pinned-IDNA comparisons; 0 mismatches

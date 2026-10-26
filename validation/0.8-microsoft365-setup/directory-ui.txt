@@ -1,0 +1,6 @@
+PASS discovery requires explicit review before applying additions
+PASS applying discovery preserves existing recipients and preferences
+PASS failed discovery offers no apply action
+PASS Admin navigation and Microsoft 365 setup fit narrow screens
+PASS Webmail uses the configured Admin origin without forwarding credentials
+PASS no browser script errors

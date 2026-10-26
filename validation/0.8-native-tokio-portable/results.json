@@ -1,0 +1,71 @@
+{
+  "scope": "Synthetic local offline checks; no production deployment",
+  "results": [
+    {
+      "check": "unicode-data-regeneration",
+      "exit_code": 0,
+      "seconds": 0.52,
+      "log": "unicode-data-regeneration.txt"
+    },
+    {
+      "check": "mime-data-regeneration",
+      "exit_code": 0,
+      "seconds": 0.05,
+      "log": "mime-data-regeneration.txt"
+    },
+    {
+      "check": "toml-fixture-regeneration",
+      "exit_code": 0,
+      "seconds": 0.08,
+      "log": "toml-fixture-regeneration.txt"
+    },
+    {
+      "check": "pratique-source-tracking",
+      "exit_code": 0,
+      "seconds": 0.1,
+      "log": "pratique-source-tracking.txt"
+    },
+    {
+      "check": "rust-tests",
+      "exit_code": 0,
+      "seconds": 13.67,
+      "log": "rust-tests.txt"
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0,
+      "seconds": 15.11,
+      "log": "clippy.txt"
+    },
+    {
+      "check": "release-build",
+      "exit_code": 0,
+      "seconds": 0.09,
+      "log": "release-build.txt"
+    },
+    {
+      "check": "outbound",
+      "exit_code": 0,
+      "seconds": 66.93,
+      "log": "outbound.txt"
+    },
+    {
+      "check": "mail",
+      "exit_code": 0,
+      "seconds": 50.31,
+      "log": "mail.txt"
+    },
+    {
+      "check": "webmail",
+      "exit_code": 0,
+      "seconds": 2.6,
+      "log": "webmail.txt"
+    },
+    {
+      "check": "installer",
+      "exit_code": 0,
+      "seconds": 3.25,
+      "log": "installer.txt"
+    }
+  ]
+}

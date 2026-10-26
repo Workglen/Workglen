@@ -1,0 +1,20 @@
+{
+  "stage": "native-diff",
+  "upstream_files_verified": 66,
+  "patch_reapplies_exactly": true,
+  "modified_or_added": [
+    "Cargo.toml",
+    "src/common/auth_results.rs",
+    "src/common/crypto/mod.rs",
+    "src/common/crypto/pratique_impl.rs",
+    "src/common/encoding.rs",
+    "src/common/headers.rs",
+    "src/common/mod.rs",
+    "src/dkim2/mod.rs",
+    "src/dkim2/native_diff.rs",
+    "src/dkim2/recipe.rs",
+    "src/dkim2/recipe_serializer.rs",
+    "src/lib.rs"
+  ],
+  "upstream_crate_checksum": "8505122ba86e1f4adeb664196c1e787c3f29bb6e7c128e4a366d47d209911440"
+}

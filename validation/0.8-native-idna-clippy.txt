@@ -1,0 +1,8 @@
+    Checking workglen-idna v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-idna)
+   Compiling syn v3.0.9
+    Checking lazaret-pg v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/vendor/lazaret-pg)
+    Checking workglen-dns v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-dns)
+   Compiling serde_derive v1.0.229
+    Checking serde v1.0.229
+    Checking workglen-mail v0.8.0 (/workspace/scratch/00e4cff63970/source/workglen)
+    Finished `release` profile [optimized] target(s) in 11.35s

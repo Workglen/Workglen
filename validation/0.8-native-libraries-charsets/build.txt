@@ -1,0 +1,15 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /workspace/scratch/00e4cff63970/serde-reduction/charset-oracle-portable/pratique-source/Cargo.toml
+workspace: /workspace/scratch/00e4cff63970/serde-reduction/charset-oracle-portable/Cargo.toml
+   Compiling rustversion v1.0.23
+   Compiling cfg-if v1.0.5
+   Compiling simdutf8 v0.1.5
+   Compiling core_detect v1.0.0
+   Compiling scopeguard v1.2.0
+   Compiling multiversion_no_op v1.0.0
+   Compiling pratique v0.1.0 (/workspace/scratch/00e4cff63970/serde-reduction/charset-oracle-portable/pratique-source)
+   Compiling encoding_rs v0.8.42
+   Compiling charset-reference v0.0.0 (/workspace/scratch/00e4cff63970/serde-reduction/charset-oracle-portable)
+    Finished `release` profile [optimized] target(s) in 15.25s
+     Running `target/release/charset-reference`
+cases=2883056 mismatches=0

@@ -1,0 +1,6 @@
+    Checking argon2 v0.5.3
+    Checking toml v0.9.12+spec-1.1.0
+    Checking chrono v0.4.45
+    Checking pratique v0.1.0 (/tmp/workglen-memory-validation-08466ao5/source/vendor/pratique)
+    Checking workglen-mail v0.8.0 (/tmp/workglen-memory-validation-08466ao5/source)
+    Finished `release` profile [optimized] target(s) in 13.13s

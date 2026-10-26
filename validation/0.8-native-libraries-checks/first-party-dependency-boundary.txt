@@ -1,0 +1,7 @@
+PASS lazaret-pg has only first-party dependencies, including build/dev/platform edges
+PASS pratique has only first-party dependencies, including build/dev/platform edges
+PASS workglen-dns has only first-party dependencies, including build/dev/platform edges
+PASS workglen-idna has only first-party dependencies, including build/dev/platform edges
+PASS workglen-mime has only first-party dependencies, including build/dev/platform edges
+PASS workglen-toml has only first-party dependencies, including build/dev/platform edges
+Application-level database/password dependencies are counted separately; this check covers six reusable libraries.

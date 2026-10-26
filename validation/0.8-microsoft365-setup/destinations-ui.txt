@@ -1,0 +1,8 @@
+PASS empty install explains missing destination and prevents premature advance
+PASS Microsoft MX discovery fills a reviewable hostname
+PASS failed test retains inputs, explains outbound SMTP and prevents save
+PASS successful test saves and selects a destination without JSON editing
+PASS recipient draft survives returning to Mail flow
+PASS domain destination and recipient save together and continue to Detection
+PASS guided destination setup fits a narrow viewport
+PASS no browser script errors

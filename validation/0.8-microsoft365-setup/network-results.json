@@ -1,0 +1,24 @@
+{
+  "passed": 19,
+  "checks": [
+    "generated-key and supplied-key instances report mandatory encrypted storage",
+    "native detector, verified TLS route, IMAPS and EWS readiness checks",
+    "identification testing has no delivery or quarantine side effects",
+    "relay refusal checks cover forged local sender, null sender, unknown users, alternate syntax and reset without submitting mail",
+    "native STARTTLS delivery prepends observed SMTP peer and preserves original MIME suffix",
+    "stored original hash remains unchanged after SMTP trace is added to delivery",
+    "AI and unreadable archives are administrator-only; ordinary spam is releasable",
+    "unknown recipient and open relay rejected",
+    "mandatory unreadable-archive block cannot be bypassed by administrator release",
+    "native digest is delivered to the configured mailbox holder",
+    "digest mutation requires valid CSRF",
+    "forwarded digest does not grant another mailbox access",
+    "central Admin manages both native instances using verified signed requests",
+    "central instance scopes and accounting/security role separation enforced",
+    "local native remediation preserves MIME under hold before scoped removal",
+    "exchange native remediation preserves MIME under hold before scoped removal",
+    "gateway continues processing while central Admin is offline",
+    "on-disk database hides recipient identifiers, message content and quarantine metadata",
+    "encrypted gateway survives forced process termination and reopens durable quarantine"
+  ]
+}

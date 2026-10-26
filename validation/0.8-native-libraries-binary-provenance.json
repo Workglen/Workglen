@@ -1,0 +1,7 @@
+{
+  "baseline_source": "native Tokio/source v33",
+  "baseline_zip_sha256": "b4592aa1dc9d95c31ac5e13ec46008347fb99cfd463d1266446d9af25a4e8769",
+  "baseline_binary_sha256": "2b4b5bcccfd85d3df08774ecb28e5b481529df324442aec76f57a157262bf8cc",
+  "after_binary_sha256": "c48f504600e0aa60582f9ca0a289881e903704f2265675d7dd8d37a163b2529f",
+  "scope": "Executables built in this isolated workspace; disposable synthetic encrypted-store/audit/password fixture; no deployment"
+}

@@ -1,0 +1,3 @@
+    Checking lazaret-pg v0.1.0 (/tmp/workglen-memory-validation-08466ao5/source/vendor/lazaret-pg)
+    Checking workglen-mail v0.8.0 (/tmp/workglen-memory-validation-08466ao5/source)
+    Finished `release` profile [optimized] target(s) in 9.72s

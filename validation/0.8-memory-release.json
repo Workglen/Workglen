@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-24",
+  "platform": "Linux x86-64",
+  "rust": "1.99.1",
+  "scope": "Isolated offline direct Cargo build; no installer, real host setup, network or swap operations. Executor exposes only UID 0. Not a 1 GiB Lightsail test.",
+  "profile": {
+    "opt-level": 1,
+    "lto": "off",
+    "codegen-units": 16,
+    "debug": 0,
+    "incremental": false,
+    "strip": true
+  },
+  "cargo_toml_sha256": "108a027d2fde8ffbcae44a02001b0baa728bac1b58373dd107de3b35e515df58",
+  "cargo_lock_sha256": "799afa78b06e3db0d7bac7bf0d4e7e5677f974b8735da81f419db95da203128b",
+  "jobs": 1,
+  "build_results": [
+    {
+      "stage": "pratique",
+      "exit_code": 0,
+      "elapsed_seconds": 36.66,
+      "max_child_rss_kib_so_far": 728760
+    },
+    {
+      "stage": "application",
+      "exit_code": 0,
+      "elapsed_seconds": 155.42,
+      "max_child_rss_kib_so_far": 761860
+    }
+  ],
+  "rss_measurement": "Linux resource.getrusage(RUSAGE_CHILDREN).ru_maxrss in KiB; largest child-process high-water across completed stages, not aggregate machine memory or a hard minimum.",
+  "release_tests": {
+    "core_passed": 12,
+    "pratique_crypto_passed": 2
+  },
+  "repeat_build": {
+    "exit_code": 0,
+    "elapsed_seconds": 0.111,
+    "compiling_lines": 0
+  }
+}

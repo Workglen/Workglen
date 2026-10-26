@@ -1,0 +1,72 @@
+{
+  "scope": "Synthetic local offline checks; no production deployment",
+  "results": [
+    {
+      "check": "unicode-data-regeneration",
+      "exit_code": 0,
+      "seconds": 0.57,
+      "log": "0.8-native-toml-unicode-data-regeneration.txt"
+    },
+    {
+      "check": "mime-data-regeneration",
+      "exit_code": 0,
+      "seconds": 0.04,
+      "log": "0.8-native-toml-mime-data-regeneration.txt"
+    },
+    {
+      "check": "rust-tests",
+      "exit_code": 0,
+      "seconds": 31.88,
+      "log": "0.8-native-toml-rust-tests.txt"
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0,
+      "seconds": 14.87,
+      "log": "0.8-native-toml-clippy.txt"
+    },
+    {
+      "check": "release-build",
+      "exit_code": 0,
+      "seconds": 32.86,
+      "log": "0.8-native-toml-release-build.txt"
+    },
+    {
+      "check": "outbound",
+      "exit_code": 0,
+      "seconds": 67.62,
+      "log": "0.8-native-toml-outbound.txt"
+    },
+    {
+      "check": "mail",
+      "exit_code": 0,
+      "seconds": 49.8,
+      "log": "0.8-native-toml-mail.txt"
+    },
+    {
+      "check": "webmail",
+      "exit_code": 0,
+      "seconds": 2.58,
+      "log": "0.8-native-toml-webmail.txt"
+    },
+    {
+      "check": "toml-fixture-regeneration",
+      "exit_code": 0,
+      "log": "0.8-native-toml-toml-fixture-regeneration.txt"
+    },
+    {
+      "check": "installer",
+      "exit_code": 0,
+      "seconds": 2.91,
+      "log": "0.8-native-toml-installer.txt",
+      "assertions": 10
+    },
+    {
+      "check": "dependency-reduction",
+      "exit_code": 0,
+      "log": "0.8-native-toml-dependency-reduction.txt"
+    }
+  ],
+  "date": "2026-10-26",
+  "note": "TOML fixture regeneration and installer were run separately while the runner was being extended; the shipped runner includes both. Graph comparison is an explicit optional baseline-ZIP check."
+}

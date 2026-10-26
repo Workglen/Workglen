@@ -1,0 +1,111 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling stable_deref_trait v1.2.1
+   Compiling litemap v0.8.3
+   Compiling writeable v0.6.4
+   Compiling icu_properties_data v2.4.0
+   Compiling utf8_iter v1.0.4
+   Compiling icu_normalizer_data v2.4.0
+   Compiling smallvec v1.16.4
+   Compiling percent-encoding v2.3.2
+   Compiling pratique v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/vendor/pratique)
+   Compiling form_urlencoded v1.2.2
+   Compiling syn v3.0.9
+   Compiling synstructure v0.14.0
+   Compiling zerovec-derive v0.11.7
+   Compiling displaydoc v0.2.7
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling workglen-idna v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-idna)
+   Compiling zerofrom v0.1.8
+   Compiling yoke v0.8.4
+   Compiling zerovec v0.11.9
+   Compiling zerotrie v0.2.5
+   Compiling tinystr v0.8.5
+   Compiling potential_utf v0.1.6
+   Compiling icu_collections v2.4.0
+   Compiling icu_locale_core v2.4.0
+   Compiling icu_provider v2.4.0
+   Compiling icu_normalizer v2.4.0
+   Compiling icu_properties v2.4.0
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling workglen-reference-oracle v0.0.0 (/workspace/scratch/00e4cff63970/portable-url-oracle/harness)
+warning: multiple methods are never used
+   --> /workspace/scratch/00e4cff63970/source/workglen/src/url.rs:364:12
+    |
+266 | impl Url {
+    | -------- methods in this implementation
+...
+364 |     pub fn scheme(&self) -> &str {
+    |            ^^^^^^
+...
+367 |     pub fn host_str(&self) -> Option<&str> {
+    |            ^^^^^^^^
+...
+370 |     pub fn username(&self) -> &str {
+    |            ^^^^^^^^
+...
+373 |     pub fn password(&self) -> Option<&str> {
+    |            ^^^^^^^^
+...
+376 |     pub fn port(&self) -> Option<u16> {
+    |            ^^^^
+...
+379 |     pub fn port_or_known_default(&self) -> Option<u16> {
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+385 |     pub fn path(&self) -> &str {
+    |            ^^^^
+...
+388 |     pub fn query(&self) -> Option<&str> {
+    |            ^^^^^
+...
+391 |     pub fn fragment(&self) -> Option<&str> {
+    |            ^^^^^^^^
+...
+397 |     pub fn origin(&self) -> Origin {
+    |            ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `Origin` is never constructed
+   --> /workspace/scratch/00e4cff63970/source/workglen/src/url.rs:436:12
+    |
+436 | pub struct Origin(String);
+    |            ^^^^^^
+
+warning: method `ascii_serialization` is never used
+   --> /workspace/scratch/00e4cff63970/source/workglen/src/url.rs:438:12
+    |
+437 | impl Origin {
+    | ----------- method in this implementation
+438 |     pub fn ascii_serialization(&self) -> String {
+    |            ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `Serializer` is never constructed
+   --> /workspace/scratch/00e4cff63970/source/workglen/src/url.rs:480:16
+    |
+480 |     pub struct Serializer(String);
+    |                ^^^^^^^^^^
+
+warning: associated items `new`, `append_pair`, and `finish` are never used
+   --> /workspace/scratch/00e4cff63970/source/workglen/src/url.rs:482:16
+    |
+481 |     impl Serializer {
+    |     --------------- associated items in this implementation
+482 |         pub fn new(value: String) -> Self {
+    |                ^^^
+...
+485 |         pub fn append_pair(&mut self, key: &str, value: &str) -> &mut Self {
+    |                ^^^^^^^^^^^
+...
+494 |         pub fn finish(&mut self) -> String {
+    |                ^^^^^^
+
+warning: `workglen-reference-oracle` (bin "workglen-reference-oracle") generated 5 warnings
+    Finished `release` profile [optimized] target(s) in 20.77s
+     Running `/workspace/scratch/00e4cff63970/portable-url-oracle/target/release/workglen-reference-oracle`
+106600 URL comparisons, 0 mismatches

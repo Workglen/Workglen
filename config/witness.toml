@@ -1,0 +1,8 @@
+listen = "10.20.0.10:9444"
+# For automatic Let’s Encrypt certificates, replace tls_cert/tls_key with [acme]; see TLS-CERTIFICATES.md.
+tls_cert = "/etc/workglen/witness-fullchain.pem"
+tls_key = "/etc/workglen/witness-key.pem"
+token_file = "/etc/workglen/witness.token"
+state_file = "/var/lib/workglen-witness/term"
+cluster_id = "replace-with-a-unique-cluster-id"
+lease_seconds = 15

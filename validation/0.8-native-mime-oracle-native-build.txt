@@ -1,0 +1,7 @@
+     Locking 19 packages to highest Rust 1.99.1 compatible versions
+   Compiling memchr v2.8.3
+   Compiling workglen-mime v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-mime)
+   Compiling serde_json v1.0.154
+   Compiling mime-reference v0.0.0 (/workspace/scratch/00e4cff63970/portable-mime-oracle/native)
+    Finished `release` profile [optimized] target(s) in 2.65s
+     Running `/workspace/scratch/00e4cff63970/portable-mime-oracle/target/release/mime-reference`

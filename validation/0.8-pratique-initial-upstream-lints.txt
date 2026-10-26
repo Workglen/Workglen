@@ -1,0 +1,1622 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /workspace/scratch/00e4cff63970/tokio-reduction/pratique-final/pratique-source/Cargo.toml
+workspace: /workspace/scratch/00e4cff63970/tokio-reduction/pratique-final/Cargo.toml
+    Checking pratique v0.1.0 (/workspace/scratch/00e4cff63970/tokio-reduction/pratique-final/pratique-source)
+error: method `next` can be confused for the standard trait method `std::iter::Iterator::next`
+  --> pratique-source/src/asn1.rs:47:5
+   |
+47 | /     pub fn next(&mut self) -> Result<Tlv<'a>> {
+48 | |         let start = self.pos;
+49 | |         let tag = *self.data.get(self.pos).ok_or(Error::Asn1("unexpected end of data"))?;
+50 | |         if tag & 0x1f == 0x1f {
+...  |
+83 | |         Ok(Tlv { tag, content, raw: &self.data[start..end] })
+84 | |     }
+   | |_____^
+   |
+   = help: consider implementing the trait `std::iter::Iterator` or choosing a less ambiguous method name
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#should_implement_trait
+   = note: `-D clippy::should-implement-trait` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::should_implement_trait)]`
+
+error: method `next` can be confused for the standard trait method `std::iter::Iterator::next`
+   --> pratique-source/src/ber.rs:303:5
+    |
+303 | /     pub fn next(&mut self) -> Result<&'n Node<'a>> {
+304 | |         let n = self.nodes.get(self.pos).ok_or(Error::Asn1("unexpected end of data"))?;
+305 | |         self.pos += 1;
+306 | |         Ok(n)
+307 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::iter::Iterator` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#should_implement_trait
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/cms.rs:189:9
+    |
+189 |         self.params.as_deref().map_or(true, |p| p == [0x05, 0x00])
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+    = note: `-D clippy::unnecessary-map-or` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_map_or)]`
+help: use `is_none_or` instead
+    |
+189 -         self.params.as_deref().map_or(true, |p| p == [0x05, 0x00])
+189 +         self.params.as_deref().is_none_or(|p| p == [0x05, 0x00])
+    |
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/cms.rs:688:30
+    |
+688 |                     Ok(t) if best.as_ref().map_or(true, |b| t.time < b.time) => best = Some(t),
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+688 -                     Ok(t) if best.as_ref().map_or(true, |b| t.time < b.time) => best = Some(t),
+688 +                     Ok(t) if best.as_ref().is_none_or(|b| t.time < b.time) => best = Some(t),
+    |
+
+error: manually reimplementing `div_ceil`
+  --> pratique-source/src/crypto/bignum.rs:16:13
+   |
+16 |     let n = (bytes.len() + 7) / 8;
+   |             ^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `bytes.len().div_ceil(8)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+   = note: `-D clippy::manual-div-ceil` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_div_ceil)]`
+
+error: this `map_or` can be simplified
+  --> pratique-source/src/crypto/bignum.rs:66:5
+   |
+66 |     a.get(i / 64).map_or(false, |l| (l >> (i % 64)) & 1 == 1)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+   |
+66 -     a.get(i / 64).map_or(false, |l| (l >> (i % 64)) & 1 == 1)
+66 +     a.get(i / 64).is_some_and(|l| (l >> (i % 64)) & 1 == 1)
+   |
+
+error: the loop variable `i` is only used to index `b`
+   --> pratique-source/src/crypto/bignum.rs:207:18
+    |
+207 |         for i in 0..n {
+    |                  ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+    = note: `-D clippy::needless-range-loop` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_range_loop)]`
+help: consider using an iterator
+    |
+207 -         for i in 0..n {
+207 +         for <item> in b.iter().take(n) {
+    |
+
+error: methods called `from_*` usually take no `self`
+   --> pratique-source/src/crypto/bignum.rs:245:22
+    |
+245 |     pub fn from_mont(&self, a: &[u64]) -> Vec<u64> {
+    |                      ^^^^^
+    |
+    = help: consider choosing a less ambiguous name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#wrong_self_convention
+    = note: `-D clippy::wrong-self-convention` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::wrong_self_convention)]`
+
+error: the loop variable `i` is only used to index `b`
+   --> pratique-source/src/crypto/bignum.rs:462:22
+    |
+462 |             for i in 0..N {
+    |                      ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+462 -             for i in 0..N {
+462 +             for <item> in b.iter().take(N) {
+    |
+
+error: manually reimplementing `div_ceil`
+   --> pratique-source/src/crypto/bignum.rs:528:33
+    |
+528 |                 for j in first..(i + 1) / 2 {
+    |                                 ^^^^^^^^^^^ help: consider using `.div_ceil()`: `i.div_ceil(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+
+error: the loop variable `j` is used to index `q`
+   --> pratique-source/src/crypto/bignum.rs:537:30
+    |
+537 |                     for j in 0..i {
+    |                              ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+537 -                     for j in 0..i {
+537 +                     for (j, <item>) in q.iter().enumerate().take(i) {
+    |
+
+error: the loop variable `j` is used to index `q`
+   --> pratique-source/src/crypto/bignum.rs:544:30
+    |
+544 |                     for j in first..N {
+    |                              ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+544 -                     for j in first..N {
+544 +                     for (j, <item>) in q.iter().enumerate().take(N).skip(first) {
+    |
+
+error: methods with the following characteristics: (`to_*` and `self` type is `Copy`) usually take `self` by value
+   --> pratique-source/src/crypto/ed25519.rs:451:18
+    |
+451 |     fn to_cached(&self) -> Cached {
+    |                  ^^^^^
+    |
+    = help: consider choosing a less ambiguous name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#wrong_self_convention
+
+error: methods with the following characteristics: (`to_*` and `self` type is `Copy`) usually take `self` by value
+   --> pratique-source/src/crypto/ed25519.rs:456:18
+    |
+456 |     fn to_affine(&self) -> Affine {
+    |                  ^^^^^
+    |
+    = help: consider choosing a less ambiguous name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#wrong_self_convention
+
+error: methods with the following characteristics: (`to_*` and `self` type is `Copy`) usually take `self` by value
+   --> pratique-source/src/crypto/ed25519.rs:461:35
+    |
+461 |     pub(super) fn to_affine_given(&self, zinv: Fe) -> Affine {
+    |                                   ^^^^^
+    |
+    = help: consider choosing a less ambiguous name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#wrong_self_convention
+
+error: manual `!RangeInclusive::contains` implementation
+   --> pratique-source/src/crypto/rsa.rs:100:12
+    |
+100 |         if e_bits < 2 || e_bits > 64 || e_limbs[0] & 1 == 0 {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `!(2..=64).contains(&e_bits)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_range_contains
+    = note: `-D clippy::manual-range-contains` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_range_contains)]`
+
+error: manually reimplementing `div_ceil`
+   --> pratique-source/src/crypto/rsa.rs:104:77
+    |
+104 |         Ok(RsaPublicKey { modulus: Modulus::new(n_limbs), e: e_limbs[0], k: (mod_bits + 7) / 8, mod_bits })
+    |                                                                             ^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `mod_bits.div_ceil(8)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+
+error: this `repeat().take()` can be written more concisely
+   --> pratique-source/src/crypto/rsa.rs:161:25
+    |
+161 |         expected.extend(std::iter::repeat(0xffu8).take(self.k - t_len - 3));
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `repeat_n()` instead: `std::iter::repeat_n(0xffu8, self.k - t_len - 3)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_repeat_n
+    = note: `-D clippy::manual-repeat-n` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_repeat_n)]`
+
+error: manually reimplementing `div_ceil`
+   --> pratique-source/src/crypto/rsa.rs:191:22
+    |
+191 |         let em_len = (em_bits + 7) / 8;
+    |                      ^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `em_bits.div_ceil(8)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+
+error: using `chunks_exact` with a constant chunk size
+  --> pratique-source/src/crypto/sha1.rs:46:32
+   |
+46 |         let mut chunks = bytes.chunks_exact(64);
+   |                                ^^^^^^^^^^^^^^^^
+   |
+help: consider using `as_chunks::<64>()` instead
+  --> pratique-source/src/crypto/sha1.rs:46:32
+   |
+46 |         let mut chunks = bytes.chunks_exact(64);
+   |                                ^^^^^^^^^^^^^^^^
+   = note: you can access the chunks using `chunks.0.iter()`, and the remainder using `chunks.1`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+   = note: `-D clippy::chunks-exact-to-as-chunks` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::chunks_exact_to_as_chunks)]`
+
+error: using `chunks_exact` with a constant chunk size
+  --> pratique-source/src/crypto/sha1.rs:59:36
+   |
+59 |         for block in tail[..total].chunks_exact(64) { compress(&mut self.state, block.try_into().unwrap()); }
+   |                                    ^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<64>().0`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact_mut` with a constant chunk size
+  --> pratique-source/src/crypto/sha1.rs:61:32
+   |
+61 |         for (dst, word) in out.chunks_exact_mut(4).zip(self.state) { dst.copy_from_slice(&word.to_be_bytes()); }
+   |                                ^^^^^^^^^^^^^^^^^^^ help: consider using `as_chunks_mut` instead: `as_chunks_mut::<4>().0.iter_mut()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact` with a constant chunk size
+  --> pratique-source/src/crypto/sha1.rs:70:27
+   |
+70 |     let mut chunks = data.chunks_exact(64);
+   |                           ^^^^^^^^^^^^^^^^
+   |
+help: consider using `as_chunks::<64>()` instead
+  --> pratique-source/src/crypto/sha1.rs:70:27
+   |
+70 |     let mut chunks = data.chunks_exact(64);
+   |                           ^^^^^^^^^^^^^^^^
+   = note: you can access the chunks using `chunks.0.iter()`, and the remainder using `chunks.1`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact` with a constant chunk size
+  --> pratique-source/src/crypto/sha1.rs:81:32
+   |
+81 |     for block in tail[..total].chunks_exact(64) {
+   |                                ^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<64>().0`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: very complex type used. Consider factoring parts into `type` definitions
+  --> pratique-source/src/crypto/sha2.rs:14:24
+   |
+14 |     pub(crate) sha256: Option<fn(&mut [u32; 8], &[u8])>,
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#type_complexity
+   = note: `-D clippy::type-complexity` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::type_complexity)]`
+
+error: very complex type used. Consider factoring parts into `type` definitions
+  --> pratique-source/src/crypto/sha2.rs:15:24
+   |
+15 |     pub(crate) sha512: Option<fn(&mut [u64; 8], &[u8])>,
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#type_complexity
+
+error: using `chunks_exact` with a constant chunk size
+  --> pratique-source/src/crypto/sha2.rs:32:25
+   |
+32 |     for block in blocks.chunks_exact(64) {
+   |                         ^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<64>().0`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact` with a constant chunk size
+  --> pratique-source/src/crypto/sha2.rs:39:25
+   |
+39 |     for block in blocks.chunks_exact(128) {
+   |                         ^^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<128>().0`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: this `repeat().take()` can be written more concisely
+   --> pratique-source/src/crypto/sha2.rs:154:20
+    |
+154 |         pad.extend(std::iter::repeat(0).take(zeros));
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `repeat_n()` instead: `std::iter::repeat_n(0, zeros)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_repeat_n
+
+error: this `repeat().take()` can be written more concisely
+   --> pratique-source/src/crypto/sha2.rs:246:20
+    |
+246 |         pad.extend(std::iter::repeat(0).take(zeros));
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `repeat_n()` instead: `std::iter::repeat_n(0, zeros)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_repeat_n
+
+error: large size difference between variants
+  --> pratique-source/src/crypto/aes.rs:43:1
+   |
+43 | / enum Imp {
+44 | |     Portable(aes_ct::Keys),
+   | |     ---------------------- the largest variant contains at least 968 bytes
+45 | |     Hardware(aes_hw::Keys),
+   | |     ---------------------- the second-largest variant contains at least 248 bytes
+46 | | }
+   | |_^ the entire enum is at least 976 bytes
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#large_enum_variant
+   = note: `-D clippy::large-enum-variant` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::large_enum_variant)]`
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+   |
+44 -     Portable(aes_ct::Keys),
+44 +     Portable(Box<aes_ct::Keys>),
+   |
+
+error: the loop variable `r` is only used to index `rks`
+  --> pratique-source/src/crypto/aes_hw.rs:66:22
+   |
+66 |             for r in 1..nr {
+   |                      ^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+   |
+66 -             for r in 1..nr {
+66 +             for <item> in rks.iter().take(nr).skip(1) {
+   |
+
+error: using `chunks_exact_mut` with a constant chunk size
+  --> pratique-source/src/crypto/aes_hw.rs:93:35
+   |
+93 |             let mut chunks = data.chunks_exact_mut(128);
+   |                                   ^^^^^^^^^^^^^^^^^^^^^
+   |
+help: consider using `as_chunks_mut::<128>()` instead
+  --> pratique-source/src/crypto/aes_hw.rs:93:35
+   |
+93 |             let mut chunks = data.chunks_exact_mut(128);
+   |                                   ^^^^^^^^^^^^^^^^^^^^^
+   = note: you can access the chunks using `chunks.0.iter_mut()`, and the remainder using `chunks.1`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: the loop variable `i` is used to index `s`
+  --> pratique-source/src/crypto/aes_hw.rs:96:26
+   |
+96 |                 for i in 0..8 {
+   |                          ^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+   |
+96 -                 for i in 0..8 {
+96 +                 for (i, <item>) in s.iter_mut().enumerate() {
+   |
+
+error: the loop variable `r` is only used to index `rks`
+   --> pratique-source/src/crypto/aes_hw.rs:101:26
+    |
+101 |                 for r in 1..nr {
+    |                          ^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+101 -                 for r in 1..nr {
+101 +                 for <item> in rks.iter().take(nr).skip(1) {
+    |
+
+error: the loop variable `i` is only used to index `s`
+   --> pratique-source/src/crypto/aes_hw.rs:102:30
+    |
+102 |                     for i in 0..8 {
+    |                              ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+102 -                     for i in 0..8 {
+102 +                     for <item> in &mut s {
+    |
+
+error: the loop variable `i` is used to index `s`
+   --> pratique-source/src/crypto/aes_hw.rs:106:26
+    |
+106 |                 for i in 0..8 {
+    |                          ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+106 -                 for i in 0..8 {
+106 +                 for (i, <item>) in s.iter().enumerate() {
+    |
+
+error: the loop variable `i` is used to index `x`
+   --> pratique-source/src/crypto/aes_hw.rs:146:22
+    |
+146 |             for i in 0..8 {
+    |                      ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+146 -             for i in 0..8 {
+146 +             for (i, <item>) in x.iter_mut().enumerate() {
+    |
+
+error: the loop variable `i` is used to index `h`
+   --> pratique-source/src/crypto/aes_hw.rs:247:22
+    |
+247 |             for i in 0..8 {
+    |                      ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+247 -             for i in 0..8 {
+247 +             for (i, <item>) in h.iter_mut().enumerate() {
+    |
+
+error: using `chunks_exact` with a constant chunk size
+   --> pratique-source/src/crypto/aes_hw.rs:280:35
+    |
+280 |             let mut chunks = data.chunks_exact(128);
+    |                                   ^^^^^^^^^^^^^^^^^
+    |
+help: consider using `as_chunks::<128>()` instead
+   --> pratique-source/src/crypto/aes_hw.rs:280:35
+    |
+280 |             let mut chunks = data.chunks_exact(128);
+    |                                   ^^^^^^^^^^^^^^^^^
+    = note: you can access the chunks using `chunks.0.iter()`, and the remainder using `chunks.1`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: the loop variable `r` is only used to index `rks`
+   --> pratique-source/src/crypto/aes_hw.rs:341:22
+    |
+341 |             for r in 1..NR {
+    |                      ^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+341 -             for r in 1..NR {
+341 +             for <item> in rks.iter().take(NR).skip(1) {
+    |
+
+error: the loop variable `i` is only used to index `s`
+   --> pratique-source/src/crypto/aes_hw.rs:342:26
+    |
+342 |                 for i in 0..8 {
+    |                          ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+342 -                 for i in 0..8 {
+342 +                 for <item> in &mut s {
+    |
+
+error: the loop variable `i` is only used to index `s`
+   --> pratique-source/src/crypto/aes_hw.rs:346:22
+    |
+346 |             for i in 0..8 {
+    |                      ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+346 -             for i in 0..8 {
+346 +             for <item> in &mut s {
+    |
+
+error: the loop variable `r` is used to index `rks`
+   --> pratique-source/src/crypto/aes_hw.rs:361:22
+    |
+361 |             for r in 1..NR {
+    |                      ^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+361 -             for r in 1..NR {
+361 +             for (r, <item>) in rks.iter().enumerate().take(NR).skip(1) {
+    |
+
+error: the loop variable `i` is used to index `ks`
+   --> pratique-source/src/crypto/aes_hw.rs:416:26
+    |
+416 |                 for i in 0..8 {
+    |                          ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+416 -                 for i in 0..8 {
+416 +                 for (i, <item>) in ks.iter().enumerate() {
+    |
+
+error: the loop variable `i` is used to index `c`
+   --> pratique-source/src/crypto/aes_hw.rs:476:26
+    |
+476 |                 for i in 0..8 {
+    |                          ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+476 -                 for i in 0..8 {
+476 +                 for (i, <item>) in c.iter_mut().enumerate() {
+    |
+
+error: using `chunks_exact_mut` with a constant chunk size
+   --> pratique-source/src/crypto/chacha20poly1305.rs:704:35
+    |
+704 |             let mut chunks = rest.chunks_exact_mut(1024);
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: consider using `as_chunks_mut::<1024>()` instead
+   --> pratique-source/src/crypto/chacha20poly1305.rs:704:35
+    |
+704 |             let mut chunks = rest.chunks_exact_mut(1024);
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^
+    = note: you can access the chunks using `chunks.0.iter_mut()`, and the remainder using `chunks.1`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact_mut` with a constant chunk size
+   --> pratique-source/src/crypto/chacha20poly1305.rs:712:35
+    |
+712 |             let mut chunks = rest.chunks_exact_mut(512);
+    |                                   ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: consider using `as_chunks_mut::<512>()` instead
+   --> pratique-source/src/crypto/chacha20poly1305.rs:712:35
+    |
+712 |             let mut chunks = rest.chunks_exact_mut(512);
+    |                                   ^^^^^^^^^^^^^^^^^^^^^
+    = note: you can access the chunks using `chunks.0.iter_mut()`, and the remainder using `chunks.1`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact_mut` with a constant chunk size
+   --> pratique-source/src/crypto/chacha20poly1305.rs:730:31
+    |
+730 |         let mut chunks = rest.chunks_exact_mut(256);
+    |                               ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: consider using `as_chunks_mut::<256>()` instead
+   --> pratique-source/src/crypto/chacha20poly1305.rs:730:31
+    |
+730 |         let mut chunks = rest.chunks_exact_mut(256);
+    |                               ^^^^^^^^^^^^^^^^^^^^^
+    = note: you can access the chunks using `chunks.0.iter_mut()`, and the remainder using `chunks.1`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact_mut` with a constant chunk size
+   --> pratique-source/src/crypto/chacha20poly1305.rs:777:30
+    |
+777 |         for (i, block) in ks.chunks_exact_mut(64).enumerate().take(1 + len.min(HEAD).div_ceil(64)) {
+    |                              ^^^^^^^^^^^^^^^^^^^^ help: consider using `as_chunks_mut` instead: `as_chunks_mut::<64>().0.iter_mut()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: the loop variable `i` is used to index `d`
+   --> pratique-source/src/crypto/ecdh.rs:216:18
+    |
+216 |         for i in 0..N {
+    |                  ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+216 -         for i in 0..N {
+216 +         for (i, <item>) in d.iter_mut().enumerate().take(N) {
+    |
+
+error: the loop variable `i` is only used to index `b`
+   --> pratique-source/src/crypto/ecdh.rs:241:18
+    |
+241 |         for i in 0..N {
+    |                  ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+241 -         for i in 0..N {
+241 +         for <item> in b.iter().take(N) {
+    |
+
+error: the loop variable `i` is only used to index `b`
+   --> pratique-source/src/crypto/ecdh.rs:276:18
+    |
+276 |         for i in 0..4 {
+    |                  ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+276 -         for i in 0..4 {
+276 +         for <item> in b.iter().take(4) {
+    |
+
+error: methods called `from_*` usually take no `self`
+   --> pratique-source/src/crypto/ecdh.rs:312:18
+    |
+312 |     fn from_mont(&self, a: &Limbs<N>) -> Limbs<N> {
+    |                  ^^^^^
+    |
+    = help: consider choosing a less ambiguous name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#wrong_self_convention
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> pratique-source/src/crypto/ecdh.rs:619:39
+    |
+619 |     fn affine(&self, p: &Point<N>) -> Option<(Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>)> {
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#type_complexity
+
+error: the loop variable `i` is used to index `d`
+   --> pratique-source/src/crypto/ct_mod.rs:228:18
+    |
+228 |         for i in 0..N {
+    |                  ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+228 -         for i in 0..N {
+228 +         for (i, <item>) in d.iter_mut().enumerate().take(N) {
+    |
+
+error: the loop variable `i` is only used to index `b`
+   --> pratique-source/src/crypto/ct_mod.rs:266:18
+    |
+266 |         for i in 0..N {
+    |                  ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+266 -         for i in 0..N {
+266 +         for <item> in b.iter().take(N) {
+    |
+
+error: manually reimplementing `div_ceil`
+   --> pratique-source/src/crypto/ct_mod.rs:333:29
+    |
+333 |             for j in first..(i + 1) / 2 {
+    |                             ^^^^^^^^^^^ help: consider using `.div_ceil()`: `i.div_ceil(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+
+error: the loop variable `j` is used to index `q`
+   --> pratique-source/src/crypto/ct_mod.rs:342:26
+    |
+342 |                 for j in 0..i {
+    |                          ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+342 -                 for j in 0..i {
+342 +                 for (j, <item>) in q.iter().enumerate().take(i) {
+    |
+
+error: the loop variable `j` is used to index `q`
+   --> pratique-source/src/crypto/ct_mod.rs:349:26
+    |
+349 |                 for j in first..N {
+    |                          ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+349 -                 for j in first..N {
+349 +                 for (j, <item>) in q.iter().enumerate().take(N).skip(first) {
+    |
+
+error: methods called `from_*` usually take no `self`
+   --> pratique-source/src/crypto/ct_mod.rs:368:29
+    |
+368 |     pub(crate) fn from_mont(&self, a: &[u64; N]) -> [u64; N] {
+    |                             ^^^^^
+    |
+    = help: consider choosing a less ambiguous name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#wrong_self_convention
+
+error: deref which would be done by auto-deref
+   --> pratique-source/src/crypto/rsa_sign.rs:139:59
+    |
+139 |         let pq_bytes = Zeroizing::new(ct_mod::limbs_to_be(&*pq, 8 * F));
+    |                                                           ^^^^ help: try: `&pq`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+    = note: `-D clippy::explicit-auto-deref` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::explicit_auto_deref)]`
+
+error: manually reimplementing `div_ceil`
+   --> pratique-source/src/crypto/rsa_sign.rs:323:17
+    |
+323 |         let k = (bits + 7) / 8;
+    |                 ^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `bits.div_ceil(8)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+
+error: manually reimplementing `div_ceil`
+   --> pratique-source/src/crypto/rsa_sign.rs:325:23
+    |
+325 |         let limbs_n = (bits + 63) / 64;
+    |                       ^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `bits.div_ceil(64)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+
+error: manually reimplementing `div_ceil`
+   --> pratique-source/src/crypto/rsa_sign.rs:370:22
+    |
+370 |         let em_len = (em_bits + 7) / 8;
+    |                      ^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `em_bits.div_ceil(8)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+
+error: deref which would be done by auto-deref
+   --> pratique-source/src/crypto/rsa_generate.rs:242:34
+    |
+242 |     let nb = ct_mod::limbs_to_be(&*n, 256);
+    |                                  ^^^ help: try: `&n`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> pratique-source/src/crypto/rsa_generate.rs:243:49
+    |
+243 |     let pb = Zeroizing::new(ct_mod::limbs_to_be(&*p, 128));
+    |                                                 ^^^ help: try: `&p`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> pratique-source/src/crypto/rsa_generate.rs:244:49
+    |
+244 |     let qb = Zeroizing::new(ct_mod::limbs_to_be(&*q, 128));
+    |                                                 ^^^ help: try: `&q`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> pratique-source/src/crypto/rsa_generate.rs:245:50
+    |
+245 |     let qib = Zeroizing::new(ct_mod::limbs_to_be(&*qi, 128));
+    |                                                  ^^^^ help: try: `&qi`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: using `chunks_exact` with a constant chunk size
+  --> pratique-source/src/crypto/ghash.rs:90:27
+   |
+90 |     let mut chunks = data.chunks_exact(16);
+   |                           ^^^^^^^^^^^^^^^^
+   |
+help: consider using `as_chunks::<16>()` instead
+  --> pratique-source/src/crypto/ghash.rs:90:27
+   |
+90 |     let mut chunks = data.chunks_exact(16);
+   |                           ^^^^^^^^^^^^^^^^
+   = note: you can access the chunks using `chunks.0.iter()`, and the remainder using `chunks.1`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: manual implementation of `.is_multiple_of()`
+   --> pratique-source/src/crypto/poly1305.rs:104:27
+    |
+104 |             debug_assert!(data.len() % 16 == 0);
+    |                           ^^^^^^^^^^^^^^^^^^^^ help: replace with: `data.len().is_multiple_of(16)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+    = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: using `chunks_exact` with a constant chunk size
+   --> pratique-source/src/crypto/poly1305.rs:114:27
+    |
+114 |             for c in data.chunks_exact(16) {
+    |                           ^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<16>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: manual implementation of `.is_multiple_of()`
+   --> pratique-source/src/crypto/poly1305.rs:507:17
+    |
+507 |         assert!(data.len() % 64 == 0 && !data.is_empty());
+    |                 ^^^^^^^^^^^^^^^^^^^^ help: replace with: `data.len().is_multiple_of(64)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: using `chunks_exact` with a constant chunk size
+   --> pratique-source/src/crypto/sha2_hw.rs:217:29
+    |
+217 |         for block in blocks.chunks_exact(64) {
+    |                             ^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<64>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: the loop variable `i` is used to index `c`
+  --> pratique-source/src/crypto/x25519.rs:15:14
+   |
+15 |     for i in 0..5 {
+   |              ^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+   |
+15 -     for i in 0..5 {
+15 +     for (i, <item>) in c.iter_mut().enumerate() {
+   |
+
+error: using `map` over `inspect`
+   --> pratique-source/src/inflate.rs:554:29
+    |
+554 |         let result = result.map(|status| {
+    |                             ^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_inspect
+    = note: `-D clippy::manual-inspect` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_inspect)]`
+help: try
+    |
+554 ~         let result = result.inspect(|status| {
+555 |             self.fold(&mut io);
+556 ~             self.total_in += io.pos as u64;
+    |
+
+error: manual implementation of `.is_multiple_of()`
+  --> pratique-source/src/pem.rs:45:8
+   |
+45 |     if b.len() % 4 != 0 {
+   |        ^^^^^^^^^^^^^^^^ help: replace with: `!b.len().is_multiple_of(4)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: manually reimplementing `div_ceil`
+  --> pratique-source/src/pem.rs:80:41
+   |
+80 |     let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+   |                                         ^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `data.len().div_ceil(3)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+
+error: manual `!RangeInclusive::contains` implementation
+   --> pratique-source/src/tlog.rs:483:8
+    |
+483 |     if height < 1 || height > MAX_TILE_HEIGHT {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `!(1..=MAX_TILE_HEIGHT).contains(&height)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_range_contains
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/trust_root.rs:163:9
+    |
+163 |         self.start.map_or(true, |s| time >= s) && self.end.map_or(true, |e| time <= e)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+163 -         self.start.map_or(true, |s| time >= s) && self.end.map_or(true, |e| time <= e)
+163 +         self.start.is_none_or(|s| time >= s) && self.end.map_or(true, |e| time <= e)
+    |
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/trust_root.rs:163:51
+    |
+163 |         self.start.map_or(true, |s| time >= s) && self.end.map_or(true, |e| time <= e)
+    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+163 -         self.start.map_or(true, |s| time >= s) && self.end.map_or(true, |e| time <= e)
+163 +         self.start.map_or(true, |s| time >= s) && self.end.is_none_or(|e| time <= e)
+    |
+
+error: manual implementation of `.is_multiple_of()`
+  --> pratique-source/src/util.rs:24:13
+   |
+24 |     assert!(digits.len() % 2 == 0, "odd hex length");
+   |             ^^^^^^^^^^^^^^^^^^^^^ help: replace with: `digits.len().is_multiple_of(2)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: manual implementation of `.is_multiple_of()`
+   --> pratique-source/src/x509.rs:386:17
+    |
+386 |         0x1e if content.len() % 2 == 0 => content
+    |                 ^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `content.len().is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: manual implementation of `.is_multiple_of()`
+   --> pratique-source/src/x509.rs:391:17
+    |
+391 |         0x1c if content.len() % 4 == 0 => content
+    |                 ^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `content.len().is_multiple_of(4)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: using `contains()` instead of `iter().any()` is more efficient
+    --> pratique-source/src/x509.rs:1257:20
+     |
+1257 |             return self.ip_addrs.iter().any(|a| *a == octets);
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `self.ip_addrs.contains(&octets)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_contains
+     = note: `-D clippy::manual-contains` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::manual_contains)]`
+
+error: this function has too many arguments (8/7)
+    --> pratique-source/src/x509.rs:1514:5
+     |
+1514 | /     fn search<'a>(
+1515 | |         &'a self,
+1516 | |         path: &mut Vec<&'a Certificate>,
+1517 | |         inters: &'a [Certificate],
+...    |
+1522 | |         attempts: &mut usize,
+1523 | |     ) -> bool {
+     | |_____________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#too_many_arguments
+     = note: `-D clippy::too-many-arguments` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::too_many_arguments)]`
+
+error: this can be `std::io::Error::other(_)`
+   --> pratique-source/src/asyncio/net.rs:191:5
+    |
+191 |     io::Error::new(io::ErrorKind::Other, e)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#io_other_error
+    = note: `-D clippy::io-other-error` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::io_other_error)]`
+help: use `std::io::Error::other`
+    |
+191 -     io::Error::new(io::ErrorKind::Other, e)
+191 +     io::Error::other(e)
+    |
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/asyncio/net.rs:229:61
+    |
+229 | ...f.writing.is_none() && Arc::get_mut(&mut self.io).map_or(false, |io| io.rearm(timeout, deadline).is_ok())
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+    |
+229 -         self.reading.is_none() && self.writing.is_none() && Arc::get_mut(&mut self.io).map_or(false, |io| io.rearm(timeout, deadline).is_ok())
+229 +         self.reading.is_none() && self.writing.is_none() && Arc::get_mut(&mut self.io).is_some_and(|io| io.rearm(timeout, deadline).is_ok())
+    |
+
+error: this can be `std::io::Error::other(_)`
+   --> pratique-source/src/http/async_client.rs:120:45
+    |
+120 |             let io = task.await.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?.map_err(|e| match e {
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#io_other_error
+help: use `std::io::Error::other`
+    |
+120 -             let io = task.await.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?.map_err(|e| match e {
+120 +             let io = task.await.map_err(|e| io::Error::other(e))?.map_err(|e| match e {
+    |
+
+error: this can be `std::io::Error::other(_)`
+   --> pratique-source/src/http/async_client.rs:122:26
+    |
+122 |                 other => io::Error::new(io::ErrorKind::Other, other.to_string()),
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#io_other_error
+help: use `std::io::Error::other`
+    |
+122 -                 other => io::Error::new(io::ErrorKind::Other, other.to_string()),
+122 +                 other => io::Error::other(other.to_string()),
+    |
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/http/async_client.rs:286:16
+    |
+286 |             if resp.content_length.map_or(true, |n| n <= REDIRECT_BODY_LIMIT) {
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+286 -             if resp.content_length.map_or(true, |n| n <= REDIRECT_BODY_LIMIT) {
+286 +             if resp.content_length.is_none_or(|n| n <= REDIRECT_BODY_LIMIT) {
+    |
+
+error: this can be `std::io::Error::other(_)`
+   --> pratique-source/src/http/async_client.rs:483:48
+    |
+483 |                 Err(e) => return Err(Error::Io(io::Error::new(io::ErrorKind::Other, e))),
+    |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#io_other_error
+help: use `std::io::Error::other`
+    |
+483 -                 Err(e) => return Err(Error::Io(io::Error::new(io::ErrorKind::Other, e))),
+483 +                 Err(e) => return Err(Error::Io(io::Error::other(e))),
+    |
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/http/cookie.rs:131:34
+    |
+131 |         store.cookies.retain(|c| c.expires.map_or(true, |e| e > t));
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+131 -         store.cookies.retain(|c| c.expires.map_or(true, |e| e > t));
+131 +         store.cookies.retain(|c| c.expires.is_none_or(|e| e > t));
+    |
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/http/cookie.rs:142:30
+    |
+142 |         s.cookies.retain(|c| c.expires.map_or(true, |e| e > t));
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+142 -         s.cookies.retain(|c| c.expires.map_or(true, |e| e > t));
+142 +         s.cookies.retain(|c| c.expires.is_none_or(|e| e > t));
+    |
+
+error: very complex type used. Consider factoring parts into `type` definitions
+  --> pratique-source/src/http/ocsp_source.rs:32:14
+   |
+32 |     entries: HashMap<(String, Vec<u8>), (Vec<u8>, i64, u64)>,
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#type_complexity
+
+error: manual implementation of `.is_multiple_of()`
+    --> pratique-source/src/http/h2/connection.rs:1024:12
+     |
+1024 |         if stream % 2 == 0 {
+     |            ^^^^^^^^^^^^^^^ help: replace with: `stream.is_multiple_of(2)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: manual implementation of `.is_multiple_of()`
+    --> pratique-source/src/http/h2/connection.rs:1237:12
+     |
+1237 |         if id % 2 == 0 || id >= self.next_stream_id {
+     |            ^^^^^^^^^^^ help: replace with: `id.is_multiple_of(2)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: manual implementation of `.is_multiple_of()`
+    --> pratique-source/src/http/h2/connection.rs:1321:12
+     |
+1321 |         if id % 2 == 0 || id >= self.next_stream_id {
+     |            ^^^^^^^^^^^ help: replace with: `id.is_multiple_of(2)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: manual implementation of `.is_multiple_of()`
+   --> pratique-source/src/http/h2/frame.rs:246:19
+    |
+246 |             sized(payload.len() % 6 == 0, "SETTINGS of a length that is not a multiple of 6")?;
+    |                   ^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `payload.len().is_multiple_of(6)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: using `chunks_exact` with a constant chunk size
+   --> pratique-source/src/http/h2/frame.rs:247:34
+    |
+247 | ...   let values = payload.chunks_exact(6).map(|c| (u16::from_be_bytes([c[0], c[1]]), u32::from_be_bytes([c[2], c[3], c[4], c[5]]))...
+    |                            ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<6>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: field assignment outside of initializer for an instance created with Default::default()
+   --> pratique-source/src/http/h3/connection.rs:440:9
+    |
+440 |         out.id = Some(id);
+    |         ^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `http::h3::connection::Outbox { id: Some(id), ..Default::default() }` and removing relevant reassignments
+   --> pratique-source/src/http/h3/connection.rs:439:9
+    |
+439 |         let mut out = Outbox::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#field_reassign_with_default
+    = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: redundant closure
+   --> pratique-source/src/http/h3/qpack.rs:799:49
+    |
+799 |                 get_int(&inbox, &mut at, 7).map(|stream| Instruction::Acknowledge(stream))
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `Instruction::Acknowledge`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_closure
+    = note: `-D clippy::redundant-closure` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_closure)]`
+
+error: redundant closure
+   --> pratique-source/src/http/h3/qpack.rs:801:49
+    |
+801 |                 get_int(&inbox, &mut at, 6).map(|stream| Instruction::Cancel(stream))
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `Instruction::Cancel`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_closure
+
+error: redundant closure
+   --> pratique-source/src/http/h3/qpack.rs:803:49
+    |
+803 |                 get_int(&inbox, &mut at, 6).map(|n| Instruction::Increment(n))
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `Instruction::Increment`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_closure
+
+error: unnecessary closure used with `bool::then`
+   --> pratique-source/src/http/h2_transport.rs:288:9
+    |
+288 |         self.cancelled.contains(&stream).then(|| Failure { error: Error::Cancelled, retry_safe: false, peer_closed: false })
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_lazy_evaluations
+    = note: `-D clippy::unnecessary-lazy-evaluations` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_lazy_evaluations)]`
+help: use `then_some` instead
+    |
+288 -         self.cancelled.contains(&stream).then(|| Failure { error: Error::Cancelled, retry_safe: false, peer_closed: false })
+288 +         self.cancelled.contains(&stream).then_some(Failure { error: Error::Cancelled, retry_safe: false, peer_closed: false })
+    |
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/http/h2_transport.rs:778:12
+    |
+778 |         if side.armed.map_or(true, |a| a.abs_diff(wait) > slack) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+778 -         if side.armed.map_or(true, |a| a.abs_diff(wait) > slack) {
+778 +         if side.armed.is_none_or(|a| a.abs_diff(wait) > slack) {
+    |
+
+error: this `let...else` may be rewritten with the `?` operator
+  --> pratique-source/src/http/idle.rs:88:13
+   |
+88 |             let Some(list) = inner.hosts.get_mut(key) else { return None };
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `let list = inner.hosts.get_mut(key)?;`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#question_mark
+   = note: `-D clippy::question-mark` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::question_mark)]`
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/http/parser.rs:417:28
+    |
+417 |                         if self.body_bytes.checked_add(size).map_or(true, |total| total > limits.max_body_bytes) {
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+417 -                         if self.body_bytes.checked_add(size).map_or(true, |total| total > limits.max_body_bytes) {
+417 +                         if self.body_bytes.checked_add(size).is_none_or(|total| total > limits.max_body_bytes) {
+    |
+
+error: large size difference between variants
+   --> pratique-source/src/http/stream.rs:527:1
+    |
+527 | / pub(super) enum Body {
+528 | |     H1(BodyReader),
+    | |     -------------- the largest variant contains at least 520 bytes
+529 | |     Mux(MuxBody),
+    | |     ------------ the second-largest variant contains at least 144 bytes
+530 | | }
+    | |_^ the entire enum is at least 520 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+528 -     H1(BodyReader),
+528 +     H1(Box<BodyReader>),
+    |
+
+error: this manual char comparison can be written more succinctly
+  --> pratique-source/src/http/url.rs:41:49
+   |
+41 |         let (authority, tail) = match rest.find(|c| c == '/' || c == '?') {
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using an array of `char`: `['/', '?']`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_pattern_char_comparison
+   = note: `-D clippy::manual-pattern-char-comparison` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_pattern_char_comparison)]`
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/http/mod.rs:431:23
+    |
+431 | ...   let port = if with_scheme.rsplit('/').next().map_or(false, |h| h.contains(':') && !h.ends_with(']')) { u.port } else { DEFAUL...
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+    |
+431 -         let port = if with_scheme.rsplit('/').next().map_or(false, |h| h.contains(':') && !h.ends_with(']')) { u.port } else { DEFAULT_PROXY_PORT };
+431 +         let port = if with_scheme.rsplit('/').next().is_some_and(|h| h.contains(':') && !h.ends_with(']')) { u.port } else { DEFAULT_PROXY_PORT };
+    |
+
+error: large size difference between variants
+    --> pratique-source/src/http/mod.rs:1504:1
+     |
+1504 | / enum H2Step {
+1505 | |     Response(ResponseStream),
+     | |     ------------------------ the largest variant contains at least 776 bytes
+1506 | |     /// Try again (on another connection).
+1507 | |     Again,
+1508 | |     /// The origin does not speak HTTP/2: go on the HTTP/1.1 way, with this connection if one was dialed.
+1509 | |     Http1(Option<Conn>),
+     | |     ------------------- the second-largest variant contains at least 88 bytes
+1510 | | }
+     | |_^ the entire enum is at least 776 bytes
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+     |
+1505 -     Response(ResponseStream),
+1505 +     Response(Box<ResponseStream>),
+     |
+
+error: large size difference between variants
+    --> pratique-source/src/http/mod.rs:1523:1
+     |
+1523 | / enum H3Step {
+1524 | |     Response(ResponseStream),
+     | |     ------------------------ the largest variant contains at least 776 bytes
+1525 | |     /// Try again (on another connection).
+1526 | |     Again,
+     | |     ----- the second-largest variant carries no data at all
+...    |
+1529 | |     Skip,
+1530 | | }
+     | |_^ the entire enum is at least 776 bytes
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+     |
+1524 -     Response(ResponseStream),
+1524 +     Response(Box<ResponseStream>),
+     |
+
+error: this `map_or` can be simplified
+    --> pratique-source/src/http/mod.rs:1624:16
+     |
+1624 |             if resp.content_length.map_or(true, |n| n <= REDIRECT_BODY_LIMIT) {
+     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+     |
+1624 -             if resp.content_length.map_or(true, |n| n <= REDIRECT_BODY_LIMIT) {
+1624 +             if resp.content_length.is_none_or(|n| n <= REDIRECT_BODY_LIMIT) {
+     |
+
+error: this `map_or` can be simplified
+    --> pratique-source/src/http/mod.rs:2196:14
+     |
+2196 |     let ok = first.split_whitespace().nth(1).map_or(false, |c| c.starts_with('2'));
+     |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+     |
+2196 -     let ok = first.split_whitespace().nth(1).map_or(false, |c| c.starts_with('2'));
+2196 +     let ok = first.split_whitespace().nth(1).is_some_and(|c| c.starts_with('2'));
+     |
+
+error: enum `Frame` has a public `len` method, but no `is_empty` method
+   --> pratique-source/src/quic/frame.rs:436:5
+    |
+436 |     pub fn len(&self) -> usize {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#len_without_is_empty
+    = note: `-D clippy::len-without-is-empty` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::len_without_is_empty)]`
+
+error: large size difference between variants
+  --> pratique-source/src/quic/keys.rs:55:1
+   |
+55 | / enum Mask {
+56 | |     Aes(Aes),
+   | |     -------- the largest variant contains at least 976 bytes
+57 | |     ChaCha(ChaCha20Mask),
+   | |     -------------------- the second-largest variant contains at least 32 bytes
+58 | | }
+   | |_^ the entire enum is at least 976 bytes
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+   |
+56 -     Aes(Aes),
+56 +     Aes(Box<Aes>),
+   |
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> pratique-source/src/quic/keys.rs:282:43
+    |
+282 | fn derive(suite: Suite, secret: &[u8]) -> (Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>) {
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#type_complexity
+
+error: manual implementation of `.is_multiple_of()`
+   --> pratique-source/src/quic/packet.rs:116:35
+    |
+116 |         if versions.is_empty() || versions.len() % 4 != 0 {
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!versions.len().is_multiple_of(4)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: using `chunks_exact` with a constant chunk size
+   --> pratique-source/src/quic/packet.rs:156:10
+    |
+156 |     list.chunks_exact(4).map(|c| u32::from_be_bytes([c[0], c[1], c[2], c[3]]))
+    |          ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<4>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+
+error: this loop could be written as a `while let` loop
+   --> pratique-source/src/quic/rangeset.rs:110:9
+    |
+110 | /         loop {
+111 | |             let Some((s, e)) = self.ranges.range(start..=end).next().map(|(&s, &e)| (s, e)) else { break };
+112 | |             end = end.max(e);
+113 | |             self.ranges.remove(&s);
+114 | |         }
+    | |_________^ help: try: `while let Some((s, e)) = self.ranges.range(start..=end).next().map(|(&s, &e)| (s, e)) { .. }`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#while_let_loop
+    = note: `-D clippy::while-let-loop` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::while_let_loop)]`
+
+error: manual absolute difference pattern without using `abs_diff`
+   --> pratique-source/src/quic/recovery.rs:341:25
+    |
+341 |         let deviation = if self.smoothed_rtt > adjusted { self.smoothed_rtt - adjusted } else { adjusted - self.smoothed_rtt };
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with `abs_diff`: `self.smoothed_rtt.abs_diff(adjusted)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_abs_diff
+    = note: `-D clippy::manual-abs-diff` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_abs_diff)]`
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/quic/recovery.rs:419:20
+    |
+419 |                 if best.map_or(true, |(b, _)| t < b) {
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+419 -                 if best.map_or(true, |(b, _)| t < b) {
+419 +                 if best.is_none_or(|(b, _)| t < b) {
+    |
+
+error: this `map_or` can be simplified
+   --> pratique-source/src/quic/recovery.rs:456:16
+    |
+456 |             if best.map_or(true, |(b, _)| t < b) {
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+456 -             if best.map_or(true, |(b, _)| t < b) {
+456 +             if best.is_none_or(|(b, _)| t < b) {
+    |
+
+error: manual implementation of `.is_multiple_of()`
+   --> pratique-source/src/quic/transport_params.rs:381:17
+    |
+381 |     id >= 27 && (id - 27) % 31 == 0 && id <= MAX_VARINT
+    |                 ^^^^^^^^^^^^^^^^^^^ help: replace with: `(id - 27).is_multiple_of(31)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: manual implementation of `.is_multiple_of()`
+   --> pratique-source/src/sign.rs:455:8
+    |
+455 |     if (data.len() + pad) % 4 != 0 || data.len() % 4 == 1 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!(data.len() + pad).is_multiple_of(4)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: manually reimplementing `div_ceil`
+   --> pratique-source/src/sign.rs:490:53
+    |
+490 |     let mut out = Zeroizing::new(Vec::with_capacity((data.len() + 2) / 3 * 4));
+    |                                                     ^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `data.len().div_ceil(3)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:11:5
+   |
+11 | //! (`psk_dhe_ke`; on by default, see [`Resumption`] for what is kept, for how long and for whom).
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+   = note: `-D clippy::doc-lazy-continuation` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::doc_lazy_continuation)]`
+help: indent this line
+   |
+11 | //!   (`psk_dhe_ke`; on by default, see [`Resumption`] for what is kept, for how long and for whom).
+   |     ++
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:12:5
+   |
+12 | //! TLS 1.2, for servers that cannot do 1.3 (the npm registry was one, in 2026), with only what has no known weakness of its own:
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+12 | //!   TLS 1.2, for servers that cannot do 1.3 (the npm registry was one, in 2026), with only what has no known weakness of its own:
+   |     ++
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:13:5
+   |
+13 | //! ECDHE, AEAD suites, the extended master secret required, the downgrade protection of TLS 1.3, no renegotiation, no
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+13 | //!   ECDHE, AEAD suites, the extended master secret required, the downgrade protection of TLS 1.3, no renegotiation, no
+   |     ++
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:14:5
+   |
+14 | //! resumption, and the same certificate checks (see [`tls12`]). [`ClientConfig::min_version`] turns it off.
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+14 | //!   resumption, and the same certificate checks (see [`tls12`]). [`ClientConfig::min_version`] turns it off.
+   |     ++
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:15:5
+   |
+15 | //! A client certificate, in TLS 1.3, when the server asks for one ([`ClientConfig::with_client_certificate`]).
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+15 | //!   A client certificate, in TLS 1.3, when the server asks for one ([`ClientConfig::with_client_certificate`]).
+   |     ++
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:16:5
+   |
+16 | //! Not supported: TLS 1.1 and earlier, 0-RTT (early data, which can be replayed), resumption in TLS 1.2 and over QUIC,
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+16 | //!   Not supported: TLS 1.1 and earlier, 0-RTT (early data, which can be replayed), resumption in TLS 1.2 and over QUIC,
+   |     ++
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:17:5
+   |
+17 | //! client certificates in TLS 1.2 (an empty Certificate is sent if the server asks), post-quantum or finite-field key
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+17 | //!   client certificates in TLS 1.2 (an empty Certificate is sent if the server asks), post-quantum or finite-field key
+   |     ++
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:18:5
+   |
+18 | //! exchange groups.
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+18 | //!   exchange groups.
+   |     ++
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:19:5
+   |
+19 | //! Revocation: a stapled OCSP response is requested and checked by default, CRLs can be supplied or
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+19 | //!   Revocation: a stapled OCSP response is requested and checked by default, CRLs can be supplied or
+   |     ++
+
+error: doc list item without indentation
+  --> pratique-source/src/tls/mod.rs:20:5
+   |
+20 | //! fetched, and the policy is in [`ClientConfig::revocation`] (see [`crate::revocation`]).
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+20 | //!   fetched, and the policy is in [`ClientConfig::revocation`] (see [`crate::revocation`]).
+   |     ++
+
+error: large size difference between variants
+   --> pratique-source/src/tls/suite.rs:146:1
+    |
+146 | / pub(crate) enum Aead {
+147 | |     Gcm(AesGcm),
+    | |     ----------- the largest variant contains at least 1152 bytes
+148 | |     ChaCha(ChaCha20Poly1305),
+    | |     ------------------------ the second-largest variant contains at least 32 bytes
+149 | | }
+    | |_^ the entire enum is at least 1152 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+147 -     Gcm(AesGcm),
+147 +     Gcm(Box<AesGcm>),
+    |
+
+error: large size difference between variants
+   --> pratique-source/src/tls/tls12.rs:281:1
+    |
+281 | / pub(crate) enum Step12 {
+282 | |     /// Send this handshake message in the clear (before our change_cipher_spec).
+283 | |     SendPlain(Vec<u8>),
+    | |     ------------------ the second-largest variant contains at least 24 bytes
+284 | |     /// Send change_cipher_spec; everything we send after it is under this cipher.
+285 | |     ChangeCipherSpec(RecordCipher12),
+    | |     -------------------------------- the largest variant contains at least 1184 bytes
+...   |
+293 | |     Established,
+294 | | }
+    | |_^ the entire enum is at least 1184 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+285 -     ChangeCipherSpec(RecordCipher12),
+285 +     ChangeCipherSpec(Box<RecordCipher12>),
+    |
+
+error: using `contains()` instead of `iter().any()` is more efficient
+   --> pratique-source/src/tls/certs.rs:193:12
+    |
+193 |         if self.dns_names.iter().any(|n| *n == name) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `self.dns_names.contains(&name)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_contains
+
+error: could not compile `pratique` (lib) due to 140 previous errors

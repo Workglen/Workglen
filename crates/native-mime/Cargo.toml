@@ -1,0 +1,13 @@
+[package]
+name = "workglen-mime"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Bounded first-party email and MIME parsing for Workglen"
+[dependencies]
+[lints.rust]
+unsafe_code = "forbid"
+
+
+[dev-dependencies]
+pratique = { path = "../../vendor/pratique", default-features = false }

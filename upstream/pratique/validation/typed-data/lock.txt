@@ -1,0 +1,3 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /workspace/scratch/00e4cff63970/serde-reduction/pratique-check-final/pratique-source/Cargo.toml
+workspace: /workspace/scratch/00e4cff63970/serde-reduction/pratique-check-final/Cargo.toml

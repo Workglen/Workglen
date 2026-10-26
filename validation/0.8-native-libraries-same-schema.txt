@@ -1,0 +1,6 @@
+PASS new executable reopens existing encrypted store and validates existing audit chain
+PASS new executable authenticates the existing Argon2 password hash
+PASS pre-change executable validates newly appended audit and encrypted records
+PASS pre-change executable authenticates newly generated Argon2 password hash
+PASS pre-change and updated executables both exclude independent flock holders
+PASS configuration and original storage key remain unchanged

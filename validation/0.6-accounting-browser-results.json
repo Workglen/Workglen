@@ -1,0 +1,23 @@
+{
+  "passed": 18,
+  "checks": [
+    "enable Accounting in module console",
+    "create book and view empty balanced ledger",
+    "create asset, liability, income and expense accounts",
+    "bank account maps to ledger",
+    "statement preview does not post ledger",
+    "statement commit and duplicate warnings",
+    "explicit posting from review",
+    "mobile banking layout",
+    "posted amount appears in balanced trial balance",
+    "edit bank-matched posting with explicit unmatch",
+    "locked posting correction rejected without closing editor",
+    "privileged period reopening",
+    "void removes financial effect and keeps visible record",
+    "deleted posting remains accessible with immutable audit snapshots",
+    "create a balanced manual journal in the browser",
+    "Xero preview and explicit cutover commit",
+    "disable/re-enable retains ledger",
+    "no browser JavaScript errors"
+  ]
+}

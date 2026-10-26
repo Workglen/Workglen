@@ -1,0 +1,2 @@
+   Compiling workglen-mail v0.8.0 (/workspace/scratch/4eac8ae55074/workglen-08)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.54s

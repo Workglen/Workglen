@@ -1,0 +1,2 @@
+Python tools/*.py: py_compile passed.
+JavaScript web/*.js and tools/*.cjs: node --check passed.

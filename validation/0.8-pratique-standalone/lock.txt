@@ -1,0 +1,3 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete/pratique-source/Cargo.toml
+workspace: /workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete/Cargo.toml

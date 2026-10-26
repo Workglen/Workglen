@@ -1,0 +1,7 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete/pratique-source/Cargo.toml
+workspace: /workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete/Cargo.toml
+    Blocking waiting for file lock on package cache
+    Checking pratique v0.1.0 (/workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete/pratique-source)
+    Checking pratique-additions-check v0.0.0 (/workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.35s

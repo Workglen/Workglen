@@ -1,0 +1,18 @@
+PASS generated-key and supplied-key instances report mandatory encrypted storage
+PASS native detector, verified TLS route, IMAPS and EWS readiness checks
+PASS identification testing has no delivery or quarantine side effects
+PASS relay refusal checks cover forged local sender, null sender, unknown users, alternate syntax and reset without submitting mail
+PASS native STARTTLS gateway and durable TLS delivery preserve original MIME
+PASS AI and unreadable archives are administrator-only; ordinary spam is releasable
+PASS unknown recipient and open relay rejected
+PASS mandatory unreadable-archive block cannot be bypassed by administrator release
+PASS native digest is delivered to the configured mailbox holder
+PASS digest mutation requires valid CSRF
+PASS forwarded digest does not grant another mailbox access
+PASS central Admin manages both native instances using verified signed requests
+PASS central instance scopes and accounting/security role separation enforced
+PASS local native remediation preserves MIME under hold before scoped removal
+PASS exchange native remediation preserves MIME under hold before scoped removal
+PASS gateway continues processing while central Admin is offline
+PASS on-disk database hides recipient identifiers, message content and quarantine metadata
+PASS encrypted gateway survives forced process termination and reopens durable quarantine

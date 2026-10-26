@@ -1,0 +1,1 @@
+PASS exact TOML fixture regeneration: 5748 cases; corpus hash verified

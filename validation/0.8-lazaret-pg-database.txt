@@ -1,0 +1,53 @@
+START driver-local
+   Compiling lazaret-pg v0.1.0 (/tmp/workglen-memory-validation-08466ao5/source/vendor/lazaret-pg)
+    Finished `release` profile [optimized] target(s) in 3.42s
+     Running tests/database.rs (/tmp/workglen-memory-validation-08466ao5/target/release/deps/database-603f8871f7f6c3d8)
+
+running 1 test
+test postgres_sql_types_transactions_streaming_and_errors ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+PASS driver-local
+START driver-tls
+    Finished `release` profile [optimized] target(s) in 0.03s
+     Running tests/database.rs (/tmp/workglen-memory-validation-08466ao5/target/release/deps/database-603f8871f7f6c3d8)
+
+running 1 test
+test postgres_sql_types_transactions_streaming_and_errors ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+
+PASS driver-tls
+START accounting
+    Finished `release` profile [optimized] target(s) in 0.07s
+     Running tests/accounting_db.rs (/tmp/workglen-memory-validation-08466ao5/target/release/deps/accounting_db-7ec6c32ee4fca849)
+
+running 1 test
+test accounting_transactions_and_banking ... Accounting scenario passed: cutover, exact ledger, replay guards, statement preview/commit, multiple banks, card signs, matching, payments, exclusion, locking, immutability and module lifecycle.
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+PASS accounting
+START postings
+    Finished `release` profile [optimized] target(s) in 0.07s
+     Running tests/posting_corrections.rs (/tmp/workglen-memory-validation-08466ao5/target/release/deps/posting_corrections-779629a26b9ca8d9)
+
+running 1 test
+test posting_corrections_locks_sources_and_audit ... PASS: edits, idempotency, stale revisions, date boundaries, reopen controls, audit guards, source integrity, payment balances, bank unmatch/repost, deleted visibility
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+PASS postings
+START local-accounting
+    Finished `release` profile [optimized] target(s) in 0.07s
+     Running tests/local_postgres.rs (/tmp/workglen-memory-validation-08466ao5/target/release/deps/local_postgres-cf6bcb58d346f4c9)
+
+running 1 test
+test accounting_initializes_and_reopens_over_explicit_local_transport ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+PASS local-accounting

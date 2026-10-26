@@ -1,0 +1,16 @@
+    Checking serde_core v1.0.229
+    Checking serde v1.0.229
+    Checking serde_json v1.0.154
+    Checking ipnet v2.12.2
+    Checking prefix-trie v0.8.4
+    Checking hickory-proto v0.26.3
+    Checking hickory-net v0.26.3
+    Checking lazaret-pg v0.1.0 (/tmp/workglen-memory-validation-08466ao5/source/vendor/lazaret-pg)
+    Checking hickory-resolver v0.26.3
+    Checking serde_spanned v1.1.2
+    Checking toml_datetime v0.7.5+spec-1.1.0
+    Checking mail-auth v0.13.3
+    Checking toml v0.9.12+spec-1.1.0
+    Checking bincode v1.3.3
+    Checking workglen-mail v0.8.0 (/tmp/workglen-memory-validation-08466ao5/source)
+    Finished `release` profile [optimized] target(s) in 15.28s

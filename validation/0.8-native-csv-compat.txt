@@ -1,0 +1,9 @@
+
+running 4 tests
+test csv_reader::tests::inherited_permissive_quote_and_empty_line_behavior ... ok
+test csv_reader::tests::multiline_quotes_empty_fields_and_unicode_whitespace ... ok
+test csv_reader::tests::widths_and_resource_limits_are_checked ... ok
+test former_csv_reader_agrees_on_generated_and_edge_inputs ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.56s
+

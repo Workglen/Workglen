@@ -1,0 +1,318 @@
+{
+  "date": "2026-10-25",
+  "before_external_versions": 173,
+  "after_external_versions": 96,
+  "added_registry_versions": [],
+  "retained_checksums_unchanged": true,
+  "removed": [
+    {
+      "name": "async-trait",
+      "version": "0.1.92"
+    },
+    {
+      "name": "autocfg",
+      "version": "1.5.1"
+    },
+    {
+      "name": "bitflags",
+      "version": "2.13.2"
+    },
+    {
+      "name": "cc",
+      "version": "1.10.0"
+    },
+    {
+      "name": "chacha20",
+      "version": "0.10.2"
+    },
+    {
+      "name": "combine",
+      "version": "4.6.9"
+    },
+    {
+      "name": "core-foundation",
+      "version": "0.9.4"
+    },
+    {
+      "name": "core-foundation-sys",
+      "version": "0.8.7"
+    },
+    {
+      "name": "cpufeatures",
+      "version": "0.3.1"
+    },
+    {
+      "name": "critical-section",
+      "version": "1.2.0"
+    },
+    {
+      "name": "crossbeam-channel",
+      "version": "0.5.17"
+    },
+    {
+      "name": "crossbeam-epoch",
+      "version": "0.9.21"
+    },
+    {
+      "name": "crossbeam-utils",
+      "version": "0.8.23"
+    },
+    {
+      "name": "data-encoding",
+      "version": "2.11.1"
+    },
+    {
+      "name": "either",
+      "version": "1.19.0"
+    },
+    {
+      "name": "find-msvc-tools",
+      "version": "0.1.15"
+    },
+    {
+      "name": "form_urlencoded",
+      "version": "1.2.2"
+    },
+    {
+      "name": "futures-channel",
+      "version": "0.3.34"
+    },
+    {
+      "name": "futures-io",
+      "version": "0.3.34"
+    },
+    {
+      "name": "futures-macro",
+      "version": "0.3.34"
+    },
+    {
+      "name": "hickory-net",
+      "version": "0.26.3"
+    },
+    {
+      "name": "hickory-proto",
+      "version": "0.26.3"
+    },
+    {
+      "name": "hickory-resolver",
+      "version": "0.26.3"
+    },
+    {
+      "name": "ipconfig",
+      "version": "0.3.4"
+    },
+    {
+      "name": "ipnet",
+      "version": "2.12.2"
+    },
+    {
+      "name": "jni",
+      "version": "0.22.4"
+    },
+    {
+      "name": "jni-macros",
+      "version": "0.22.4"
+    },
+    {
+      "name": "jni-sys",
+      "version": "0.4.1"
+    },
+    {
+      "name": "jni-sys-macros",
+      "version": "0.4.1"
+    },
+    {
+      "name": "lock_api",
+      "version": "0.4.14"
+    },
+    {
+      "name": "log",
+      "version": "0.4.34"
+    },
+    {
+      "name": "moka",
+      "version": "0.12.16"
+    },
+    {
+      "name": "ndk-context",
+      "version": "0.1.1"
+    },
+    {
+      "name": "num-traits",
+      "version": "0.2.19"
+    },
+    {
+      "name": "parking_lot",
+      "version": "0.12.5"
+    },
+    {
+      "name": "parking_lot_core",
+      "version": "0.9.12"
+    },
+    {
+      "name": "percent-encoding",
+      "version": "2.3.2"
+    },
+    {
+      "name": "portable-atomic",
+      "version": "1.15.0"
+    },
+    {
+      "name": "prefix-trie",
+      "version": "0.8.4"
+    },
+    {
+      "name": "rand",
+      "version": "0.10.3"
+    },
+    {
+      "name": "rand_core",
+      "version": "0.10.1"
+    },
+    {
+      "name": "redox_syscall",
+      "version": "0.5.18"
+    },
+    {
+      "name": "resolv-conf",
+      "version": "0.7.6"
+    },
+    {
+      "name": "ring",
+      "version": "0.17.14"
+    },
+    {
+      "name": "rustc_version",
+      "version": "0.4.1"
+    },
+    {
+      "name": "same-file",
+      "version": "1.0.6"
+    },
+    {
+      "name": "semver",
+      "version": "1.0.28"
+    },
+    {
+      "name": "shlex",
+      "version": "2.0.1"
+    },
+    {
+      "name": "simd_cesu8",
+      "version": "1.2.0"
+    },
+    {
+      "name": "system-configuration",
+      "version": "0.7.0"
+    },
+    {
+      "name": "system-configuration-sys",
+      "version": "0.6.0"
+    },
+    {
+      "name": "tagptr",
+      "version": "0.2.0"
+    },
+    {
+      "name": "thiserror",
+      "version": "2.0.21"
+    },
+    {
+      "name": "thiserror-impl",
+      "version": "2.0.21"
+    },
+    {
+      "name": "tinyvec",
+      "version": "1.13.3"
+    },
+    {
+      "name": "tokio-macros",
+      "version": "2.7.2"
+    },
+    {
+      "name": "tracing",
+      "version": "0.1.44"
+    },
+    {
+      "name": "tracing-core",
+      "version": "0.1.36"
+    },
+    {
+      "name": "untrusted",
+      "version": "0.9.0"
+    },
+    {
+      "name": "url",
+      "version": "2.5.8"
+    },
+    {
+      "name": "uuid",
+      "version": "1.26.1"
+    },
+    {
+      "name": "walkdir",
+      "version": "2.5.0"
+    },
+    {
+      "name": "widestring",
+      "version": "1.2.1"
+    },
+    {
+      "name": "winapi-util",
+      "version": "0.1.11"
+    },
+    {
+      "name": "windows-registry",
+      "version": "0.6.1"
+    },
+    {
+      "name": "windows-result",
+      "version": "0.4.1"
+    },
+    {
+      "name": "windows-strings",
+      "version": "0.5.1"
+    },
+    {
+      "name": "windows-sys",
+      "version": "0.52.0"
+    },
+    {
+      "name": "windows-targets",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_aarch64_gnullvm",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_aarch64_msvc",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_i686_gnu",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_i686_gnullvm",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_i686_msvc",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_x86_64_gnu",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_x86_64_gnullvm",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_x86_64_msvc",
+      "version": "0.52.6"
+    }
+  ],
+  "cargo_lock_sha256": "dc17c1c94269045af76a08a1c3460be264efffaad3a040e45bfe2776c95619df"
+}

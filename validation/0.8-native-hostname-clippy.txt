@@ -1,0 +1,7 @@
+Rust 1.99.1, Linux x86-64, isolated synthetic validation
+Command: cargo clippy --offline --locked --release --all-targets --jobs 1 -- -D warnings
+    Checking lazaret-pg v0.1.0 (/tmp/workglen-crate-validation/source/vendor/lazaret-pg)
+    Checking mail-builder v1.0.0
+    Checking mail-auth v0.13.3 (/tmp/workglen-crate-validation/source/vendor/mail-auth)
+    Checking workglen-mail v0.8.0 (/tmp/workglen-crate-validation/source)
+    Finished `release` profile [optimized] target(s) in 17.05s

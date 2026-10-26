@@ -1,0 +1,15 @@
+{
+  "stage": "base64",
+  "before_registry": 230,
+  "after_registry": 229,
+  "removed_packages": [
+    {
+      "name": "base64",
+      "version": "0.22.1"
+    }
+  ],
+  "added_registry_packages": [],
+  "retained_checksums_unchanged": true,
+  "before_lock_sha256": "9a57cf188b507e18bda7e546746a337af386391838e2bfd41180dc4a3a408bd9",
+  "after_lock_sha256": "c4d98b160a34b98936b6c0d8e806271ce5850599ecc90a41aa4cf8471726153e"
+}

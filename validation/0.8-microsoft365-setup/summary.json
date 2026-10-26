@@ -1,0 +1,36 @@
+{
+  "scope": "Synthetic offline/loopback source validation; no Microsoft tenant changes or real mail",
+  "rust": {
+    "passed": 308,
+    "failed": 0,
+    "ignored": 4
+  },
+  "plan_checks": 6,
+  "microsoft365_browser": 9,
+  "destination_browser": 8,
+  "directory_browser": 6,
+  "native_network": 19,
+  "native_security_browser": 14,
+  "clippy": "passed; all workspace targets/features, warnings denied",
+  "release_build": "passed; offline and locked",
+  "external_registry_versions": 15,
+  "all_manifest_and_lockfile_bytes_unchanged_from_baseline": true,
+  "first_party_libraries_with_zero_external_dependencies": 6,
+  "baseline_zip_sha256": "6189ec210af9edad7e9a9756d7763393e1e3913a71169015cb6cea33a5177b3a",
+  "source_reproduction": "python3 tools/check-microsoft365-setup.py --browser",
+  "validation_environment": {
+    "os": "Linux x86_64",
+    "rust": "1.99.1",
+    "node": "24.22.1",
+    "playwright": "1.62.1",
+    "chromium": "156.0.8078.47",
+    "cargo_profile_dev_debug": "0",
+    "cargo_profile_test_debug": "0"
+  },
+  "limits": [
+    "Live tenant connector restrictions and Enhanced Filtering require deployment verification",
+    "macOS execution not exercised in this environment",
+    "Four optional PostgreSQL tests ignored",
+    "No authenticated submission or intra-tenant mail enforcement added"
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "dependencies": {
+    "pratique": {
+      "path": "vendor/pratique",
+      "features": [
+        "server"
+      ]
+    },
+    "redb": "3",
+    "workglen-mime": {
+      "path": "crates/native-mime"
+    },
+    "workglen-dns": {
+      "path": "crates/native-dns"
+    },
+    "workglen-toml": {
+      "path": "crates/native-toml"
+    },
+    "workglen-idna": {
+      "path": "crates/native-idna"
+    },
+    "argon2": {
+      "version": "0.5",
+      "default-features": false,
+      "features": [
+        "alloc",
+        "password-hash"
+      ]
+    },
+    "subtle": "2",
+    "lazaret-pg": {
+      "path": "vendor/lazaret-pg",
+      "features": [
+        "with-json"
+      ]
+    }
+  },
+  "registry_packages": [
+    {
+      "name": "argon2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.5.3"
+    },
+    {
+      "name": "base64ct",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "1.8.3"
+    },
+    {
+      "name": "blake2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.10.6"
+    },
+    {
+      "name": "block-buffer",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.10.4"
+    },
+    {
+      "name": "cpufeatures",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.2.17"
+    },
+    {
+      "name": "crypto-common",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.1.7"
+    },
+    {
+      "name": "digest",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.10.7"
+    },
+    {
+      "name": "generic-array",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.14.7"
+    },
+    {
+      "name": "libc",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.2.191"
+    },
+    {
+      "name": "password-hash",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.5.0"
+    },
+    {
+      "name": "rand_core",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.6.4"
+    },
+    {
+      "name": "redb",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "3.1.3"
+    },
+    {
+      "name": "subtle",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "2.6.1"
+    },
+    {
+      "name": "typenum",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "1.20.1"
+    },
+    {
+      "name": "version_check",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.9.5"
+    }
+  ],
+  "vendored_third_party": []
+}

@@ -1,0 +1,141 @@
+{
+  "review_date": "2026-10-26",
+  "scope": "All lockfile package declarations; existing notices retained, not a full source provenance audit. TOML test corpus is MIT; retain tests/fixtures/toml-test/LICENSE.",
+  "cargo_lock_sha256": "147130e6bb8c1a69501a628151743f95c1a728f2c416d095ba332f282568690f",
+  "package_count": 22,
+  "registry_count": 15,
+  "packages": [
+    {
+      "name": "argon2",
+      "version": "0.5.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "base64ct",
+      "version": "1.8.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "Apache-2.0 OR MIT"
+    },
+    {
+      "name": "blake2",
+      "version": "0.10.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "block-buffer",
+      "version": "0.10.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "cpufeatures",
+      "version": "0.2.17",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "crypto-common",
+      "version": "0.1.7",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "digest",
+      "version": "0.10.7",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "generic-array",
+      "version": "0.14.7",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT"
+    },
+    {
+      "name": "lazaret-pg",
+      "version": "0.1.0",
+      "source": "first-party path",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "libc",
+      "version": "0.2.191",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "password-hash",
+      "version": "0.5.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "pratique",
+      "version": "0.1.0",
+      "source": "first-party path",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "rand_core",
+      "version": "0.6.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "redb",
+      "version": "3.1.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "subtle",
+      "version": "2.6.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "typenum",
+      "version": "1.20.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "version_check",
+      "version": "0.9.5",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MIT/Apache-2.0"
+    },
+    {
+      "name": "workglen-dns",
+      "version": "0.1.0",
+      "source": "first-party path",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "workglen-idna",
+      "version": "0.1.0",
+      "source": "first-party path",
+      "license": "Apache-2.0 AND Unicode-3.0"
+    },
+    {
+      "name": "workglen-mail",
+      "version": "0.8.0",
+      "source": "first-party path",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "workglen-mime",
+      "version": "0.1.0",
+      "source": "first-party path",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "workglen-toml",
+      "version": "0.1.0",
+      "source": "first-party path",
+      "license": "Apache-2.0"
+    }
+  ]
+}

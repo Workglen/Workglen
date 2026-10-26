@@ -1,0 +1,795 @@
+diff --git a/src/asyncio/exec.rs b/src/asyncio/exec.rs
+--- a/src/asyncio/exec.rs
++++ b/src/asyncio/exec.rs
+@@ -6,6 +6,16 @@
+ use std::sync::Arc;
+ use std::task::{Context, Poll, Wake, Waker};
+ use std::thread::{self, Thread};
++
++/// Yields once to the caller's executor, including enclosing timeout futures.
++/// It does not wait for another thread and wakes itself without allocating a task.
++pub async fn yield_now() {
++    let mut first = true;
++    std::future::poll_fn(|cx| {
++        if first { first = false; cx.waker().wake_by_ref(); Poll::Pending }
++        else { Poll::Ready(()) }
++    }).await
++}
+ 
+ struct Unpark {
+     thread: Thread,
+diff --git a/src/asyncio/mod.rs b/src/asyncio/mod.rs
+--- a/src/asyncio/mod.rs
++++ b/src/asyncio/mod.rs
+@@ -28,13 +28,14 @@
+ mod io;
+ pub(crate) mod net;
+ mod pool;
++pub mod socket;
+ pub(crate) mod slots;
+ mod timer;
+ #[cfg(test)]
+ mod timer_tests;
+ mod tls;
+ 
+-pub use exec::block_on;
++pub use exec::{block_on, yield_now};
+ pub use io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+ pub use net::ThreadedStream;
+ pub use pool::{BlockingTask, Pool, TaskError};
+diff --git a/src/asyncio/socket.rs b/src/asyncio/socket.rs
+new file mode 100644
+--- /dev/null
++++ b/src/asyncio/socket.rs
+@@ -0,0 +1,264 @@
++//! Cancellable, bounded UDP/TCP client sockets using nonblocking operating-system I/O.
++//!
++//! Literal addresses only: no hidden blocking hostname resolution. The existing timer
++//! wakes a stalled operation after 2 ms; no worker, queue or detached socket operation
++//! survives dropping its owner. Every successful operation yields once before its next
++//! syscall, allowing enclosing deadlines to run even under continuous traffic.
++//! TCP connection initiation is supported on Linux and macOS; other targets return
++//! `Unsupported`. UDP and already-connected TCP wrapping use the standard library.
++use super::{sleep, yield_now, AsyncRead, AsyncWrite, Sleep};
++use std::future::{poll_fn, Future};
++use std::io::{self, Read, Write};
++use std::net::{Shutdown, SocketAddr};
++use std::pin::Pin;
++use std::sync::{
++    atomic::{AtomicUsize, Ordering},
++    Arc,
++};
++use std::task::{Context, Poll};
++use std::time::Duration;
++
++mod connect;
++const RETRY_DELAY: Duration = Duration::from_millis(2);
++
++#[derive(Debug)]
++struct Budget {
++    limit: usize,
++    used: AtomicUsize,
++}
++
++/// Shared hard cap on live sockets, including in-progress TCP connections.
++/// Capacity exhaustion fails immediately with `WouldBlock`; there is no wait queue.
++/// Clones share the cap. A permit is returned when its socket is dropped.
++#[derive(Clone, Debug)]
++pub struct SocketBudget(Arc<Budget>);
++impl SocketBudget {
++    pub fn new(limit: usize) -> io::Result<Self> {
++        if limit == 0 {
++            return Err(io::Error::new(
++                io::ErrorKind::InvalidInput,
++                "socket budget must be nonzero",
++            ));
++        }
++        Ok(Self(Arc::new(Budget {
++            limit,
++            used: AtomicUsize::new(0),
++        })))
++    }
++    pub fn in_use(&self) -> usize {
++        self.0.used.load(Ordering::Acquire)
++    }
++    pub fn limit(&self) -> usize {
++        self.0.limit
++    }
++    fn reserve(&self) -> io::Result<Permit> {
++        let mut used = self.0.used.load(Ordering::Acquire);
++        loop {
++            if used >= self.0.limit {
++                return Err(io::Error::new(
++                    io::ErrorKind::WouldBlock,
++                    "socket budget exhausted",
++                ));
++            }
++            match self.0.used.compare_exchange_weak(
++                used,
++                used + 1,
++                Ordering::AcqRel,
++                Ordering::Acquire,
++            ) {
++                Ok(_) => break,
++                Err(current) => used = current,
++            }
++        }
++        Ok(Permit(self.0.clone()))
++    }
++    /// Bind a nonblocking UDP socket without resolving a hostname.
++    pub fn udp_bind(&self, address: SocketAddr) -> io::Result<UdpSocket> {
++        let permit = self.reserve()?;
++        let socket = std::net::UdpSocket::bind(address)?;
++        socket.set_nonblocking(true)?;
++        Ok(UdpSocket {
++            socket,
++            _permit: permit,
++        })
++    }
++    /// Initiate a nonblocking connection. Wrap this future in `timeout`/`timeout_at`.
++    /// Dropping the future closes its pending connection and releases its permit.
++    pub async fn tcp_connect(&self, address: SocketAddr) -> io::Result<TcpStream> {
++        yield_now().await;
++        let permit = self.reserve()?;
++        let socket = connect::start(address)?;
++        let mut wait = Wait::default();
++        poll_fn(|cx| {
++            wait.poll(cx, || {
++                if connect::ready(&socket)? {
++                    Ok(())
++                } else {
++                    Err(io::ErrorKind::WouldBlock.into())
++                }
++            })
++        })
++        .await?;
++        Ok(TcpStream {
++            socket,
++            reading: Wait::default(),
++            writing: Wait::default(),
++            _permit: permit,
++        })
++    }
++    /// Wrap an owned, connected socket. It is put into nonblocking mode.
++    pub fn tcp_from_std(&self, socket: std::net::TcpStream) -> io::Result<TcpStream> {
++        let permit = self.reserve()?;
++        socket.peer_addr()?;
++        socket.set_nonblocking(true)?;
++        Ok(TcpStream {
++            socket,
++            reading: Wait::default(),
++            writing: Wait::default(),
++            _permit: permit,
++        })
++    }
++}
++struct Permit(Arc<Budget>);
++impl Drop for Permit {
++    fn drop(&mut self) {
++        self.0.used.fetch_sub(1, Ordering::AcqRel);
++    }
++}
++
++struct Wait {
++    timer: Option<Sleep>,
++    yield_due: bool,
++}
++impl Default for Wait {
++    fn default() -> Self {
++        Self {
++            timer: None,
++            yield_due: true,
++        }
++    }
++}
++impl Wait {
++    fn poll<T>(
++        &mut self,
++        cx: &mut Context<'_>,
++        operation: impl FnOnce() -> io::Result<T>,
++    ) -> Poll<io::Result<T>> {
++        if self.yield_due {
++            self.yield_due = false;
++            cx.waker().wake_by_ref();
++            return Poll::Pending;
++        }
++        if let Some(timer) = &mut self.timer {
++            if Pin::new(timer).poll(cx).is_pending() {
++                return Poll::Pending;
++            }
++            self.timer = None;
++        }
++        match operation() {
++            Err(e)
++                if matches!(
++                    e.kind(),
++                    io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
++                ) =>
++            {
++                let mut timer = sleep(RETRY_DELAY);
++                // Timer startup failure must still yield to the caller's deadline.
++                if Pin::new(&mut timer).poll(cx).is_ready() {
++                    cx.waker().wake_by_ref();
++                }
++                self.timer = Some(timer);
++                Poll::Pending
++            }
++            result => {
++                self.yield_due = true;
++                Poll::Ready(result)
++            }
++        }
++    }
++}
++
++/// Owned nonblocking UDP socket. Connected receives accept only the chosen peer.
++pub struct UdpSocket {
++    socket: std::net::UdpSocket,
++    _permit: Permit,
++}
++impl UdpSocket {
++    pub fn local_addr(&self) -> io::Result<SocketAddr> {
++        self.socket.local_addr()
++    }
++    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
++        self.socket.peer_addr()
++    }
++    pub fn connect(&self, peer: SocketAddr) -> io::Result<()> {
++        self.socket.connect(peer)
++    }
++    pub async fn send(&self, bytes: &[u8]) -> io::Result<usize> {
++        let mut wait = Wait::default();
++        poll_fn(|cx| wait.poll(cx, || self.socket.send(bytes))).await
++    }
++    pub async fn recv(&self, bytes: &mut [u8]) -> io::Result<usize> {
++        let mut wait = Wait::default();
++        poll_fn(|cx| wait.poll(cx, || self.socket.recv(bytes))).await
++    }
++    pub async fn send_to(&self, bytes: &[u8], peer: SocketAddr) -> io::Result<usize> {
++        let mut wait = Wait::default();
++        poll_fn(|cx| wait.poll(cx, || self.socket.send_to(bytes, peer))).await
++    }
++    pub async fn recv_from(&self, bytes: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
++        let mut wait = Wait::default();
++        poll_fn(|cx| wait.poll(cx, || self.socket.recv_from(bytes))).await
++    }
++}
++
++/// Owned nonblocking TCP socket implementing Pratique's async I/O traits.
++/// Writes go directly to the socket; no background buffered write remains on drop.
++pub struct TcpStream {
++    socket: std::net::TcpStream,
++    reading: Wait,
++    writing: Wait,
++    _permit: Permit,
++}
++impl TcpStream {
++    pub fn local_addr(&self) -> io::Result<SocketAddr> {
++        self.socket.local_addr()
++    }
++    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
++        self.socket.peer_addr()
++    }
++}
++impl AsyncRead for TcpStream {
++    fn poll_read(
++        self: Pin<&mut Self>,
++        cx: &mut Context<'_>,
++        bytes: &mut [u8],
++    ) -> Poll<io::Result<usize>> {
++        let this = self.get_mut();
++        if bytes.is_empty() {
++            return Poll::Ready(Ok(0));
++        }
++        this.reading.poll(cx, || (&this.socket).read(bytes))
++    }
++}
++impl AsyncWrite for TcpStream {
++    fn poll_write(
++        self: Pin<&mut Self>,
++        cx: &mut Context<'_>,
++        bytes: &[u8],
++    ) -> Poll<io::Result<usize>> {
++        let this = self.get_mut();
++        if bytes.is_empty() {
++            return Poll::Ready(Ok(0));
++        }
++        this.writing.poll(cx, || (&this.socket).write(bytes))
++    }
++    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
++        Poll::Ready(Ok(()))
++    }
++    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
++        Poll::Ready(match self.socket.shutdown(Shutdown::Write) {
++            Err(e) if e.kind() == io::ErrorKind::NotConnected => Ok(()),
++            result => result,
++        })
++    }
++}
+diff --git a/src/asyncio/socket/connect.rs b/src/asyncio/socket/connect.rs
+new file mode 100644
+--- /dev/null
++++ b/src/asyncio/socket/connect.rs
+@@ -0,0 +1,204 @@
++//! Small OS boundary: create/connect nonblocking TCP, then probe readiness with poll(0).
++//! Descriptor ownership moves immediately into std, which closes it on every error/drop.
++#[cfg(any(target_os = "linux", target_os = "macos"))]
++mod native {
++    use std::{
++        ffi::{c_int, c_short, c_void},
++        io,
++        mem::size_of,
++        net::{SocketAddr, TcpStream},
++        os::fd::{AsRawFd, FromRawFd},
++    };
++    #[cfg(target_os = "linux")]
++    type Nfds = std::ffi::c_ulong;
++    #[cfg(target_os = "macos")]
++    type Nfds = u32;
++    #[repr(C)]
++    struct PollFd {
++        fd: c_int,
++        events: c_short,
++        revents: c_short,
++    }
++    #[repr(C)]
++    struct Address4 {
++        #[cfg(target_os = "macos")]
++        len: u8,
++        #[cfg(target_os = "macos")]
++        family: u8,
++        #[cfg(target_os = "linux")]
++        family: u16,
++        port: u16,
++        address: [u8; 4],
++        padding: [u8; 8],
++    }
++    #[repr(C)]
++    struct Address6 {
++        #[cfg(target_os = "macos")]
++        len: u8,
++        #[cfg(target_os = "macos")]
++        family: u8,
++        #[cfg(target_os = "linux")]
++        family: u16,
++        port: u16,
++        flow: u32,
++        address: [u8; 16],
++        scope: u32,
++    }
++    const _: () = assert!(
++        size_of::<Address4>() == 16 && size_of::<Address6>() == 28 && size_of::<PollFd>() == 8
++    );
++    #[cfg(target_os = "linux")]
++    const IPV6: c_int = 10;
++    #[cfg(target_os = "macos")]
++    const IPV6: c_int = 30;
++    extern "C" {
++        fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int;
++        fn connect(fd: c_int, address: *const c_void, len: u32) -> c_int;
++        fn poll(fds: *mut PollFd, count: Nfds, timeout: c_int) -> c_int;
++        #[cfg(target_os = "macos")]
++        fn fcntl(fd: c_int, command: c_int, ...) -> c_int;
++        #[cfg(target_os = "macos")]
++        fn setsockopt(
++            fd: c_int,
++            level: c_int,
++            name: c_int,
++            value: *const c_void,
++            len: u32,
++        ) -> c_int;
++    }
++    pub(super) fn start(address: SocketAddr) -> io::Result<TcpStream> {
++        #[cfg(target_os = "linux")]
++        let flags = 1 | 0o2000000; // SOCK_STREAM | SOCK_CLOEXEC
++        #[cfg(target_os = "macos")]
++        let flags = 1;
++        // SAFETY: socket takes integer constants, returns a new owned descriptor or -1.
++        let fd = unsafe { socket(if address.is_ipv4() { 2 } else { IPV6 }, flags, 0) };
++        if fd < 0 {
++            return Err(io::Error::last_os_error());
++        }
++        // SAFETY: fd is a fresh TCP socket and is transferred exactly once into std ownership.
++        let stream = unsafe { TcpStream::from_raw_fd(fd) };
++        #[cfg(target_os = "macos")]
++        {
++            let one: c_int = 1;
++            // SAFETY: a live owned fd, F_SETFD/FD_CLOEXEC and a valid int buffer for SO_NOSIGPIPE.
++            if unsafe { fcntl(fd, 2, 1) } < 0
++                || unsafe {
++                    setsockopt(
++                        fd,
++                        0xffff,
++                        0x1022,
++                        (&one as *const c_int).cast(),
++                        size_of::<c_int>() as u32,
++                    )
++                } < 0
++            {
++                return Err(io::Error::last_os_error());
++            }
++        }
++        stream.set_nonblocking(true)?;
++        let result = match address {
++            SocketAddr::V4(a) => {
++                let address = Address4 {
++                    #[cfg(target_os = "macos")]
++                    len: 16,
++                    family: 2,
++                    port: a.port().to_be(),
++                    address: a.ip().octets(),
++                    padding: [0; 8],
++                };
++                // SAFETY: exact sockaddr_in ABI and size; pointer lives for the synchronous call.
++                unsafe {
++                    connect(
++                        fd,
++                        (&address as *const Address4).cast(),
++                        size_of::<Address4>() as u32,
++                    )
++                }
++            }
++            SocketAddr::V6(a) => {
++                let address = Address6 {
++                    #[cfg(target_os = "macos")]
++                    len: 28,
++                    family: IPV6 as _,
++                    port: a.port().to_be(),
++                    flow: a.flowinfo(),
++                    address: a.ip().octets(),
++                    scope: a.scope_id(),
++                };
++                // SAFETY: exact sockaddr_in6 ABI and size; pointer lives for the synchronous call.
++                unsafe {
++                    connect(
++                        fd,
++                        (&address as *const Address6).cast(),
++                        size_of::<Address6>() as u32,
++                    )
++                }
++            }
++        };
++        if result < 0 {
++            let error = io::Error::last_os_error();
++            #[cfg(target_os = "linux")]
++            let in_progress = error.raw_os_error() == Some(115);
++            #[cfg(target_os = "macos")]
++            let in_progress = error.raw_os_error() == Some(36);
++            if !in_progress && error.kind() != io::ErrorKind::Interrupted {
++                return Err(error);
++            }
++        }
++        Ok(stream)
++    }
++    pub(super) fn ready(stream: &TcpStream) -> io::Result<bool> {
++        let mut fd = PollFd {
++            fd: stream.as_raw_fd(),
++            events: 4,
++            revents: 0,
++        }; // POLLOUT
++           // SAFETY: one initialized pollfd, live borrowed descriptor, zero timeout; never blocks.
++        let result = unsafe { poll(&mut fd, 1, 0) };
++        if result < 0 {
++            return Err(io::Error::last_os_error());
++        }
++        if result == 0 {
++            return Ok(false);
++        }
++        if let Some(error) = stream.take_error()? {
++            return Err(error);
++        }
++        if fd.revents & 4 == 0 {
++            return Err(io::Error::new(
++                io::ErrorKind::ConnectionAborted,
++                "TCP connection failed",
++            ));
++        }
++        Ok(true)
++    }
++}
++pub(super) fn start(address: std::net::SocketAddr) -> std::io::Result<std::net::TcpStream> {
++    #[cfg(any(target_os = "linux", target_os = "macos"))]
++    {
++        native::start(address)
++    }
++    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
++    {
++        let _ = address;
++        Err(std::io::Error::new(
++            std::io::ErrorKind::Unsupported,
++            "nonblocking TCP connect requires Linux or macOS",
++        ))
++    }
++}
++pub(super) fn ready(stream: &std::net::TcpStream) -> std::io::Result<bool> {
++    #[cfg(any(target_os = "linux", target_os = "macos"))]
++    {
++        native::ready(stream)
++    }
++    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
++    {
++        let _ = stream;
++        Err(std::io::Error::new(
++            std::io::ErrorKind::Unsupported,
++            "nonblocking TCP connect requires Linux or macOS",
++        ))
++    }
++}
+diff --git a/tests/async_socket.rs b/tests/async_socket.rs
+new file mode 100644
+--- /dev/null
++++ b/tests/async_socket.rs
+@@ -0,0 +1,273 @@
++//! Local-only acceptance tests, also included by Workglen's portable workspace suite.
++use pratique::asyncio::{
++    block_on, socket::SocketBudget, timeout, yield_now, AsyncReadExt, AsyncWriteExt,
++};
++use std::{
++    future::Future,
++    io::{self, Read, Write},
++    net::{SocketAddr, TcpListener, UdpSocket},
++    sync::{Arc, Barrier},
++    task::{Context, Waker},
++    time::{Duration, Instant},
++};
++
++fn addr(ip: &str) -> SocketAddr {
++    format!("{ip}:0").parse().unwrap()
++}
++
++#[test]
++fn executor_and_timer_can_interrupt_a_continuously_ready_task() {
++    let start = Instant::now();
++    assert!(block_on(timeout(Duration::from_millis(25), async {
++        loop {
++            yield_now().await;
++        }
++    }))
++    .is_err());
++    assert!(start.elapsed() < Duration::from_secs(1));
++    assert_eq!(
++        block_on(async {
++            yield_now().await;
++            42
++        }),
++        42
++    );
++}
++
++#[test]
++fn socket_budget_is_shared_and_returns_failed_or_dropped_reservations() {
++    assert!(SocketBudget::new(0).is_err());
++    let budget = SocketBudget::new(1).unwrap();
++    let clone = budget.clone();
++    let first = budget.udp_bind(addr("127.0.0.1")).unwrap();
++    assert_eq!(clone.in_use(), 1);
++    assert_eq!(clone.limit(), 1);
++    assert!(
++        matches!(clone.udp_bind(addr("127.0.0.1")),Err(e)if e.kind()==io::ErrorKind::WouldBlock)
++    );
++    drop(first);
++    assert_eq!(clone.in_use(), 0);
++    let occupied = UdpSocket::bind(addr("127.0.0.1")).unwrap();
++    assert!(budget.udp_bind(occupied.local_addr().unwrap()).is_err());
++    assert_eq!(budget.in_use(), 0);
++}
++
++#[test]
++fn parallel_socket_admission_never_exceeds_the_shared_cap() {
++    let budget = SocketBudget::new(4).unwrap();
++    let ready = Arc::new(Barrier::new(17));
++    let release = Arc::new(Barrier::new(17));
++    let workers: Vec<_> = (0..16)
++        .map(|_| {
++            let budget = budget.clone();
++            let ready = ready.clone();
++            let release = release.clone();
++            std::thread::spawn(move || {
++                let socket = budget.udp_bind(addr("127.0.0.1"));
++                ready.wait();
++                release.wait();
++                drop(socket);
++            })
++        })
++        .collect();
++    ready.wait();
++    assert_eq!(budget.in_use(), 4);
++    release.wait();
++    for worker in workers {
++        worker.join().unwrap();
++    }
++    assert_eq!(budget.in_use(), 0);
++}
++
++#[test]
++fn udp_ipv4_ipv6_and_connected_peer_filtering() {
++    for ip in ["127.0.0.1", "[::1]"] {
++        let server = UdpSocket::bind(addr(ip)).unwrap();
++        server
++            .set_read_timeout(Some(Duration::from_secs(2)))
++            .unwrap();
++        let address = server.local_addr().unwrap();
++        let budget = SocketBudget::new(1).unwrap();
++        let socket = budget.udp_bind(addr(ip)).unwrap();
++        socket.connect(address).unwrap();
++        assert_eq!(socket.peer_addr().unwrap(), address);
++        let rogue = UdpSocket::bind(addr(ip)).unwrap();
++        rogue
++            .send_to(b"forged", socket.local_addr().unwrap())
++            .unwrap();
++        let worker = std::thread::spawn(move || {
++            let mut bytes = [0; 16];
++            let (n, peer) = server.recv_from(&mut bytes).unwrap();
++            assert_eq!(&bytes[..n], b"query");
++            server.send_to(b"answer", peer).unwrap();
++        });
++        block_on(async {
++            assert_eq!(socket.send(b"query").await.unwrap(), 5);
++            let mut bytes = [0; 16];
++            let n = timeout(Duration::from_secs(2), socket.recv(&mut bytes))
++                .await
++                .unwrap()
++                .unwrap();
++            assert_eq!(&bytes[..n], b"answer");
++        });
++        worker.join().unwrap();
++        drop(socket);
++        assert_eq!(budget.in_use(), 0);
++    }
++}
++
++#[test]
++fn udp_cancellation_closes_socket_and_releases_capacity() {
++    let budget = SocketBudget::new(1).unwrap();
++    let socket = budget.udp_bind(addr("127.0.0.1")).unwrap();
++    let address = socket.local_addr().unwrap();
++    let start = Instant::now();
++    assert!(block_on(timeout(Duration::from_millis(25), async move {
++        let mut bytes = [0; 8];
++        socket.recv_from(&mut bytes).await
++    }))
++    .is_err());
++    assert!(start.elapsed() < Duration::from_secs(1));
++    assert_eq!(budget.in_use(), 0);
++    let reopened = budget.udp_bind(address).unwrap();
++    drop(reopened);
++    assert_eq!(budget.in_use(), 0);
++}
++
++#[test]
++fn tcp_ipv4_ipv6_partial_reads_and_half_close() {
++    for ip in ["127.0.0.1", "[::1]"] {
++        let server = TcpListener::bind(addr(ip)).unwrap();
++        let address = server.local_addr().unwrap();
++        let budget = SocketBudget::new(1).unwrap();
++        let worker = std::thread::spawn(move || {
++            let (mut socket, _) = server.accept().unwrap();
++            socket
++                .set_read_timeout(Some(Duration::from_secs(2)))
++                .unwrap();
++            let mut bytes = [0; 5];
++            socket.read_exact(&mut bytes).unwrap();
++            assert_eq!(&bytes, b"hello");
++            for b in b"world" {
++                socket.write_all(&[*b]).unwrap();
++                std::thread::sleep(Duration::from_millis(3));
++            }
++            assert_eq!(socket.read(&mut bytes).unwrap(), 0);
++        });
++        block_on(async {
++            let mut socket = timeout(Duration::from_secs(2), budget.tcp_connect(address))
++                .await
++                .unwrap()
++                .unwrap();
++            assert_eq!(socket.peer_addr().unwrap(), address);
++            let mut bytes = [0; 5];
++            socket.write_all(b"hello").await.unwrap();
++            socket.read_exact(&mut bytes).await.unwrap();
++            assert_eq!(&bytes, b"world");
++            socket.close().await.unwrap();
++        });
++        worker.join().unwrap();
++        assert_eq!(budget.in_use(), 0);
++    }
++}
++
++#[test]
++fn refused_and_dropped_tcp_connect_return_capacity() {
++    let listener = TcpListener::bind(addr("127.0.0.1")).unwrap();
++    let address = listener.local_addr().unwrap();
++    drop(listener);
++    let budget = SocketBudget::new(1).unwrap();
++    let result = block_on(timeout(Duration::from_secs(1), budget.tcp_connect(address))).unwrap();
++    assert!(result.is_err());
++    assert_eq!(budget.in_use(), 0);
++    let listener = TcpListener::bind(addr("127.0.0.1")).unwrap();
++    let mut connecting = Box::pin(budget.tcp_connect(listener.local_addr().unwrap()));
++    let mut cx = Context::from_waker(Waker::noop());
++    assert!(connecting.as_mut().poll(&mut cx).is_pending());
++    assert_eq!(budget.in_use(), 0);
++    assert!(connecting.as_mut().poll(&mut cx).is_pending());
++    assert_eq!(budget.in_use(), 1);
++    drop(connecting);
++    assert_eq!(budget.in_use(), 0);
++}
++
++#[test]
++fn cancellation_during_tcp_read_closes_the_peer_without_a_background_worker() {
++    let listener = TcpListener::bind(addr("127.0.0.1")).unwrap();
++    let address = listener.local_addr().unwrap();
++    let budget = SocketBudget::new(1).unwrap();
++    let worker = std::thread::spawn(move || {
++        let (mut socket, _) = listener.accept().unwrap();
++        socket
++            .set_read_timeout(Some(Duration::from_secs(2)))
++            .unwrap();
++        let mut byte = [0];
++        assert_eq!(socket.read(&mut byte).unwrap(), 0);
++    });
++    block_on(async {
++        let mut socket = budget.tcp_connect(address).await.unwrap();
++        assert!(timeout(Duration::from_millis(25), async move {
++            let mut byte = [0];
++            socket.read_exact(&mut byte).await
++        })
++        .await
++        .is_err());
++    });
++    worker.join().unwrap();
++    assert_eq!(budget.in_use(), 0);
++}
++
++#[test]
++fn tcp_backpressure_is_cancellable_without_detached_writes() {
++    let listener = TcpListener::bind(addr("127.0.0.1")).unwrap();
++    let address = listener.local_addr().unwrap();
++    let budget = SocketBudget::new(1).unwrap();
++    let (done_tx, done_rx) = std::sync::mpsc::channel();
++    let worker = std::thread::spawn(move || {
++        let (_socket, _) = listener.accept().unwrap();
++        done_rx.recv_timeout(Duration::from_secs(2)).unwrap();
++    });
++    block_on(async {
++        let mut socket = budget.tcp_connect(address).await.unwrap();
++        let bytes = vec![7; 1024 * 1024];
++        assert!(timeout(Duration::from_millis(40), async move {
++            for _ in 0..128 {
++                socket.write_all(&bytes).await.unwrap();
++            }
++        })
++        .await
++        .is_err());
++    });
++    assert_eq!(budget.in_use(), 0);
++    done_tx.send(()).unwrap();
++    worker.join().unwrap();
++}
++
++#[test]
++fn trickled_tcp_payload_does_not_reset_an_absolute_deadline() {
++    let listener = TcpListener::bind(addr("127.0.0.1")).unwrap();
++    let address = listener.local_addr().unwrap();
++    let budget = SocketBudget::new(1).unwrap();
++    let worker = std::thread::spawn(move || {
++        let (mut socket, _) = listener.accept().unwrap();
++        for _ in 0..100 {
++            if socket.write_all(&[1]).is_err() {
++                break;
++            }
++            std::thread::sleep(Duration::from_millis(8));
++        }
++    });
++    let start = Instant::now();
++    block_on(async {
++        let mut socket = budget.tcp_connect(address).await.unwrap();
++        assert!(timeout(Duration::from_millis(40), async move {
++            let mut bytes = [0; 100];
++            socket.read_exact(&mut bytes).await
++        })
++        .await
++        .is_err());
++    });
++    assert!(start.elapsed() < Duration::from_millis(500));
++    assert_eq!(budget.in_use(), 0);
++    worker.join().unwrap();
++}

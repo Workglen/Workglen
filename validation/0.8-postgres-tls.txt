@@ -1,0 +1,12 @@
+   Compiling pratique v0.1.0 (/workspace/scratch/4eac8ae55074/workglen-08/vendor/pratique)
+   Compiling workglen-mail v0.8.0 (/workspace/scratch/4eac8ae55074/workglen-08)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 27.90s
+     Running unittests src/lib.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/workglen_mail-2af16ba53a341d6c)
+
+running 3 tests
+test accounting::tls::tests::channel_binding_uses_the_certificate_hash_and_refuses_undefined_algorithms ... ok
+test accounting::tls::tests::postgres_adapter_verifies_chain_hostname_expiry_and_moves_records ... ok
+test accounting::tls::tests::postgres_scram_plus_authenticates_with_required_channel_binding ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 83 filtered out; finished in 0.24s
+

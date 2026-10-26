@@ -1,0 +1,27 @@
+{
+  "upstream_files_verified_before_patch": 66,
+  "patch_reapplies_exactly": true,
+  "modified_or_added": [
+    "Cargo.toml",
+    "src/common/crypto/mod.rs",
+    "src/common/headers.rs",
+    "src/common/crypto/pratique_impl.rs",
+    "src/lib.rs"
+  ],
+  "report_feature_exposed": false,
+  "retained_runtime_utilities": [
+    "mail-builder",
+    "similar",
+    "serde_json",
+    "memchr",
+    "idna",
+    "hashify",
+    "rustls-pki-types"
+  ],
+  "unchanged_scanner_files": [
+    "src/security/archive_zip.rs",
+    "src/security/scan.rs",
+    "vendor/pratique/src/inflate.rs"
+  ],
+  "upstream_crate_checksum": "8505122ba86e1f4adeb664196c1e787c3f29bb6e7c128e4a366d47d209911440"
+}

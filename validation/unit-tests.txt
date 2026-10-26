@@ -1,0 +1,67 @@
+   Compiling workglen-mail v0.5.0 (/workspace/scratch/4eac8ae55074/workglen-direct)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.13s
+     Running unittests src/lib.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/workglen_mail-538021b81adc6218)
+
+running 22 tests
+test accounting::bank_files::tests::ofx_sgml ... ok
+test accounting::feeds::tests::restrict_destinations ... ok
+test accounting::bank_files::tests::chase_csv_exact_and_duplicates ... ok
+test accounting::bank_files::tests::hostile_and_precision ... ok
+test accounting::xero::tests::exact_money ... ok
+test accounting::feeds::tests::v2_scopes_pending_and_partial_errors ... ok
+test accounting::xero::tests::fixture_reconciles ... ok
+test accounting::xero::tests::mismatch_blocks ... ok
+test relay::tests::signed_message_transfer_never_rewrites_octets ... ok
+test routing::tests::rejects_internal_and_special_destinations ... ok
+test web::tests::login_limits_isolate_sources_and_expire ... ok
+test web::tests::origin_is_exact_not_a_substring ... ok
+test webmail::tests::compose_preserves_unicode_and_hides_bcc ... ok
+test accounting::xero::tests::credit_card_and_foreign_bank_migration ... ok
+test web::tests::sessions_expire_and_have_a_fixed_bound ... ok
+test webmail::tests::compose_rejects_injected_headers_and_large_payloads ... ok
+test webmail::tests::old_module_state_keeps_webmail_disabled ... ok
+test relay::tests::smtp_replies_are_framed_and_bounded ... ok
+test accounting::feeds::tests::encrypted_scoped_tokens ... ok
+test dkim::tests::weak_keys_are_rejected ... ok
+test web::tests::login_source_table_has_a_fixed_bound_without_evicting_active_buckets ... ok
+test dkim::tests::key_protection_and_signature_shape ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+     Running unittests src/main.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/workglen-a748ba8e1b899e73)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/accounting_db.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/accounting_db-63d777f4eac5bfa3)
+
+running 1 test
+test accounting_transactions_and_banking ... ignored, requires WORKGLEN_TEST_DSN_FILE and WORKGLEN_TEST_CA_FILE; disposable DB
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/core.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/core-66e5ec4ed2c38123)
+
+running 12 tests
+test address_and_header_injection_are_rejected ... ok
+test imap_quoted_and_section_grammar_and_reversed_uid_sets ... ok
+test smtp_ehlo_accepts_address_literals_without_injection ... ok
+test acceptance_rejects_mime_floods_and_shapes_that_imap_cannot_render ... ok
+test witness_never_overlaps_leases_and_waits_after_restart ... ok
+test quota_failure_does_not_commit_body_or_sequence ... ok
+test a_pre_mode_cluster_cannot_become_an_unfenced_writer ... ok
+test gc_preserves_shared_message_body ... ok
+test uid_state_survives_restart_and_changes_on_promotion ... ok
+test deployment_transitions_require_seeded_data_and_explicit_demotion ... ok
+test journal_replay_is_atomic_and_rejects_gaps ... ok
+test backup_has_consistent_metadata_and_read_only_export ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+   Doc-tests workglen_mail
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

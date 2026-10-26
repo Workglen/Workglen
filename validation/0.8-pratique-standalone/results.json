@@ -1,0 +1,25 @@
+{
+  "scope": "Pratique only; zero external dependencies; synthetic loopback tests",
+  "results": [
+    {
+      "check": "lock",
+      "exit_code": 0,
+      "log": "lock.txt"
+    },
+    {
+      "check": "pure",
+      "exit_code": 0,
+      "log": "pure.txt"
+    },
+    {
+      "check": "net-tests",
+      "exit_code": 0,
+      "log": "net-tests.txt"
+    },
+    {
+      "check": "net-clippy",
+      "exit_code": 0,
+      "log": "net-clippy.txt"
+    }
+  ]
+}

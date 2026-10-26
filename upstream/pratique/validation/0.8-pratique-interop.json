@@ -1,0 +1,14 @@
+{
+  "native_rsa_key_independent_validation": "passed",
+  "native_local_certificate_independent_validation": "passed",
+  "no_libssl_or_libcrypto_linkage": true,
+  "dynamic_libraries": [
+    "libgcc_s",
+    "libm",
+    "libc",
+    "system loader"
+  ],
+  "oracle": "OpenSSL CLI used only by development tests",
+  "independently_generated_rsa_keys_checked": 3,
+  "generated_public_keys_distinct": true
+}

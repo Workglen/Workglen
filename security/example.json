@@ -1,0 +1,52 @@
+{
+  "workspace": "replace-with-the-admin-cluster-id",
+  "instance": "gateway-a",
+  "hostname": "security.example.com",
+  "origin": "https://security.example.com:8445",
+  "data_dir": "/var/lib/workglen-security",
+  "control_key_file": "/etc/workglen-security/control.key",
+  "tls_cert": "/etc/workglen-security/fullchain.pem",
+  "tls_key": "/etc/workglen-security/privkey.pem",
+  "smtp_listen": [
+    "0.0.0.0",
+    2525
+  ],
+  "https_listen": [
+    "0.0.0.0",
+    8445
+  ],
+  "require_inbound_tls": false,
+  "routes": {
+    "existing-mail-system": {
+      "host": "mail.example.com",
+      "port": 25,
+      "implicit_tls": false
+    }
+  },
+  "connectors": {},
+  "trusted_admin": {
+    "permissions": [
+      "read",
+      "rules.write",
+      "rules.test",
+      "rules.activate",
+      "content",
+      "release",
+      "discard",
+      "remediation.preview",
+      "remediation.execute",
+      "configure",
+      "retention",
+      "jobs",
+      "audit",
+      "learn"
+    ],
+    "domains": [
+      "example.com"
+    ],
+    "mailboxes": [
+      "*"
+    ]
+  },
+  "storage_key_file": "/etc/workglen-security/storage.key"
+}

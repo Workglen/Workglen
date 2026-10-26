@@ -1,0 +1,16 @@
+{
+  "rust": "1.99.1",
+  "platform": "Linux x86-64",
+  "scope": "Synthetic local compatibility; no live provider access",
+  "former_implementation": "mail-auth 0.13.3 + similar 3.2.0, DEPS-07 checkpoint",
+  "former_source_zip_sha256": "000bbbecd2b0fcc86406ff0950c81b1c7195c0771de12f7adeccd7c0c4b35321",
+  "oracle_source": "tools/dkim2-diff-compat.rs",
+  "oracle_source_sha256": "56eeec152fe96e921ec8d50df2e2f3176b72df11b338bbbf1820842b097ce578",
+  "message_pairs": 5000,
+  "canonical_reconstruction_checks": 20000,
+  "generated_json_identical": 1396,
+  "generated_json_different_valid_scripts": 3604,
+  "old_and_new_readers_reconstructed_identical_bytes_per_recipe": true,
+  "sequence_lcs_oracle_pairs": 14641,
+  "seeded_sequence_pairs": 2000
+}

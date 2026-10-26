@@ -1,0 +1,19 @@
+{
+  "upstream_production_files_modified": [
+    "src/common/crypto/mod.rs",
+    "src/common/headers.rs"
+  ],
+  "upstream_source_added": [
+    "src/common/crypto/pratique_impl.rs"
+  ],
+  "pratique_files_changed": [
+    "src/crypto/mod.rs",
+    "src/crypto/ed25519.rs",
+    "src/crypto/rsa.rs",
+    "src/crypto/sha1.rs"
+  ],
+  "fixture_sha256": "8d45a11bb2de44a572e79a4f55c25bec9fcd9b74587560cc5a7e84d449d1004d",
+  "no_registry_packages_added": true,
+  "retained_registry_checksums_unchanged": true,
+  "third_party_mail_auth_counted": true
+}

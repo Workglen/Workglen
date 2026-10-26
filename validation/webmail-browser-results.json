@@ -1,0 +1,24 @@
+{
+  "passed": 17,
+  "checks": [
+    "Mailbox login and populated inbox",
+    "HTML is converted to text",
+    "Remote images are not fetched",
+    "Unicode reader and attachment listing",
+    "Attachment download",
+    "Reply prefills recipient, subject and quote",
+    "Reply is accepted with a Sent copy",
+    "Compose with attachment",
+    "Sent folder lists composed message",
+    "Reply from Sent addresses the original recipient",
+    "Star persists",
+    "Move to Trash",
+    "Mobile list has no horizontal overflow",
+    "Mobile reader has no horizontal overflow",
+    "Mobile returns to message list",
+    "Logout clears visible message content",
+    "No script errors or remote requests"
+  ],
+  "errors": [],
+  "remote": []
+}

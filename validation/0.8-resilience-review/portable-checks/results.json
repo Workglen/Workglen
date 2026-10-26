@@ -1,0 +1,15 @@
+{
+  "scope": "Synthetic offline and loopback checks; no live mail, DNS provider or tenant tests",
+  "checks": [
+    {
+      "check": "native-regressions",
+      "exit_code": 0
+    },
+    {
+      "check": "security-gateway-regressions",
+      "exit_code": 0
+    }
+  ],
+  "browser_requested": true,
+  "fuzz_seconds_per_target": 0
+}

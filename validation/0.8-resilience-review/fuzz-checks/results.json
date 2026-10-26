@@ -1,0 +1,36 @@
+{
+  "scope": "Memory-only local ASan and coverage-guided fuzzing; bounded campaign, not a security certification",
+  "nightly": "nightly",
+  "seconds_per_target": 30,
+  "fuzz_lock_sha256": "52544b6fe1a8a37355b2c5765c8d29746434848edbc48052b21cb91e1d8fd712",
+  "results": [
+    {
+      "check": "fuzzer-version",
+      "exit_code": 0,
+      "seconds": 0.22,
+      "executed_inputs": null,
+      "log": "fuzzer-version.txt"
+    },
+    {
+      "check": "seed-replay",
+      "exit_code": 0,
+      "seconds": 0.15,
+      "executed_inputs": null,
+      "log": "seed-replay.txt"
+    },
+    {
+      "check": "fuzz-build",
+      "exit_code": 0,
+      "seconds": 65.26,
+      "executed_inputs": null,
+      "log": "fuzz-build.txt"
+    },
+    {
+      "check": "tls_client",
+      "exit_code": 1,
+      "seconds": 31.16,
+      "executed_inputs": 20928,
+      "log": "tls_client.txt"
+    }
+  ]
+}

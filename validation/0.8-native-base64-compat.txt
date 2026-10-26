@@ -1,0 +1,8 @@
+
+running 3 tests
+test encoding::tests::refuses_noncanonical_and_mixed_forms ... ok
+test encoding::tests::rfc4648_vectors_and_binary_alphabets ... ok
+test independent_previous_codec_agrees_on_binary_and_hostile_inputs ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+

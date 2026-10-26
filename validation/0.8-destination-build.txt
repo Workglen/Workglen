@@ -1,0 +1,2 @@
+   Compiling workglen-mail v0.8.0 (/tmp/workglen-memory-validation-08466ao5/source)
+    Finished `release` profile [optimized] target(s) in 34.92s

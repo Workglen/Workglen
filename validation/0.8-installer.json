@@ -1,0 +1,17 @@
+{
+  "passed": 11,
+  "checks": [
+    "private paired bundles share workspace/key and exclude local database/admin secrets",
+    "repeat installation refuses to overwrite configuration and keys",
+    "local Admin requires loopback HTTPS and an explicit admin-only configuration",
+    "ACME requires explicit agreement and prepares offline; BYOK stays in the selected gateway bundle",
+    "configuration injection and linked password files are refused before installation",
+    "Linux staging preserves private files and creates no service, database or storage key",
+    "native Admin serves HTTPS/CLI with Mail disabled and never binds occupied SMTP/IMAP ports",
+    "generated pairing performs verified TLS and authenticated remote gateway control",
+    "browser displays local Admin profile, remote gateway and no mail-enable controls",
+    "gateway recovery access and gateway process survive local Admin shutdown",
+    "installer and native application complete with the OpenSSL command blocked"
+  ],
+  "platform": "Linux local fixtures; not macOS or live Lightsail validation"
+}

@@ -1,0 +1,17 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running tests/accounting_db.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/accounting_db-8a45aeab1588f15d)
+
+running 1 test
+test accounting_transactions_and_banking ... Accounting scenario passed: cutover, exact ledger, replay guards, statement preview/commit, multiple banks, card signs, matching, payments, exclusion, locking, immutability and module lifecycle.
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.28s
+
+     Running tests/posting_corrections.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/posting_corrections-e716f45f4842bfe7)
+
+running 1 test
+test posting_corrections_locks_sources_and_audit ... PASS: edits, idempotency, stale revisions, date boundaries, reopen controls, audit guards, source integrity, payment balances, bank unmatch/repost, deleted visibility
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.84s
+

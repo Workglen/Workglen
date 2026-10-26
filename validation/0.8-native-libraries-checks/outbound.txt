@@ -1,0 +1,55 @@
+PASS DKIM generation returns chunked public DNS record
+PASS DKIM private key permissions
+PASS DKIM generation refuses to replace an existing key
+PASS DKIM DNS command is stable
+PASS status exposes direct delivery and DKIM selector
+PASS direct mode does not enable an open relay
+PASS direct delivery negotiates STARTTLS and preserves dot-stuffed body
+PASS independent OpenSSL DKIM verification
+PASS published DKIM TXT passes receiving verification and aligned DMARC
+PASS inbound mail preserves signature without re-signing
+PASS DKIM rejects body tampering
+PASS DKIM rejects Subject tampering
+PASS DKIM oversigning rejects added From
+PASS relaxed DKIM tolerates body whitespace normalization
+PASS direct transport sends no AUTH command
+PASS DKIM empty body verification
+PASS 8BITMIME body delivered and signed
+PASS SMTPUTF8 headers refused before acceptance
+PASS lower-priority MX tried after primary greeting failure
+PASS implicit.test routing succeeds
+PASS multi.test routing succeeds
+PASS v6.test routing succeeds
+PASS better.test routing succeeds
+PASS forward.test routing succeeds
+PASS AAAA works despite A lookup SERVFAIL
+PASS no@null.test permanent failure retained
+PASS no@nx.test permanent failure retained
+PASS no@empty.test permanent failure retained
+PASS no@loop.test permanent failure retained
+PASS no@reject.test permanent failure retained
+PASS no@small.test permanent failure retained
+PASS no@datareject.test permanent failure retained
+PASS Null MX never falls back to A/AAAA
+PASS recipient 550 is not bypassed using another MX
+PASS later@servfail.test deferred without message loss
+PASS later@mixednull.test deferred without message loss
+PASS later@plain.test deferred without message loss
+PASS later@badcert.test deferred without message loss
+PASS later@startfail.test deferred without message loss
+PASS later@inject.test deferred without message loss
+PASS later@cap.test deferred without message loss
+PASS post-TLS EHLO replaces pre-TLS capabilities
+PASS maybe@uncertain.test deferred without message loss
+PASS lost final acknowledgment does not trigger another MX in same attempt
+PASS required TLS sends no MAIL to plaintext peer
+PASS failed STARTTLS never falls back to plaintext
+PASS blocked@private.test permanent failure retained
+PASS compat@plain.test explicit plaintext compatibility
+PASS compat@helo.test explicit plaintext compatibility
+PASS 451 is retried and delivery eventually leaves queue
+PASS DKIM signed bytes remain identical across recipient retry
+PASS permanent errors create local failure notices
+PASS relay hostname resolves through configured DNS
+PASS authenticated implicit-TLS relay remains available with DKIM
+{"passed": 54}

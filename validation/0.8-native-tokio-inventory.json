@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-26",
+  "baseline": "source version 32, native TOML checkpoint",
+  "before_external_versions": 41,
+  "after_external_versions": 33,
+  "added_registry_versions": [],
+  "retained_checksums_unchanged": true,
+  "removed": [
+    {
+      "name": "bytes",
+      "version": "1.12.1"
+    },
+    {
+      "name": "mio",
+      "version": "1.2.4"
+    },
+    {
+      "name": "pin-project-lite",
+      "version": "0.2.17"
+    },
+    {
+      "name": "socket2",
+      "version": "0.6.5"
+    },
+    {
+      "name": "tokio",
+      "version": "1.54.1"
+    },
+    {
+      "name": "wasi",
+      "version": "0.11.1+wasi-snapshot-preview1"
+    },
+    {
+      "name": "windows-link",
+      "version": "0.2.1"
+    },
+    {
+      "name": "windows-sys",
+      "version": "0.61.2"
+    }
+  ],
+  "cargo_lock_sha256": "8e8edf5e7be8d4595a66676027aaaae393784fc9c5686cc4ba241c61245f88b0",
+  "baseline_zip_sha256": "85c0d644a5f5772b55b016b113014ddc22eb177bc0077d67bd71a0b406cba159",
+  "external_versions_removed_from_96": 63,
+  "first_party_packages": 7,
+  "direct_external_crates": 5,
+  "total_lock_entries": 40
+}

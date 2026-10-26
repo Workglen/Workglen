@@ -1,0 +1,15 @@
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling syn v3.0.9
+   Compiling serde_derive v1.0.229
+   Compiling json-reference-former v0.0.0 (/workspace/scratch/00e4cff63970/serde-reduction/json-oracle-final/former)
+    Finished `release` profile [optimized] target(s) in 9.66s
+     Running `/workspace/scratch/00e4cff63970/serde-reduction/json-oracle-final/former-target/release/json-reference-former`

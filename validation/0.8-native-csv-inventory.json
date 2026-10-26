@@ -1,0 +1,23 @@
+{
+  "stage": "csv",
+  "before_registry": 229,
+  "after_registry": 226,
+  "removed_packages": [
+    {
+      "name": "csv",
+      "version": "1.4.0"
+    },
+    {
+      "name": "csv-core",
+      "version": "0.1.13"
+    },
+    {
+      "name": "ryu",
+      "version": "1.0.23"
+    }
+  ],
+  "added_registry_packages": [],
+  "retained_checksums_unchanged": true,
+  "before_lock_sha256": "c4d98b160a34b98936b6c0d8e806271ce5850599ecc90a41aa4cf8471726153e",
+  "after_lock_sha256": "ca1c133ec6842614f26ddd7a478e7118c062a51a670255fd2fd6da7f495babaf"
+}

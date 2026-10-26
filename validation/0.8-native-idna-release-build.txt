@@ -1,0 +1,7 @@
+   Compiling syn v3.0.9
+   Compiling workglen-idna v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-idna)
+   Compiling workglen-dns v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-dns)
+   Compiling serde_derive v1.0.229
+   Compiling serde v1.0.229
+   Compiling workglen-mail v0.8.0 (/workspace/scratch/00e4cff63970/source/workglen)
+    Finished `release` profile [optimized] target(s) in 20.28s

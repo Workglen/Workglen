@@ -1,0 +1,452 @@
+   Compiling workglen-toml v0.1.0 (/workspace/scratch/00e4cff63970/reduction-review/source/workglen/crates/native-toml)
+   Compiling workglen-idna v0.1.0 (/workspace/scratch/00e4cff63970/reduction-review/source/workglen/crates/native-idna)
+   Compiling workglen-mail v0.8.0 (/workspace/scratch/00e4cff63970/reduction-review/source/workglen)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.20s
+     Running unittests src/lib.rs (target/debug/deps/lazaret_pg-912baae4bab7ddbb)
+
+running 9 tests
+test md5::tests::rfc1321_vectors ... ok
+test scram::tests::hostile_scram_rejected ... ok
+test saslprep::tests::lazaret_postgres_normalization_cases ... ok
+test transport::tests::channel_binding_uses_the_certificate_hash_and_refuses_undefined_algorithms ... ok
+test scram::tests::rfc7677_independent_vector ... ok
+test transport::tests::postgres_transport_verifies_chain_hostname_expiry_and_moves_records ... ok
+test transport::tests::postgres_scram_plus_authenticates_with_required_channel_binding ... ok
+test saslprep::tests::every_unicode_scalar_matches_lazaret_python ... ok
+test scram::tests::postgres16_password_verifiers ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+
+     Running tests/database.rs (target/debug/deps/database-fa1a5c73cef9473f)
+
+running 1 test
+test postgres_sql_types_transactions_streaming_and_errors ... ignored, requires LAZARET_PG_TEST_DSN for a disposable PostgreSQL database
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/protocol.rs (target/debug/deps/protocol-91b4b8d60793a6d7)
+
+running 13 tests
+test connection_strings_keep_secrets_private_and_reject_unsupported_options ... ok
+test cleartext_password_is_not_sent_without_opt_in ... ok
+test invalid_frame_length_and_startup_state_are_rejected ... ok
+test malformed_rows_close_connection ... ok
+test cancel_token_uses_original_peer_and_backend_key ... ok
+test trust_is_refused_when_binding_required ... ok
+test notification_and_server_parameter_bounds ... ok
+test unexpected_auth_steps_are_rejected ... ok
+test legacy_md5_matches_independent_python_hashlib_vector ... ok
+test dropping_unfinished_stream_closes_connection ... ok
+test deferred_commit_error_is_not_reported_as_success ... ok
+test operation_timeout_closes_connection ... ok
+test recoverable_sql_error_drains_and_reuses_connection ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running unittests src/lib.rs (target/debug/deps/workglen_dns-b321610db3831985)
+
+running 9 tests
+test tests::txt_fragments_and_null_mx ... ok
+test tests::negative_soa_and_temporary_errors ... ok
+test tests::aliases_cannot_mix_with_data_or_cycle ... ok
+test tests::names_and_system_config ... ok
+test tests::owner_binding_alias_and_ttl ... ok
+test tests::spoofed_id_ignored_and_zero_ttl_not_cached ... ok
+test tests::udp_truncation_retries_tcp_and_caches ... ok
+test tests::packet_bounds_and_mutations ... ok
+test tests::cache_and_cancellation_are_bounded ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (target/debug/deps/workglen_idna-799cf4f4be151ab0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/conformance.rs (target/debug/deps/conformance-c7565e0165d3f8bf)
+
+running 3 tests
+test policies_context_and_limits ... ok
+20171 normalization rows, 100855 NFC assertions
+test unicode_18_nfc_conformance ... ok
+19182 official IDNA checks; 2 ill-formed UTF-16 source rows cannot be represented by Rust str
+test unicode_18_idna_conformance ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/security_boundary.rs (target/debug/deps/security_boundary-44ad4e941e911fe2)
+
+running 2 tests
+test uts46_is_not_idna2008_or_impersonation_detection ... ok
+test hostile_contextual_sequences_are_bounded ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/workglen_mail-19bd7ab904115c6d)
+
+running 116 tests
+test accounting::bank_files::tests::hostile_and_precision ... ok
+test accounting::bank_files::tests::ofx_sgml ... ok
+test accounting::db::transport_tests::local_transport_never_falls_back_to_a_remote_endpoint ... ok
+test accounting::db::transport_tests::verified_tls_remains_the_default_and_overrides_dsn_downgrades ... ok
+test accounting::xero::tests::exact_money ... ok
+test accounting::xero::tests::mismatch_blocks ... ok
+test accounting::xero::tests::credit_card_and_foreign_bank_migration ... ok
+test accounting::feeds::tests::restrict_destinations ... ok
+test accounting::xero::tests::fixture_reconciles ... ok
+test certificates::tests::configuration_is_explicit_and_covers_every_service_name ... ok
+test certificates::tests::state_is_private_exclusive_and_rejects_links ... ok
+test csv_reader::tests::inherited_permissive_quote_and_empty_line_behavior ... ok
+test csv_reader::tests::multiline_quotes_empty_fields_and_unicode_whitespace ... ok
+test config::toml_tests::shipped_node_and_witness_configs_deserialize ... ok
+test config::toml_tests::real_config_schema_keeps_defaults_and_rejects_invalid_fields ... ok
+test dkim::tests::weak_keys_are_rejected ... ok
+test encoding::tests::refuses_noncanonical_and_mixed_forms ... ok
+test encoding::tests::rfc4648_vectors_and_binary_alphabets ... ok
+test csv_reader::tests::widths_and_resource_limits_are_checked ... ok
+test accounting::feeds::tests::encrypted_scoped_tokens ... ok
+test accounting::feeds::tests::v2_scopes_pending_and_partial_errors ... ok
+test accounting::bank_files::tests::chase_csv_exact_and_duplicates ... ok
+test encrypted_store::tests::generated_and_supplied_keys_are_private_and_not_overwritten ... ok
+test encrypted_store::tests::exclusive_lock_and_bounds_fail_closed ... ok
+test encrypted_store::tests::ciphertext_cannot_be_transplanted_between_databases ... ok
+test encrypted_store::tests::recovery_uses_a_fresh_nonce_when_rewriting_an_aborted_sequence ... ok
+test encrypted_store::tests::unsafe_key_files_are_rejected ... ok
+test certificates::tests::fallback_tracks_certificate_lifetime_including_short_certificates ... ok
+test error::tests::contexts_preserve_typed_causes_and_display ... ok
+test error::tests::errors_are_send_sync_and_macros_evaluate_once ... ok
+test error::tests::permission_and_delivery_markers_survive_context ... ok
+test error::tests::result_option_and_lazy_context_keep_values_and_causes ... ok
+test mailauth::dkim2::native_diff::tests::comparison_and_work_budgets_are_shared_and_fail_closed ... ok
+test encrypted_store::tests::restart_discards_unsynced_and_partially_written_tail ... ok
+test mailauth::dkim::tests::rfc6376_body_vectors_and_empty_line_rules ... ok
+test mailauth::dkim::tests::rfc6376_header_folding_and_case ... ok
+test rbac::tests::finance_roles_are_scoped_and_deny_unknown_actions ... ok
+test rbac::tests::posting_corrections_and_period_control_are_separate ... ok
+test rbac::tests::role_domains_do_not_imply_each_other ... ok
+test relay::tests::signed_message_transfer_never_rewrites_octets ... ok
+test encrypted_store::tests::wrong_key_corruption_and_plaintext_are_rejected_without_replacement ... ok
+test routing::tests::rejects_internal_and_special_destinations ... ok
+test security::destinations::tests::destination_input_and_public_network_boundary ... ok
+test security::directory::tests::hostile_pagination_and_partial_failure_refused ... ok
+test security::directory::tests::origins_and_profile_ids_reject_redirects_or_paths ... ok
+test security::directory::tests::pagination_complete_and_empty_result ... ok
+test security::directory::tests::shared_users_aliases_groups_contacts_and_domain_filter ... ok
+test relay::tests::smtp_replies_are_framed_and_bounded ... ok
+test security::tests::ai_override_is_admin_only ... ok
+test security::tests::arbitrary_spam_rule_cannot_disable_attachment_guard ... ok
+test encrypted_store::tests::encrypted_redb_roundtrip_hides_keys_values_and_headers ... ok
+TLS ACME: certificate for mail.example.test obtained, valid until Wed, 25 Nov 2026 00:43:00 GMT
+test mailauth::dkim2::native_diff::tests::distance_and_item_caps_are_enforced ... ok
+test security::tests::benign_zip_fully_inspected ... ok
+test security::tests::binary_unscanned_coverage_is_not_antivirus_claim ... ok
+test security::tests::audit_chain_verifies_and_detects_corruption ... ok
+test security::tests::activation_requires_test_confirmation_and_expected_revision ... ok
+test security::tests::discussing_ai_without_instructions_is_not_blocked ... ok
+test security::tests::archive_mutation_corpus_never_panics ... ok
+test security::tests::command_idempotency_and_collision ... ok
+test security::tests::gzip_crc_and_expansion_limits ... ok
+test security::tests::domain_and_mailbox_permissions_both_required ... ok
+test security::tests::independent_deflated_zip_and_ustar_fixtures ... ok
+test security::tests::inherited_dependencies_do_not_expand ... ok
+test security::tests::digest_frozen_and_recipient_scoped ... ok
+test security::tests::holds_override_expiry_and_discard ... ok
+test security::tests::learning_requires_permission_and_deduplicates_content ... ok
+test security::tests::management_signature_nonce_and_audience ... ok
+test security::tests::mandatory_attachment_release_prevented_even_for_owner ... ok
+test security::tests::misleading_zip_name_still_inspected ... ok
+test security::tests::native_mime_incomplete_decoding_requires_quarantine ... ok
+test security::tests::nested_archive_depth_is_bounded ... ok
+test security::tests::nested_zip_executable_blocked ... ok
+test security::tests::normalized_ai_obfuscation ... ok
+test security::tests::ordinary_message_delivers ... ok
+test security::tests::pdf_active_and_ole_blocked ... ok
+test security::tests::microsoft365_discovery_permissions_review_and_additive_apply ... ok
+test security::tests::renamed_executable_blocked ... ok
+test security::tests::microsoft365_failure_stale_preview_expiry_and_live_acceptance_are_safe ... ok
+test security::tests::release_is_durable_and_cancel_restores_quarantine ... ok
+test security::tests::restart_marks_inflight_operation_uncertain ... ok
+test security::tests::shell_script_blocked ... ok
+test security::tests::spam_remains_releasable ... ok
+test security::tests::truncated_and_unsupported_archives_blocked ... ok
+test security::tests::unknown_rules_and_bad_values_rejected ... ok
+test security::tests::rules_test_has_no_delivery_or_removal_effect ... ok
+test security::tests::retention_removes_unheld_expired_blob_but_keeps_audit ... ok
+test security::tests::wizard_destination_rechecks_private_address_on_actual_transport ... ok
+test security::tests::wizard_destination_restart_interrupts_test_without_saving ... ok
+test security::tests::xml_dtd_wrong_nesting_and_duplicates_rejected ... ok
+test security::tests::xml_namespace_and_entities ... ok
+test security::tests::zip_checksum_failure_blocked ... ok
+test security::tests::zip_conflicting_header_blocked ... ok
+test security::tests::wizard_destination_permissions_failed_test_and_stale_save_are_refused ... ok
+test security::tests::zip_encryption_blocked ... ok
+test security::tests::zip_prefixed_blocked ... ok
+test security_remote::tests::unknown_and_removal_permissions_are_separate ... ok
+test security::tests::zip_traversal_blocked ... ok
+test test_support_tests::cleanup_does_not_follow_child_symlinks ... ok
+
+thread 'test_support_tests::cleanup_refuses_replaced_root_and_runs_during_unwind' (2407) panicked at src/test_support_tests.rs:53:9:
+synthetic unwind
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test test_support_tests::cleanup_refuses_replaced_root_and_runs_during_unwind ... ok
+test test_support_tests::private_unique_directories_remove_nested_contents_on_drop ... ok
+test url::tests::credentials_removed_before_requests ... ok
+test url::tests::origins_and_authorities ... ok
+test url::tests::traversal_and_empty_segments ... ok
+test web::tests::login_limits_isolate_sources_and_expire ... ok
+test security::tests::wizard_destination_from_empty_install_is_audited_persistent_and_usable ... ok
+test web::tests::origin_is_exact_not_a_substring ... ok
+test web::tests::sessions_expire_and_have_a_fixed_bound ... ok
+test webmail::tests::compose_preserves_unicode_and_hides_bcc ... ok
+test webmail::tests::compose_rejects_injected_headers_and_large_payloads ... ok
+test web::tests::login_source_table_has_a_fixed_bound_without_evicting_active_buckets ... ok
+test setup::tests::local_chain_is_verified_private_and_never_replaced ... ok
+test security::tests::identity_changes_invalidate_sessions_revision ... ok
+test encrypted_store::tests::automatic_compaction_preserves_durable_contents_and_uses_a_new_file_key ... ok
+test encrypted_store::tests::random_access_and_resize_match_a_plain_file_without_persisting_plaintext ... ok
+TLS ACME: renewal of the certificate for mail.example.test set for Mon, 26 Oct 2026 00:42:15 GMT, in the CA's window
+TLS ACME: certificate for mail.example.test: serverInternal: synthetic outage (trying again at Mon, 26 Oct 2026 00:43:03 GMT)
+TLS ACME: certificate for mail.example.test renewed, valid until Wed, 25 Nov 2026 00:43:03 GMT
+TLS ACME: certificate for mail.example.test loaded from /tmp/workglen-test-76dfa8c039bb693d9e2661f0c350602b/acme/127.0.0.1_40659_dir/certificates/mail.example.test
+TLS ACME: renewal of the certificate for mail.example.test set for Tue, 10 Nov 2026 00:43:20 GMT, in the CA's window
+test certificates::tests::native_issuance_retry_live_reload_and_cached_restart ... ok
+test dkim::tests::key_protection_and_signature_shape ... ok
+
+test result: ok. 116 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.88s
+
+     Running unittests src/main.rs (target/debug/deps/workglen-4f6f1c2919e48564)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/accounting_db.rs (target/debug/deps/accounting_db-f84f4f33b527fa2d)
+
+running 1 test
+test accounting_transactions_and_banking ... ignored, requires WORKGLEN_TEST_DSN_FILE and WORKGLEN_TEST_CA_FILE; disposable DB
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/core.rs (target/debug/deps/core-fe5c99afcbab95bc)
+
+running 12 tests
+test imap_quoted_and_section_grammar_and_reversed_uid_sets ... ok
+test address_and_header_injection_are_rejected ... ok
+test smtp_ehlo_accepts_address_literals_without_injection ... ok
+test acceptance_rejects_mime_floods_and_shapes_that_imap_cannot_render ... ok
+test witness_never_overlaps_leases_and_waits_after_restart ... ok
+test quota_failure_does_not_commit_body_or_sequence ... ok
+test missing_deployment_marker_cannot_allow_an_unfenced_writer ... ok
+test gc_preserves_shared_message_body ... ok
+test uid_state_survives_restart_and_changes_on_promotion ... ok
+test deployment_transitions_require_seeded_data_and_explicit_demotion ... ok
+test journal_replay_is_atomic_and_rejects_gaps ... ok
+test backup_has_consistent_metadata_and_read_only_export ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/datetime.rs (target/debug/deps/datetime-6948be6cb0769a66)
+
+running 6 tests
+test before_epoch_and_millisecond_timestamps_keep_fraction_and_day ... ok
+test gregorian_leaps_and_supported_bounds ... ok
+test imap_offsets_and_legacy_leap_seconds_keep_existing_epoch_semantics ... ok
+test accounting_dates_stay_canonical_and_remediation_uses_calendar_days ... ok
+test mail_imap_rfc3339_and_certificate_format_known_answers ... ok
+test retry_after_dates_require_valid_weekday_zone_and_complete_input ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/local_postgres.rs (target/debug/deps/local_postgres-0f336e92f2757617)
+
+running 1 test
+test accounting_initializes_and_reopens_over_explicit_local_transport ... ignored, requires disposable WORKGLEN_LOCAL_TEST_DSN_FILE
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mailauth_crypto.rs (target/debug/deps/mailauth_crypto-da4f98aa8f640926)
+
+running 5 tests
+test strict_ed25519_rejects_small_order_without_changing_general_verifier ... ok
+test native_ed25519_signing_hashes_once_and_validates_key_identity ... ok
+test revoked_malformed_oversized_and_weak_keys_are_refused ... ok
+test independent_rsa_and_ed25519_vectors_and_rejections ... ok
+test hash_known_answers_and_streaming_boundaries ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+
+     Running tests/mailauth_diff.rs (target/debug/deps/mailauth_diff-254e7e7d926fe2ed)
+
+running 10 tests
+test malformed_recipes_are_rejected_and_ranges_stay_bounded ... ok
+test native_diff::tests::comparison_and_work_budgets_are_shared_and_fail_closed ... ok
+test unchanged_binary_is_copied_and_lossy_literal_is_unreconstructable ... ok
+test recipes_reconstruct_folded_repeated_unicode_and_empty_inputs ... ok
+test large_changes_use_lossless_linear_fallback ... ok
+test native_diff::tests::distance_and_item_caps_are_enforced ... ok
+test exhaustive_short_sequences_match_independent_lcs_oracle ... ok
+test signed_two_hop_chain_verifies_reconstruction_and_rejects_tampering ... ok
+test generation_caps_mark_unreconstructable_without_affecting_recipe_reader ... ok
+test seeded_sequences_cover_repetitions_binary_and_reordering ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/mailauth_dkim.rs (target/debug/deps/mailauth_dkim-1da8dabc107ae16c)
+
+running 3 tests
+test revoked_keys_and_dns_errors_never_become_authentication_passes ... ok
+test all_canonicalizations_and_algorithms_preserve_dkim_and_dmarc_results ... ok
+test native_outbound_signatures_verify_and_protect_repeated_headers ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/mailauth_encoding.rs (target/debug/deps/mailauth_encoding-e8aac5a21206f9a7)
+
+running 2 tests
+test rfc_vectors_and_output_bounds ... ok
+test streamed_chunks_do_not_add_padding_or_newlines_between_blocks ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/native_auth_limits.rs (target/debug/deps/native_auth_limits-fab354124a80233d)
+
+running 5 tests
+test dmarc_tree_invalid_records_and_policy_modes ... ok
+test spf_dns_mechanisms_macros_and_explanations ... ok
+test spf_shared_budgets_and_dns_errors ... ok
+test independent_dkim_extensions_and_key_policies ... ok
+test dkim2_signed_restrictions_and_dsn ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/native_mailauth.rs (target/debug/deps/native_mailauth-eb7ff855ecd56434)
+
+running 6 tests
+test dmarc_alignment_tree_and_policy ... ok
+test spf_recursive_limits_qualifiers_and_null_sender ... ok
+test spf_text_mechanisms_match_recorded_reference ... ok
+test spf_candidate_rejects_malformed_policies ... ok
+test independent_dkim_messages_and_mutations ... ok
+test native_signing_verifies_repeated_headers ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/native_mime.rs (target/debug/deps/native_mime-37a4ac7ffb1748c9)
+
+running 7 tests
+test encoded_display_name_cannot_inject_an_author ... ok
+test international_parameters_transfer_and_html_projection ... ok
+test mime_boundaries_offsets_and_nested_content_are_exact ... ok
+test bad_decoding_and_ambiguous_headers_never_look_complete ... ok
+test shared_budgets_bound_headers_parts_depth_and_expansion ... ok
+344 independent MIME snapshots, with explicit reviewed differences
+test reference_corpus_and_reviewed_differences ... ok
+test deterministic_mutations_never_panic_or_escape_offsets ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/native_protocols.rs (target/debug/deps/native_protocols-aaedf82981908740)
+
+running 3 tests
+test independent_arc_sets_and_refusals ... ok
+test native_dkim2_signing_reconstruction_flags_and_envelope ... ok
+test independent_dkim2_chains_and_refusals ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/posting_corrections.rs (target/debug/deps/posting_corrections-ef3c93207634afbb)
+
+running 1 test
+test posting_corrections_locks_sources_and_audit ... ignored, requires disposable WORKGLEN_TEST_DSN_FILE and WORKGLEN_TEST_CA_FILE
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pratique_crypto.rs (target/debug/deps/pratique_crypto-a352592a5404a653)
+
+running 5 tests
+test os_entropy_fills_slices_and_preserves_boundaries ... ok
+test aes256_gcm_known_answer_and_authentication_failure ... ok
+test hmac_sha256_rfc4231_case_one ... ok
+test persisted_accounting_hash_encoding_is_unchanged ... ok
+test sha256_known_answers_and_streaming_boundaries ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/replication_codec.rs (target/debug/deps/replication_codec-a259f6ea7a67553c)
+
+running 4 tests
+test persisted_format_is_exact_and_preserves_empty_unicode_and_binary_values ... ok
+test malformed_frames_are_rejected_before_any_database_change ... ok
+test legacy_frame_replays_and_log_bytes_survive_reopen ... ok
+test exact_transaction_limit_and_oversize_refusal ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src/lib.rs (target/debug/deps/workglen_mime-3f0f5741f7b5fdf0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/workglen_toml-8a71ff836d08f9f1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/conformance.rs (target/debug/deps/conformance-bbdaa3ffadb64dde)
+
+running 2 tests
+test official_toml_11_corpus ... ok
+test pinned_former_parser_snapshots ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/contracts.rs (target/debug/deps/contracts-e4c990ded458e031)
+
+running 5 tests
+test definitions_and_toml_11_extensions ... ok
+test schema_failures_are_not_coerced_or_ignored ... ok
+test schemas_preserve_defaults_options_arrays_and_enums ... ok
+test resource_limits_fail_closed ... ok
+test deterministic_mutations_never_panic ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+   Doc-tests lazaret_pg
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests workglen_dns
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests workglen_idna
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests workglen_mail
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests workglen_mime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests workglen_toml
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

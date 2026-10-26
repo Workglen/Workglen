@@ -1,0 +1,11 @@
+{
+  "passed": 6,
+  "checks": [
+    "new executable reopens existing encrypted store and validates existing audit chain",
+    "new executable authenticates the existing Argon2 password hash",
+    "pre-change executable validates newly appended audit and encrypted records",
+    "pre-change executable authenticates newly generated Argon2 password hash",
+    "pre-change and updated executables both exclude independent flock holders",
+    "configuration and original storage key remain unchanged"
+  ]
+}

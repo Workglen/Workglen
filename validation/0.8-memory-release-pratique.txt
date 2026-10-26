@@ -1,0 +1,2 @@
+   Compiling pratique v0.1.0 (/tmp/workglen-memory-validation-08466ao5/source/vendor/pratique)
+    Finished `release` profile [optimized] target(s) in 36.64s

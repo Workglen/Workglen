@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-25",
+  "external_before": 182,
+  "external_after": 175,
+  "registry_after": 174,
+  "direct_external_crates": 13,
+  "added_packages": [],
+  "retained_versions_and_checksums_unchanged": true,
+  "final_cargo_lock_sha256": "e6e0aa7a50e8114a9dba0c3ec70d16be834329ae17fb860172e3898c2814ab2b",
+  "checkpoints": [
+    {
+      "stage": "hostname",
+      "before_registry": 181,
+      "after_registry": 177,
+      "before_external": 182,
+      "after_external": 178,
+      "removed_packages": [
+        {
+          "name": "errno",
+          "version": "0.3.14"
+        },
+        {
+          "name": "gethostname",
+          "version": "1.1.0"
+        },
+        {
+          "name": "linux-raw-sys",
+          "version": "0.12.1"
+        },
+        {
+          "name": "rustix",
+          "version": "1.1.5"
+        }
+      ],
+      "added_registry_packages": [],
+      "retained_checksums_unchanged": true,
+      "before_lock_sha256": "c3cde47baa72910ab214263883527a5e14096e1aee60e6135ce3dca395606a4f",
+      "after_lock_sha256": "c28ecea49b831e7a7ac4caa801b314baa33d6ff3cefd85d6c96a34e7648e6fbb"
+    },
+    {
+      "stage": "mailbuilder",
+      "before_registry": 177,
+      "after_registry": 176,
+      "before_external": 178,
+      "after_external": 177,
+      "removed_packages": [
+        {
+          "name": "mail-builder",
+          "version": "1.0.0"
+        }
+      ],
+      "added_registry_packages": [],
+      "retained_checksums_unchanged": true,
+      "before_lock_sha256": "c28ecea49b831e7a7ac4caa801b314baa33d6ff3cefd85d6c96a34e7648e6fbb",
+      "after_lock_sha256": "6eddf83ba8aa4c9bca7278c2ab7b4b021348573b525aeaa11008a395668a109a"
+    },
+    {
+      "stage": "native-diff",
+      "before_registry": 176,
+      "after_registry": 174,
+      "before_external": 177,
+      "after_external": 175,
+      "removed_packages": [
+        {
+          "name": "bstr",
+          "version": "1.13.1"
+        },
+        {
+          "name": "similar",
+          "version": "3.2.0"
+        }
+      ],
+      "added_registry_packages": [],
+      "retained_checksums_unchanged": true,
+      "before_lock_sha256": "6eddf83ba8aa4c9bca7278c2ab7b4b021348573b525aeaa11008a395668a109a",
+      "after_lock_sha256": "e6e0aa7a50e8114a9dba0c3ec70d16be834329ae17fb860172e3898c2814ab2b"
+    }
+  ],
+  "final_validation": {
+    "rust_version": "1.99.1",
+    "platform": "Linux x86-64",
+    "offline_locked_release_tests_passed": 164,
+    "optional_postgresql_tests_skipped": 4,
+    "release_clippy_all_targets_warnings_denied": "passed",
+    "release_build": "passed",
+    "delivery_dkim_checks_passed": 54,
+    "base64_differential_cases": 53261,
+    "dkim2_message_pairs": 5000,
+    "dkim2_canonical_reconstructions": 20000,
+    "live_hosts_or_tenants_modified": false,
+    "macos_and_live_lightsail_validation": "not performed in this run"
+  },
+  "catalog": "DEPENDENCY-CATALOG.md"
+}

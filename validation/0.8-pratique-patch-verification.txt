@@ -1,0 +1,3 @@
+PASS vendored Pratique source hashes: 195
+PASS patch application and exact resulting bytes: 0001-workglen-crypto.patch
+PASS patch application and exact resulting bytes: 0002-workglen-async-sockets.patch

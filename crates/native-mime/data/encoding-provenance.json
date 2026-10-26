@@ -1,0 +1,17 @@
+{
+  "retrieved": "2026-10-26",
+  "standard": "https://encoding.spec.whatwg.org/",
+  "standard_last_updated": "2026-10-19",
+  "inputs": {
+    "indexes.json": {
+      "url": "https://encoding.spec.whatwg.org/indexes.json",
+      "sha256": "b7c8961095f0b4cae8f4a16a5011e7c84047a60c1277e28ee8df9e56074ee509"
+    },
+    "encodings.json": {
+      "url": "https://encoding.spec.whatwg.org/encodings.json",
+      "sha256": "078212b3697f60b81225b6671bd9da2604497abff0aa8e96e4d46605c02ac9e7"
+    }
+  },
+  "implementation": "First-party decoder code; official mapping data and label metadata only. No encoding_rs implementation source copied.",
+  "license": "WHATWG CC-BY-4.0; BSD-3-Clause for portions incorporated into code; see LICENSE-WHATWG."
+}

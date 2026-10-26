@@ -1,0 +1,82 @@
+mode = "dual" # Requires a witness; may start before the second mail node is online.
+# Change every example hostname/address/path before deployment.
+hostname = "mail.example.com"
+domain = "example.com"
+data_dir = "/var/lib/workglen"
+role = "standby" # Initial bootstrap permission only; the witness controls runtime leadership.
+# For automatic Let’s Encrypt certificates, replace tls_cert/tls_key with [acme]; see TLS-CERTIFICATES.md.
+tls_cert = "/etc/workglen/fullchain.pem"
+tls_key = "/etc/workglen/privkey.pem"
+smtp_listen = "0.0.0.0:25"
+submission_listen = "0.0.0.0:465"
+imap_listen = "0.0.0.0:993"
+admin_listen = "127.0.0.1:8025"
+admin_token_file = "/etc/workglen/admin.token"
+# dns_server = "127.0.0.1:53" # Otherwise use /etc/resolv.conf.
+
+[limits]
+connections = 16
+data_transfers = 2
+message_bytes = 10485760
+recipients = 25
+io_seconds = 60
+session_seconds = 1800
+auth_seconds = 20
+commands = 10000
+mailbox_messages = 10000 # Per user, across folders.
+quota_bytes = 1073741824
+queue_messages = 1000
+
+[policy]
+# DMARC always enforces the domain owner's effective policy.
+# Forwarded mail can fail SPF but pass aligned DKIM: keep these independent rules off unless needed.
+reject_spf_fail = false
+reject_dkim_fail = false
+require_dkim = false
+quarantine_dmarc = true # Deliver DMARC p=quarantine failures to Junk; false rejects them.
+blocked_senders = []
+blocked_domains = []
+blocked_ips = [] # Exact IPv4/IPv6 addresses, not CIDR ranges.
+
+[replication]
+cluster_id = "replace-with-a-unique-cluster-id"
+listen = "10.20.0.12:9443"
+peer_address = "10.20.0.11:9443" # Fixed private IP: no unbounded resolver calls on the mail threads.
+peer_name = "mail.example.com" # Must match the peer's certificate.
+ca_file = "/etc/ssl/certs/ca-certificates.crt"
+token_file = "/etc/workglen/replication.token"
+
+[witness]
+address = "10.20.0.10:9444"
+server_name = "witness.example.com"
+ca_file = "/etc/workglen/cluster-ca.pem"
+token_file = "/etc/workglen/witness.token"
+node_id = "node-b"
+
+[relay]
+address = "192.0.2.25:465" # REPLACE: documentation-only IP, not a live service.
+server_name = "smtp.your-provider.example"
+ca_file = "/etc/ssl/certs/ca-certificates.crt"
+username = "replace-me"
+password_file = "/etc/workglen/relay.password"
+
+# Optional embedded web administration (HTTPS, separate admin credentials).
+# [web]
+# listen = "127.0.0.1:8443"
+# origin = "https://mail.example.com:8443"
+# username = "admin"
+# password_hash_file = "/etc/workglen/web-admin.hash"
+# session_minutes = 30
+
+# Optional Accounting; same endpoint and feed key on both nodes.
+# [accounting]
+# dsn_file = "/etc/workglen/postgres.dsn"
+# ca_file = "/etc/workglen/provider-ca.pem"
+# pool_size = 2
+# feed_key_file = "/etc/workglen/feed.key"
+
+# Optional mailbox web client, enabled separately in Modules or via the CLI.
+# [webmail]
+# listen = "0.0.0.0:8444"
+# origin = "https://mail.example.com:8444"
+# session_minutes = 30

@@ -1,0 +1,9 @@
+{
+  "source": "https://github.com/toml-lang/toml-test",
+  "commit": "ff49d109861c1ad25af53f687f2aef19ab650600",
+  "archive_sha256": "618f617987f0e28f91b0337658b3434902d50dadb835fe78904e8a32ba9f1ba5",
+  "manifest": "tests/files-toml-1.1.0",
+  "cases": 712,
+  "cases_sha256": "6299868efc18c1006d8f5aa0c3b8b8c66cb06d84fd410ced20dba02131a9a2e1",
+  "notes": "Verbatim test input bytes in hex and upstream expected JSON; no implementation code included."
+}

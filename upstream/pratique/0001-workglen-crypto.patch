@@ -1,0 +1,515 @@
+diff --git a/src/crypto/ed25519.rs b/src/crypto/ed25519.rs
+--- a/src/crypto/ed25519.rs
++++ b/src/crypto/ed25519.rs
+@@ -52,6 +52,33 @@
+ /// The length of a signature in bytes.
+ pub const SIGNATURE_LEN: usize = 64;
+ 
++/// Whether the bytes decode as an Ed25519 public point. This checks encoding,
++/// not whether the key has small order; use `verify_strict` for authentication.
++pub fn public_key_is_valid(bytes: &[u8]) -> bool {
++    <&[u8; 32]>::try_from(bytes).ok().and_then(Point::decode).is_some()
++}
++
++/// Strict, cofactorless verification for mail authentication. In addition to
++/// `verify`'s canonical scalar and recomputed-R checks, reject small-order A and
++/// R. This matches the strict policy used by Workglen's former Ed25519 provider.
++/// The general Go-compatible `verify` entry point retains its existing policy.
++pub fn verify_strict(public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
++    let (Ok(a), Ok(sig)) = (<&[u8; 32]>::try_from(public_key), <&[u8; 64]>::try_from(signature)) else {
++        return false;
++    };
++    let r: &[u8; 32] = sig[..32].try_into().expect("fixed-size signature");
++    let (Some(a), Some(r)) = (Point::decode(a), Point::decode(r)) else {
++        return false;
++    };
++    let mut identity = [0u8; 32];
++    identity[0] = 1;
++    if a.double().double().double().encode() == identity
++        || r.double().double().double().encode() == identity {
++        return false;
++    }
++    verify(public_key, message, signature)
++}
++
+ /// The order of the base point, L = 2^252 + 27742317777372353535851937790883648493, as four
+ /// little-endian 64-bit limbs.
+ const L: [u64; 4] = [0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0, 0x1000000000000000];
+diff --git a/src/crypto/mod.rs b/src/crypto/mod.rs
+--- a/src/crypto/mod.rs
++++ b/src/crypto/mod.rs
+@@ -14,6 +14,17 @@
+ pub(crate) mod fe25519;
+ pub mod rsa;
+ pub(crate) mod sha1;
++/// Legacy SHA-1 interoperability only. These APIs do not enable SHA-1 in TLS,
++/// X.509 validation, certificate provisioning, or new signature generation.
++pub mod legacy {
++    pub use super::sha1::Sha1;
++
++    /// Verify an existing RSA/SHA-1 signature for protocols that still read it.
++    /// SHA-1 is collision-broken; callers own the legacy acceptance policy.
++    pub fn verify_rsa_sha1(key: &super::rsa::RsaPublicKey, message: &[u8], signature: &[u8]) -> bool {
++        key.verify_pkcs1_sha1(message, signature)
++    }
++}
+ pub mod sha2;
+ mod sha2_consts;
+ #[cfg(test)]
+@@ -44,6 +55,8 @@
+ pub mod ed25519_sign;
+ #[cfg(feature = "net")]
+ pub mod rsa_sign;
++#[cfg(feature = "net")]
++pub mod rsa_generate;
+ #[cfg(all(test, feature = "net"))]
+ pub(crate) mod ecdh_vectors;
+ #[cfg(feature = "net")]
+diff --git a/src/crypto/rand.rs b/src/crypto/rand.rs
+--- a/src/crypto/rand.rs
++++ b/src/crypto/rand.rs
+@@ -69,14 +69,11 @@
+     /// The longest to wait for the pool to be seeded before the fallback gives up.
+     const POOL_WAIT: std::time::Duration = std::time::Duration::from_secs(60);
+ 
+-    /// Waits until `/dev/random` says the kernel's pool is seeded, which is the wait `getrandom(0)` does itself
+-    /// and a read of `/dev/urandom` does not (at the time of a very early boot, or on a restored snapshot, it
+-    /// would hand out bytes from a pool nobody has seeded). It is a best effort for a fallback that exists
+-    /// for old kernels and sandboxes: if the wait cannot be made at all (no `/dev/random`, `poll` refused) the
+-    /// caller reads `/dev/urandom` as before; only a pool still unseeded after a minute is an error.
++    /// Waits until `/dev/random` says the kernel's pool is seeded. If readiness
++    /// cannot be established, fail closed rather than reading `/dev/urandom`.
+     pub(super) fn wait_for_pool() -> io::Result<()> {
+         use std::os::fd::AsRawFd;
+-        let Ok(file) = std::fs::File::open("/dev/random") else { return Ok(()) };
++        let file = std::fs::File::open("/dev/random")?;
+         let deadline = std::time::Instant::now() + POOL_WAIT;
+         loop {
+             let left = deadline.saturating_duration_since(std::time::Instant::now());
+@@ -84,8 +81,7 @@
+             // SAFETY: `fds` is one valid, initialised `pollfd` that lives through the call, and the count says one.
+             let n = unsafe { poll(&mut fds, 1, left.as_millis().min(i32::MAX as u128) as core::ffi::c_int) };
+             if n > 0 {
+-                // readable, or in a state (an error, a hang-up) from which there is nothing more to wait for
+-                return Ok(());
++                return pool_ready(fds.revents);
+             }
+             if n == 0 {
+                 return Err(io::Error::new(io::ErrorKind::TimedOut, "the operating system's random pool was not seeded within a minute"));
+@@ -93,8 +89,18 @@
+             let e = io::Error::last_os_error();
+             match e.kind() {
+                 io::ErrorKind::Interrupted => {}
+-                _ => return Ok(()),
+-            }
++                _ => return Err(e),
++            }
++        }
++    }
++
++    pub(super) fn pool_ready(events: i16) -> io::Result<()> {
++        // POLLERR, POLLHUP, POLLNVAL and any unexpected event fail closed,
++        // including when they occur together with POLLIN.
++        if events == POLLIN {
++            Ok(())
++        } else {
++            Err(io::Error::other("could not establish OS random pool readiness"))
+         }
+     }
+ 
+@@ -210,6 +216,18 @@
+ mod tests {
+     use super::*;
+ 
++    #[cfg(all(
++        any(target_os = "linux", target_os = "android"),
++        any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64", target_arch = "arm")
++    ))]
++    #[test]
++    fn fallback_requires_unambiguous_pool_readiness() {
++        assert!(os::pool_ready(1).is_ok());
++        for events in [0, 8, 16, 32, 9, 17, 33, -1] {
++            assert!(os::pool_ready(events).is_err());
++        }
++    }
++
+     #[test]
+     fn produces_distinct_nonzero_output() {
+         let a: [u8; 32] = bytes().unwrap();
+diff --git a/src/crypto/rsa.rs b/src/crypto/rsa.rs
+--- a/src/crypto/rsa.rs
++++ b/src/crypto/rsa.rs
+@@ -107,6 +107,11 @@
+     /// Size of the modulus in bits.
+     pub fn bits(&self) -> usize {
+         self.mod_bits
++    }
++
++    /// Public exponent, for protocol-specific key policy checks.
++    pub fn exponent(&self) -> u64 {
++        self.e
+     }
+ 
+     /// Computes sig^e mod n as exactly `k` bytes, or None if the signature is malformed.
+diff --git a/src/crypto/rsa_generate.rs b/src/crypto/rsa_generate.rs
+new file mode 100644
+--- /dev/null
++++ b/src/crypto/rsa_generate.rs
+@@ -0,0 +1,260 @@
++//! Bounded RSA-2048 key generation for offline provisioning. No external process.
++//! Uses the OS random source and the existing constant-time Montgomery arithmetic.
++//! Candidate selection/rejection is variable-time; this is not an online signing API.
++use super::{
++    ct_mod::{self, Modulus},
++    rand,
++    rsa_sign::RsaSigningKey,
++};
++use crate::{
++    asn1::write as der,
++    error::{Error, Result},
++    zeroize::Zeroizing,
++};
++
++const E: u64 = 65537;
++const ROUNDS: usize = 80;
++type Half = [u64; 16];
++
++// Private-key DER owns every intermediate allocation in a zeroizing buffer.
++// The generic DER writer is used only for public algorithm/version fields.
++fn private_tlv(tag: u8, content: &[u8]) -> Zeroizing<Vec<u8>> {
++    let mut out = Zeroizing::new(Vec::with_capacity(content.len() + 10));
++    out.push(tag);
++    if content.len() < 128 {
++        out.push(content.len() as u8);
++    } else {
++        let length = content.len().to_be_bytes();
++        let start = length.iter().position(|b| *b != 0).unwrap();
++        out.push(0x80 | (length.len() - start) as u8);
++        out.extend_from_slice(&length[start..]);
++    }
++    out.extend_from_slice(content);
++    out
++}
++fn private_integer(bytes: &[u8]) -> Zeroizing<Vec<u8>> {
++    let first = bytes.iter().position(|b| *b != 0).unwrap_or(bytes.len());
++    let value = &bytes[first..];
++    let mut content = Zeroizing::new(Vec::with_capacity(value.len() + 1));
++    if value.is_empty() || value[0] & 0x80 != 0 {
++        content.push(0);
++    }
++    content.extend_from_slice(value);
++    private_tlv(0x02, &content)
++}
++fn private_sequence(parts: &[&[u8]]) -> Zeroizing<Vec<u8>> {
++    let mut content = Zeroizing::new(Vec::new());
++    for part in parts {
++        content.extend_from_slice(part);
++    }
++    private_tlv(0x30, &content)
++}
++
++fn small_remainder(n: &[u64], divisor: u64) -> u64 {
++    let mut r = 0u128;
++    for word in n.iter().rev() {
++        r = ((r << 64) | *word as u128) % divisor as u128;
++    }
++    r as u64
++}
++fn minus_one(mut n: Half) -> Half {
++    n[0] -= 1;
++    n
++}
++fn half(n: &mut Half) {
++    for i in 0..16 {
++        n[i] = (n[i] >> 1) | if i < 15 { n[i + 1] << 63 } else { 0 };
++    }
++}
++fn random_half() -> Result<Zeroizing<Half>> {
++    let mut bytes = Zeroizing::new([0u8; 128]);
++    rand::fill(&mut *bytes)?;
++    Ok(Zeroizing::new(ct_mod::limbs_from_be(&*bytes)))
++}
++fn primes() -> Vec<u64> {
++    (3..2048u64)
++        .step_by(2)
++        .filter(|n| {
++            (3..)
++                .step_by(2)
++                .take_while(|d| d * d <= *n)
++                .all(|d| n % d != 0)
++        })
++        .collect()
++}
++fn probable_prime(n: &Half) -> Result<bool> {
++    let modulus = Modulus::new_secret(*n);
++    let nm1 = Zeroizing::new(minus_one(*n));
++    let mut exponent = Zeroizing::new(*nm1);
++    let mut s = 0;
++    while exponent[0] & 1 == 0 {
++        half(&mut exponent);
++        s += 1;
++    }
++    let one = Zeroizing::new(modulus.one());
++    let negative_one = Zeroizing::new(modulus.to_mont(&nm1));
++    for _ in 0..ROUNDS {
++        // Uniform independent bases in [2,n-2], with bounded rejection.
++        let mut base = None;
++        for _ in 0..128 {
++            let candidate = random_half()?;
++            if modulus.below_mask(&candidate) != 0
++                && *candidate != *nm1
++                && (candidate[1..].iter().any(|x| *x != 0) || candidate[0] >= 2)
++            {
++                base = Some(candidate);
++                break;
++            }
++        }
++        let base = base.ok_or_else(|| Error::Key("RSA random-base rejection limit".into()))?;
++        let mut x = Zeroizing::new(modulus.pow_secret(&modulus.to_mont(&base), &exponent));
++        if *x == *one || *x == *negative_one {
++            continue;
++        }
++        let mut passed = false;
++        for _ in 1..s {
++            *x = modulus.sqr(&x);
++            if *x == *negative_one {
++                passed = true;
++                break;
++            }
++            if *x == *one {
++                break;
++            }
++        }
++        if !passed {
++            return Ok(false);
++        }
++    }
++    Ok(true)
++}
++fn prime(small: &[u64]) -> Result<Zeroizing<Half>> {
++    for _ in 0..32768 {
++        let mut n = random_half()?;
++        n[15] |= 3 << 62; // Both high bits set: p*q has exactly 2048 bits.
++        n[0] |= 1;
++        if small_remainder(&*n, E) == 1 || small.iter().any(|p| small_remainder(&*n, *p) == 0) {
++            continue;
++        }
++        if probable_prime(&n)? {
++            return Ok(n);
++        }
++    }
++    Err(Error::Key("RSA prime-generation attempt limit".into()))
++}
++fn product(a: &Half, b: &Half) -> Zeroizing<[u64; 32]> {
++    let mut out = Zeroizing::new([0u64; 32]);
++    for i in 0..16 {
++        let mut carry = 0u128;
++        for j in 0..16 {
++            let v = a[i] as u128 * b[j] as u128 + out[i + j] as u128 + carry;
++            out[i + j] = v as u64;
++            carry = v >> 64;
++        }
++        out[i + 16] = carry as u64;
++    }
++    out
++}
++// 65537^-1 modulo an even number m coprime to 65537. Pick k such that
++// k*m+1 is divisible by 65537; d=(k*m+1)/65537. All loops have fixed lengths.
++fn exponent(m: &[u64]) -> Result<Zeroizing<Vec<u8>>> {
++    let r = small_remainder(m, E);
++    if r == 0 {
++        return Err(Error::Key("RSA exponent is not invertible".into()));
++    }
++    let mut inv = 1u64;
++    // Fermat in the public, small prime field: r^(65535) modulo 65537.
++    for _ in 0..16 {
++        inv = (inv * inv % E) * r % E;
++    }
++    let k = E - inv;
++    let mut value = Zeroizing::new(vec![0u64; m.len() + 1]);
++    let mut carry = 1u128;
++    for (i, word) in m.iter().enumerate() {
++        let v = *word as u128 * k as u128 + carry;
++        value[i] = v as u64;
++        carry = v >> 64;
++    }
++    value[m.len()] = carry as u64;
++    let mut rem = 0u128;
++    for word in value.iter_mut().rev() {
++        let v = (rem << 64) | *word as u128;
++        *word = (v / E as u128) as u64;
++        rem = v % E as u128;
++    }
++    if rem != 0 || value[m.len()] != 0 {
++        return Err(Error::Key("RSA exponent division failed".into()));
++    }
++    let mut bytes = Zeroizing::new(Vec::with_capacity(m.len() * 8));
++    for word in value[..m.len()].iter().rev() {
++        bytes.extend(word.to_be_bytes());
++    }
++    Ok(bytes)
++}
++
++/// Generates a two-prime RSA-2048 key, exponent 65537, as unencrypted PKCS#8 DER.
++/// 80 independent Miller–Rabin rounds per candidate, trial division, separated
++/// primes and a signing self-check. Secret intermediate buffers are wiped on drop.
++pub fn generate_pkcs8() -> Result<Zeroizing<Vec<u8>>> {
++    let small = primes();
++    let p = prime(&small)?;
++    let mut q = None;
++    for _ in 0..128 {
++        let candidate = prime(&small)?;
++        let (lo, hi) = if *p < *candidate {
++            (&*p, &*candidate)
++        } else {
++            (&*candidate, &*p)
++        };
++        // Subtract in little-endian limb order, then normalize the sign below.
++        // Separation does not depend on which candidate was subtracted first.
++        let mut diff = Zeroizing::new([0u64; 16]);
++        let mut borrow = false;
++        for i in 0..16 {
++            let (a, b) = hi[i].overflowing_sub(lo[i]);
++            let (a, c) = a.overflowing_sub(borrow as u64);
++            diff[i] = a;
++            borrow = b || c;
++        }
++        if borrow {
++            let mut carry = 1u128;
++            for v in diff.iter_mut() {
++                let n = (!*v) as u128 + carry;
++                *v = n as u64;
++                carry = n >> 64;
++            }
++        }
++        if diff[15] != 0 || diff[14] >> 28 != 0 {
++            q = Some(candidate);
++            break;
++        }
++    }
++    let q = q.ok_or_else(|| Error::Key("RSA prime-separation limit".into()))?;
++    let n = product(&p, &q);
++    let pm1 = Zeroizing::new(minus_one(*p));
++    let qm1 = Zeroizing::new(minus_one(*q));
++    let phi = product(&pm1, &qm1);
++    let d = exponent(&*phi)?;
++    let dp = exponent(&*pm1)?;
++    let dq = exponent(&*qm1)?;
++    let pm = Modulus::new_secret(*p);
++    let qi = Zeroizing::new(pm.from_mont(&pm.pow_secret(&pm.to_mont(&q), pm.minus_two())));
++    let nb = ct_mod::limbs_to_be(&*n, 256);
++    let pb = Zeroizing::new(ct_mod::limbs_to_be(&*p, 128));
++    let qb = Zeroizing::new(ct_mod::limbs_to_be(&*q, 128));
++    let qib = Zeroizing::new(ct_mod::limbs_to_be(&*qi, 128));
++    // Validates CRT consistency and performs a blinded, verified signature.
++    RsaSigningKey::from_crt(&nb, &[1, 0, 1], &pb, &qb, &dp, &dq, &qib)?;
++    let fields: Vec<Zeroizing<Vec<u8>>> = [&[0][..], &nb, &[1, 0, 1], &d, &pb, &qb, &dp, &dq, &qib]
++        .iter()
++        .map(|v| private_integer(v))
++        .collect();
++    let refs: Vec<&[u8]> = fields.iter().map(|v| v.as_slice()).collect();
++    let pkcs1 = private_sequence(&refs);
++    let octets = private_tlv(0x04, &pkcs1);
++    Ok(private_sequence(&[
++        &der::integer(&[0]),
++        &der::sequence(&[&der::oid_str("1.2.840.113549.1.1.1"), &der::tlv(0x05, &[])]),
++        &octets,
++    ]))
++}
+diff --git a/src/crypto/sha1.rs b/src/crypto/sha1.rs
+--- a/src/crypto/sha1.rs
++++ b/src/crypto/sha1.rs
+@@ -12,6 +12,56 @@
+ //! here is a verdict that the data is authentic.
+ 
+ pub(crate) const OUTPUT_LEN: usize = 20;
++
++/// Streaming SHA-1 for bounded-memory legacy protocol interoperability.
++#[derive(Clone)]
++pub struct Sha1 {
++    state: [u32; 5],
++    buffer: [u8; 64],
++    used: usize,
++    length: u64,
++}
++
++impl Default for Sha1 {
++    fn default() -> Self { Self::new() }
++}
++
++impl Sha1 {
++    pub fn new() -> Self {
++        Self { state: [0x6745_2301, 0xefcd_ab89, 0x98ba_dcfe, 0x1032_5476, 0xc3d2_e1f0],
++            buffer: [0; 64], used: 0, length: 0 }
++    }
++
++    pub fn update(&mut self, mut bytes: &[u8]) {
++        self.length = self.length.wrapping_add(bytes.len() as u64);
++        if self.used != 0 {
++            let take = (64 - self.used).min(bytes.len());
++            self.buffer[self.used..self.used + take].copy_from_slice(&bytes[..take]);
++            self.used += take;
++            bytes = &bytes[take..];
++            if self.used != 64 { return; }
++            compress(&mut self.state, &self.buffer);
++            self.used = 0;
++        }
++        let mut chunks = bytes.chunks_exact(64);
++        for block in &mut chunks { compress(&mut self.state, block.try_into().unwrap()); }
++        let rest = chunks.remainder();
++        self.buffer[..rest.len()].copy_from_slice(rest);
++        self.used = rest.len();
++    }
++
++    pub fn finalize(mut self) -> [u8; 20] {
++        let mut tail = [0; 128];
++        tail[..self.used].copy_from_slice(&self.buffer[..self.used]);
++        tail[self.used] = 0x80;
++        let total = if self.used < 56 { 64 } else { 128 };
++        tail[total - 8..total].copy_from_slice(&self.length.wrapping_mul(8).to_be_bytes());
++        for block in tail[..total].chunks_exact(64) { compress(&mut self.state, block.try_into().unwrap()); }
++        let mut out = [0; 20];
++        for (dst, word) in out.chunks_exact_mut(4).zip(self.state) { dst.copy_from_slice(&word.to_be_bytes()); }
++        out
++    }
++}
+ 
+ pub(crate) fn digest(data: &[u8]) -> [u8; OUTPUT_LEN] {
+     let mut h: [u32; 5] = [0x6745_2301, 0xefcd_ab89, 0x98ba_dcfe, 0x1032_5476, 0xc3d2_e1f0];
+diff --git a/src/sign.rs b/src/sign.rs
+--- a/src/sign.rs
++++ b/src/sign.rs
+@@ -329,15 +329,7 @@
+     /// The key as a PEM `PRIVATE KEY` block (unencrypted PKCS#8), as bytes of text.
+     pub fn to_pkcs8_pem(&self) -> Result<Zeroizing<Vec<u8>>> {
+         let der = self.to_pkcs8_der()?;
+-        let b64 = ct_base64_encode(&der);
+-        let mut out = Zeroizing::new(Vec::with_capacity(b64.len() + b64.len() / 64 + 64));
+-        out.extend_from_slice(b"-----BEGIN PRIVATE KEY-----\n");
+-        for line in b64.chunks(64) {
+-            out.extend_from_slice(line);
+-            out.push(b'\n');
+-        }
+-        out.extend_from_slice(b"-----END PRIVATE KEY-----\n");
+-        Ok(out)
++        Ok(private_key_pem(&der))
+     }
+ 
+     /// The ECDSA key inside, if it is one.
+@@ -636,3 +628,16 @@
+         assert!(SigningKey::from_der(&bare).unwrap_err().to_string().contains("curve"));
+     }
+ }
++
++/// Encodes PKCS#8 DER as private-key PEM without secret-indexed Base64 tables.
++pub fn private_key_pem(der: &[u8]) -> Zeroizing<Vec<u8>> {
++    let b64 = ct_base64_encode(der);
++    let mut out = Zeroizing::new(Vec::with_capacity(b64.len() + b64.len() / 64 + 64));
++    out.extend_from_slice(b"-----BEGIN PRIVATE KEY-----\n");
++    for line in b64.chunks(64) {
++        out.extend_from_slice(line);
++        out.push(b'\n');
++    }
++    out.extend_from_slice(b"-----END PRIVATE KEY-----\n");
++    out
++}

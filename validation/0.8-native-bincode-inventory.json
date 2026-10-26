@@ -1,0 +1,17 @@
+{
+  "stage": "bincode",
+  "before_registry": 188,
+  "after_registry": 187,
+  "before_external": 189,
+  "after_external": 188,
+  "removed_packages": [
+    {
+      "name": "bincode",
+      "version": "1.3.3"
+    }
+  ],
+  "added_registry_packages": [],
+  "retained_checksums_unchanged": true,
+  "before_lock_sha256": "c236985a7ca6c2c64ee1df9fe1fe8cc41cb84a4f0e34755f355646846c26fadd",
+  "after_lock_sha256": "793bd393b225a996566750de31efbe50a34706e8c8d316f636772777ddfdc50f"
+}

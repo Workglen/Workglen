@@ -1,0 +1,7 @@
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling workglen-toml v0.1.0 (/workspace/scratch/00e4cff63970/reduction-review/source/workglen/crates/native-toml)
+   Compiling toml-reference v0.0.0 (/workspace/scratch/00e4cff63970/reduction-review/toml-oracle-final/native)
+    Finished `release` profile [optimized] target(s) in 4.14s
+     Running `/workspace/scratch/00e4cff63970/reduction-review/toml-oracle-final/target/release/toml-reference`

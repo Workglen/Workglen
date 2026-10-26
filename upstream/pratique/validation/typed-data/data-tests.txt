@@ -1,0 +1,20 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /workspace/scratch/00e4cff63970/serde-reduction/pratique-check-final/pratique-source/Cargo.toml
+workspace: /workspace/scratch/00e4cff63970/serde-reduction/pratique-check-final/Cargo.toml
+   Compiling pratique-additions-check v0.0.0 (/workspace/scratch/00e4cff63970/serde-reduction/pratique-check-final)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.51s
+     Running tests/data_json.rs (target/debug/deps/data_json-c422a38c9c51ec9c)
+
+running 9 tests
+test format_distinctions_and_error_locations ... ok
+test float_boundaries_rounding_and_nonfinite ... ok
+test input_limits_invalid_utf8_and_surrogates ... ok
+test generic_duplicates_and_signed_json_policy ... ok
+test precise_numbers_and_private_names ... ok
+test record_order_defaults_and_sequence ... ok
+test output_limits_include_escaping_and_nodes ... ok
+test values_macros_and_mutation ... ok
+test toml_tuple_compatibility_keeps_format_boundary ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

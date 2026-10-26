@@ -1,0 +1,12 @@
+{
+  "cases": 5748,
+  "official_corpus": 712,
+  "schema_contracts": 26,
+  "shipped_configs": 6,
+  "edge_cases": 4,
+  "seeded_mutations": 5000,
+  "mismatches": 0,
+  "former": "toml 0.9.12+spec-1.1.0",
+  "native": "workglen-toml 0.1.0",
+  "scope": "Pinned corpus and synthetic compatibility checks, not proof for every possible document"
+}

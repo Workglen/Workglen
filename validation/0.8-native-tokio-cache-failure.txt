@@ -1,0 +1,63 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling pratique v0.1.0 (/workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/vendor/pratique)
+   Compiling workglen-toml v0.1.0 (/workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/crates/native-toml)
+   Compiling workglen-mime v0.1.0 (/workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/crates/native-mime)
+   Compiling workglen-idna v0.1.0 (/workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/crates/native-idna)
+   Compiling lazaret-pg v0.1.0 (/workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/vendor/lazaret-pg)
+   Compiling workglen-dns v0.1.0 (/workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/crates/native-dns)
+   Compiling workglen-mail v0.8.0 (/workspace/scratch/00e4cff63970/tokio-reduction/source/workglen)
+error[E0463]: can't find crate for `lazaret_pg`
+ --> vendor/lazaret-pg/tests/database.rs:2:5
+  |
+2 | use lazaret_pg::{Config, IsolationLevel, types::Text};
+  |     ^^^^^^^^^^ can't find crate
+
+error[E0460]: found possibly newer version of crate `pratique` which `workglen_idna` depends on
+  --> crates/native-dns/src/lib.rs:83:17
+   |
+83 |         let s = workglen_idna::domain_to_ascii(s)
+   |                 ^^^^^^^^^^^^^
+   |
+   = note: perhaps that crate needs to be recompiled?
+   = note: the following crate versions were found:
+           crate `pratique`: /workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/target/debug/deps/libpratique-cd29a5b7a4ce8514.rmeta
+           crate `pratique`: /workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/target/debug/deps/libpratique-cd29a5b7a4ce8514.rlib
+           crate `pratique`: /workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/target/debug/deps/libpratique-620680f02d3acb92.rmeta
+           crate `pratique`: /workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/target/debug/deps/libpratique-620680f02d3acb92.rlib
+           crate `pratique`: /workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/target/debug/deps/libpratique-098a7673364c1d05.rmeta
+           crate `pratique`: /workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/target/debug/deps/libpratique-2e331130ef888714.rmeta
+           crate `workglen_idna`: /workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/target/debug/deps/libworkglen_idna-852915f43587d121.rlib
+
+For more information about this error, try `rustc --explain E0463`.
+error[E0463]: can't find crate for `lazaret_pg`
+ --> vendor/lazaret-pg/tests/protocol.rs:1:5
+  |
+1 | use lazaret_pg::{ChannelBinding, Config, ErrorKind, SslMode};
+  |     ^^^^^^^^^^ can't find crate
+
+error: could not compile `lazaret-pg` (test "database") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `lazaret-pg` (test "protocol") due to 1 previous error
+error[E0463]: can't find crate for `workglen_idna`
+ --> crates/native-idna/tests/conformance.rs:2:5
+  |
+2 | use workglen_idna::{Options, normalize_nfc, to_ascii, to_unicode};
+  |     ^^^^^^^^^^^^^ can't find crate
+
+error: could not compile `workglen-idna` (test "conformance") due to 1 previous error
+For more information about this error, try `rustc --explain E0460`.
+error: could not compile `workglen-dns` (lib test) due to 1 previous error
+error[E0463]: can't find crate for `lazaret_pg`
+ --> src/accounting/db.rs:3:5
+  |
+3 | use lazaret_pg::{
+  |     ^^^^^^^^^^ can't find crate
+
+error[E0463]: can't find crate for `workglen_dns`
+ --> src/routing.rs:5:5
+  |
+5 | use workglen_dns::{Error as NetError, RData, RecordType};
+  |     ^^^^^^^^^^^^ can't find crate
+
+error: could not compile `workglen-mail` (lib test) due to 2 previous errors

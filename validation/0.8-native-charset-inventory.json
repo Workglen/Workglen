@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-26",
+  "baseline": "saved intermediate typed-data lock",
+  "before_external_versions": 22,
+  "after_external_versions": 15,
+  "added_registry_versions": [],
+  "retained_checksums_unchanged": true,
+  "removed": [
+    {
+      "name": "cfg-if",
+      "version": "1.0.5"
+    },
+    {
+      "name": "core_detect",
+      "version": "1.0.0"
+    },
+    {
+      "name": "encoding_rs",
+      "version": "0.8.42"
+    },
+    {
+      "name": "multiversion_no_op",
+      "version": "1.0.0"
+    },
+    {
+      "name": "rustversion",
+      "version": "1.0.23"
+    },
+    {
+      "name": "scopeguard",
+      "version": "1.2.0"
+    },
+    {
+      "name": "simdutf8",
+      "version": "0.1.5"
+    }
+  ],
+  "cargo_lock_sha256": "147130e6bb8c1a69501a628151743f95c1a728f2c416d095ba332f282568690f"
+}

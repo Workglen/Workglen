@@ -1,0 +1,33 @@
+PASS generated-key and supplied-key instances report mandatory encrypted storage
+PASS native detector, verified TLS route, IMAPS and EWS readiness checks
+PASS identification testing has no delivery or quarantine side effects
+PASS relay refusal checks cover forged local sender, null sender, unknown users, alternate syntax and reset without submitting mail
+PASS native STARTTLS delivery prepends observed SMTP peer and preserves original MIME suffix
+PASS stored original hash remains unchanged after SMTP trace is added to delivery
+PASS AI and unreadable archives are administrator-only; ordinary spam is releasable
+PASS unknown recipient and open relay rejected
+PASS mandatory unreadable-archive block cannot be bypassed by administrator release
+PASS native digest is delivered to the configured mailbox holder
+PASS digest mutation requires valid CSRF
+PASS forwarded digest does not grant another mailbox access
+PASS central Admin manages both native instances using verified signed requests
+PASS central instance scopes and accounting/security role separation enforced
+PASS local native remediation preserves MIME under hold before scoped removal
+PASS exchange native remediation preserves MIME under hold before scoped removal
+PASS browser standalone admin sign-in and live overview
+PASS browser standalone administrator gets configured Admin destination
+PASS browser encrypted storage status explains supplied/generated keys and separate backup
+PASS browser TLS certificate availability and expiry are visible
+PASS browser guided TLS setup explains DNS, port 80, staging and automatic renewal
+PASS browser eight-step setup includes downstream protection guidance and preserves options
+PASS browser AI instruction rule defaults to quarantine and explains coverage
+PASS browser draft and identification-only test report
+PASS browser quarantine evidence inspection
+PASS browser recipient-scoped digest bulk action excludes administrator-only items
+PASS browser central console switches independently hosted gateway
+PASS browser central Back to Admin works at mobile width without losing session
+PASS browser Mail administration returns to Admin module overview
+PASS browser no browser script errors
+PASS gateway continues processing while central Admin is offline
+PASS on-disk database hides recipient identifiers, message content and quarantine metadata
+PASS encrypted gateway survives forced process termination and reopens durable quarantine

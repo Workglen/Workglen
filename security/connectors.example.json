@@ -1,0 +1,26 @@
+{
+  "workglen-mail": {
+    "type": "workglen",
+    "host": "mail.example.com",
+    "port": 993,
+    "mailboxes": ["alice@example.com"],
+    "password_files": {"alice@example.com": "/etc/workglen-security/alice-imap.password"},
+    "allow_hard_delete": false
+  },
+  "exchange-online": {
+    "type": "graph",
+    "tenant": "replace-with-tenant-id",
+    "client_id": "replace-with-client-id",
+    "secret_file": "/etc/workglen-security/graph.secret",
+    "mailboxes": ["alice@example.com"],
+    "allow_hard_delete": false
+  },
+  "exchange-on-premises": {
+    "type": "ews",
+    "endpoint": "https://exchange.example.com/EWS/Exchange.asmx",
+    "username": "EXAMPLE\\workglen-security",
+    "password_file": "/etc/workglen-security/ews.password",
+    "mailboxes": ["alice@example.com"],
+    "allow_hard_delete": false
+  }
+}

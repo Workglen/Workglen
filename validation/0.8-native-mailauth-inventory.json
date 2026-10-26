@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-25",
+  "baseline": "source version 29, native DNS/URL checkpoint",
+  "before_external_versions": 96,
+  "after_external_versions": 79,
+  "added_registry_versions": [],
+  "retained_checksums_unchanged": true,
+  "removed": [
+    {
+      "name": "bumpalo",
+      "version": "3.20.3"
+    },
+    {
+      "name": "futures-core",
+      "version": "0.3.34"
+    },
+    {
+      "name": "futures-task",
+      "version": "0.3.34"
+    },
+    {
+      "name": "futures-util",
+      "version": "0.3.34"
+    },
+    {
+      "name": "getrandom",
+      "version": "0.2.17"
+    },
+    {
+      "name": "getrandom",
+      "version": "0.4.3"
+    },
+    {
+      "name": "js-sys",
+      "version": "0.3.106"
+    },
+    {
+      "name": "mail-auth",
+      "version": "0.13.3"
+    },
+    {
+      "name": "once_cell",
+      "version": "1.21.4"
+    },
+    {
+      "name": "r-efi",
+      "version": "6.0.0"
+    },
+    {
+      "name": "rustls-pki-types",
+      "version": "1.15.1"
+    },
+    {
+      "name": "slab",
+      "version": "0.4.12"
+    },
+    {
+      "name": "wasm-bindgen",
+      "version": "0.2.129"
+    },
+    {
+      "name": "wasm-bindgen-macro",
+      "version": "0.2.129"
+    },
+    {
+      "name": "wasm-bindgen-macro-support",
+      "version": "0.2.129"
+    },
+    {
+      "name": "wasm-bindgen-shared",
+      "version": "0.2.129"
+    },
+    {
+      "name": "zeroize",
+      "version": "1.9.1"
+    }
+  ],
+  "cargo_lock_sha256": "ff26b90c1b242c0550e1d2c8b2b82b06ece2911967dcc48ad0f7eee8e762e621"
+}

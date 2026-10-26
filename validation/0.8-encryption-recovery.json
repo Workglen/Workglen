@@ -1,0 +1,11 @@
+{
+  "encrypted_offline_backup_restore": "passed",
+  "audit_verification": {
+    "events": 41,
+    "head": "bed7c0b87c1aa109b0ab39e1a038d9d3ce4e84f896541918ec68097e2d39f0a6",
+    "verified": true
+  },
+  "audit_chain_unchanged": true,
+  "wrong_key_rejected_without_modifying_store": true,
+  "missing_key_rejected_without_modifying_store": true
+}

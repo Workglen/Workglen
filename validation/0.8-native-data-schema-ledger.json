@@ -1,0 +1,2323 @@
+[
+  {
+    "file": "src/accounting/bank_files.rs",
+    "type": "Entry",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "date",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "amount",
+        "type": "i64",
+        "attributes": []
+      },
+      {
+        "name": "description",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/bank_files.rs",
+    "type": "Statement",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "source",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "account_id",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "currency",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "entries",
+        "type": "Vec<Entry>",
+        "attributes": []
+      },
+      {
+        "name": "warnings",
+        "type": "Vec<String>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/db.rs",
+    "type": "Config",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "dsn_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "ca_file",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "feed_key_file",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "pool_size",
+        "type": "usize",
+        "attributes": [
+          "#[serde(default = \"pool_default\")]"
+        ]
+      },
+      {
+        "name": "transport",
+        "type": "Transport",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/db.rs",
+    "type": "Transport",
+    "kind": "enum",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(rename_all = \"kebab-case\")]",
+    "variants": [
+      "VerifiedTls",
+      "Local"
+    ]
+  },
+  {
+    "file": "src/accounting/model.rs",
+    "type": "Account",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "code",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "name",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "kind",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "bank",
+        "type": "bool",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "control",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "source_id",
+        "type": "Option<String>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/model.rs",
+    "type": "Contact",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "name",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "email",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "source_id",
+        "type": "Option<String>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/model.rs",
+    "type": "InputLine",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "account",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "debit",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "credit",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/model.rs",
+    "type": "Line",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "account",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "debit",
+        "type": "i64",
+        "attributes": []
+      },
+      {
+        "name": "credit",
+        "type": "i64",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/model.rs",
+    "type": "Journal",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "request_id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "date",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "description",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "lines",
+        "type": "Vec<InputLine>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/model.rs",
+    "type": "Command",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "action",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "book_id",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "data",
+        "type": "serde_json::Value",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/model.rs",
+    "type": "OpenDocument",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "kind",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "contact_id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "number",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "issued",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "due",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "control_account",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "original_amount",
+        "type": "i64",
+        "attributes": []
+      },
+      {
+        "name": "opening_due",
+        "type": "i64",
+        "attributes": []
+      },
+      {
+        "name": "source_id",
+        "type": "Option<String>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/xero.rs",
+    "type": "Bundle",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "source_org",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "as_of",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "currency",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "receivable_account",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "payable_account",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "trial_balance_csv",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "accounts",
+        "type": "Vec<Value>",
+        "attributes": []
+      },
+      {
+        "name": "contacts",
+        "type": "Vec<Value>",
+        "attributes": []
+      },
+      {
+        "name": "invoices",
+        "type": "Vec<Value>",
+        "attributes": []
+      },
+      {
+        "name": "credit_notes",
+        "type": "Vec<Value>",
+        "attributes": []
+      },
+      {
+        "name": "prepayments",
+        "type": "Vec<Value>",
+        "attributes": []
+      },
+      {
+        "name": "overpayments",
+        "type": "Vec<Value>",
+        "attributes": []
+      },
+      {
+        "name": "source_frozen",
+        "type": "bool",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/accounting/xero.rs",
+    "type": "Plan",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "source_org",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "as_of",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "accounts",
+        "type": "Vec<Account>",
+        "attributes": []
+      },
+      {
+        "name": "contacts",
+        "type": "Vec<Contact>",
+        "attributes": []
+      },
+      {
+        "name": "lines",
+        "type": "Vec<Line>",
+        "attributes": []
+      },
+      {
+        "name": "documents",
+        "type": "Vec<OpenDocument>",
+        "attributes": []
+      },
+      {
+        "name": "summary",
+        "type": "Value",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/admin.rs",
+    "type": "Request",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "command",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "accounting",
+        "type": "Option<crate::accounting::model::Command>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "access",
+        "type": "Option<crate::rbac::Change>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "user",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "password_hash",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "expected_revision",
+        "type": "Option<u64>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "src/admin.rs",
+    "type": "AccountSummary",
+    "kind": "struct",
+    "encode": true,
+    "decode": false,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "email",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "quota",
+        "type": "u64",
+        "attributes": []
+      },
+      {
+        "name": "used_bytes",
+        "type": "u64",
+        "attributes": []
+      },
+      {
+        "name": "messages",
+        "type": "u64",
+        "attributes": []
+      },
+      {
+        "name": "folders",
+        "type": "u64",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/app.rs",
+    "type": "ReplicationStatus",
+    "kind": "struct",
+    "encode": true,
+    "decode": false,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "last_contact",
+        "type": "Option<i64>",
+        "attributes": []
+      },
+      {
+        "name": "peer_sequence",
+        "type": "Option<u64>",
+        "attributes": []
+      },
+      {
+        "name": "term",
+        "type": "Option<u64>",
+        "attributes": []
+      },
+      {
+        "name": "last_error",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "direction",
+        "type": "Option<String>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/certificates.rs",
+    "type": "AcmeSettings",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "domains",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "email",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "state_dir",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "http_listen",
+        "type": "SocketAddr",
+        "attributes": [
+          "#[serde(default = \"challenge_address\")]"
+        ]
+      },
+      {
+        "name": "staging",
+        "type": "bool",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "agree_to_terms",
+        "type": "bool",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Config",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "admin_only",
+        "type": "bool",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "mode",
+        "type": "Mode",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "node_id",
+        "type": "String",
+        "attributes": [
+          "#[serde(default = \"default_node_id\")]"
+        ]
+      },
+      {
+        "name": "security_remotes",
+        "type": "Vec<crate::security_remote::Remote>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "web",
+        "type": "Option<Web>",
+        "attributes": []
+      },
+      {
+        "name": "webmail",
+        "type": "Option<Webmail>",
+        "attributes": []
+      },
+      {
+        "name": "accounting",
+        "type": "Option<crate::accounting::Config>",
+        "attributes": []
+      },
+      {
+        "name": "hostname",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "dns_server",
+        "type": "Option<std::net::SocketAddr>",
+        "attributes": []
+      },
+      {
+        "name": "domain",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "data_dir",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "admin_listen",
+        "type": "std::net::SocketAddr",
+        "attributes": []
+      },
+      {
+        "name": "admin_token_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "role",
+        "type": "Role",
+        "attributes": []
+      },
+      {
+        "name": "tls_cert",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "tls_key",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "acme",
+        "type": "Option<crate::certificates::AcmeSettings>",
+        "attributes": []
+      },
+      {
+        "name": "smtp_listen",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "submission_listen",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "imap_listen",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "limits",
+        "type": "Limits",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "policy",
+        "type": "Policy",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "replication",
+        "type": "Replication",
+        "attributes": []
+      },
+      {
+        "name": "witness",
+        "type": "Option<Witness>",
+        "attributes": []
+      },
+      {
+        "name": "relay",
+        "type": "Option<Relay>",
+        "attributes": []
+      },
+      {
+        "name": "direct",
+        "type": "Option<Direct>",
+        "attributes": []
+      },
+      {
+        "name": "dkim",
+        "type": "Option<Dkim>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Mode",
+    "kind": "enum",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(rename_all = \"lowercase\")]",
+    "variants": [
+      "Single",
+      "Dual"
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Web",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "listen",
+        "type": "std::net::SocketAddr",
+        "attributes": []
+      },
+      {
+        "name": "origin",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "username",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "password_hash_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "session_minutes",
+        "type": "u64",
+        "attributes": [
+          "#[serde(default = \"default_session_minutes\")]"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Webmail",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "listen",
+        "type": "std::net::SocketAddr",
+        "attributes": []
+      },
+      {
+        "name": "origin",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "session_minutes",
+        "type": "u64",
+        "attributes": [
+          "#[serde(default = \"default_session_minutes\")]"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Role",
+    "kind": "enum",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(rename_all = \"lowercase\")]",
+    "variants": [
+      "Primary",
+      "Standby"
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Limits",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(default, deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "connections",
+        "type": "usize",
+        "attributes": []
+      },
+      {
+        "name": "data_transfers",
+        "type": "usize",
+        "attributes": []
+      },
+      {
+        "name": "message_bytes",
+        "type": "usize",
+        "attributes": []
+      },
+      {
+        "name": "recipients",
+        "type": "usize",
+        "attributes": []
+      },
+      {
+        "name": "session_seconds",
+        "type": "u64",
+        "attributes": []
+      },
+      {
+        "name": "io_seconds",
+        "type": "u64",
+        "attributes": []
+      },
+      {
+        "name": "auth_seconds",
+        "type": "u64",
+        "attributes": []
+      },
+      {
+        "name": "commands",
+        "type": "usize",
+        "attributes": []
+      },
+      {
+        "name": "mailbox_messages",
+        "type": "usize",
+        "attributes": []
+      },
+      {
+        "name": "quota_bytes",
+        "type": "u64",
+        "attributes": []
+      },
+      {
+        "name": "queue_messages",
+        "type": "usize",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Policy",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(default, deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "reject_spf_fail",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "reject_dkim_fail",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "require_dkim",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "blocked_senders",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "blocked_domains",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "blocked_ips",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "quarantine_dmarc",
+        "type": "bool",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Replication",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "cluster_id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "listen",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "peer_address",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "peer_name",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "ca_file",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "token_file",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Relay",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "address",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "server_name",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "ca_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "username",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "password_file",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Dkim",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "selector",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "key_file",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "DeliveryTls",
+    "kind": "enum",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(rename_all = \"lowercase\")]",
+    "variants": [
+      "Required",
+      "Opportunistic"
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Direct",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(default, deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "tls",
+        "type": "DeliveryTls",
+        "attributes": []
+      },
+      {
+        "name": "ca_file",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "port",
+        "type": "u16",
+        "attributes": []
+      },
+      {
+        "name": "allow_private_addresses",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "own_addresses",
+        "type": "Vec<std::net::IpAddr>",
+        "attributes": []
+      },
+      {
+        "name": "retry_seconds",
+        "type": "u64",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "User",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "password_hash",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "quota",
+        "type": "u64",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Folder",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "validity",
+        "type": "u32",
+        "attributes": []
+      },
+      {
+        "name": "next_uid",
+        "type": "u32",
+        "attributes": []
+      },
+      {
+        "name": "subscribed",
+        "type": "bool",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Message",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "blob",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "uid",
+        "type": "u32",
+        "attributes": []
+      },
+      {
+        "name": "flags",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "size",
+        "type": "usize",
+        "attributes": []
+      },
+      {
+        "name": "date",
+        "type": "i64",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "QueueItem",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "blob",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "sender",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "recipient",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "attempts",
+        "type": "u32",
+        "attributes": []
+      },
+      {
+        "name": "next_try",
+        "type": "i64",
+        "attributes": []
+      },
+      {
+        "name": "created",
+        "type": "i64",
+        "attributes": []
+      },
+      {
+        "name": "status",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "last_error",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "dkim_signed",
+        "type": "bool",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/config.rs",
+    "type": "Witness",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "address",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "server_name",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "ca_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "token_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "node_id",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/modules.rs",
+    "type": "State",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "revision",
+        "type": "u64",
+        "attributes": []
+      },
+      {
+        "name": "mail_enabled",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "webmail_enabled",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "changed_at",
+        "type": "Option<i64>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/modules.rs",
+    "type": "Module",
+    "kind": "struct",
+    "encode": true,
+    "decode": false,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "id",
+        "type": "&'static str",
+        "attributes": []
+      },
+      {
+        "name": "name",
+        "type": "&'static str",
+        "attributes": []
+      },
+      {
+        "name": "description",
+        "type": "&'static str",
+        "attributes": []
+      },
+      {
+        "name": "implemented",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "requires",
+        "type": "&'static [&'static str]",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/rbac.rs",
+    "type": "Identity",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "username",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "password_hash",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "roles",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "books",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "security_domains",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "security_mailboxes",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "security_instances",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "revision",
+        "type": "u64",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/rbac.rs",
+    "type": "Change",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "username",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "roles",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "books",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "security_domains",
+        "type": "Vec<String>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "security_mailboxes",
+        "type": "Vec<String>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "security_instances",
+        "type": "Vec<String>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "expected_revision",
+        "type": "Option<u64>",
+        "attributes": []
+      },
+      {
+        "name": "password",
+        "type": "Option<String>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/security/destinations.rs",
+    "type": "Candidate",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "label",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "provider",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "host",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "port",
+        "type": "u16",
+        "attributes": []
+      },
+      {
+        "name": "implicit_tls",
+        "type": "bool",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/security/directory.rs",
+    "type": "Microsoft365",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "tenant",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "client_id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "secret_file",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/security/model.rs",
+    "type": "Route",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "host",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "port",
+        "type": "u16",
+        "attributes": []
+      },
+      {
+        "name": "implicit_tls",
+        "type": "bool",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "public_only",
+        "type": "bool",
+        "attributes": [
+          "#[serde(default, skip_serializing_if = \"std::ops::Not::not\")]"
+        ]
+      },
+      {
+        "name": "ca_file",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "username",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "password_file",
+        "type": "Option<String>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/security/model.rs",
+    "type": "Connector",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "r#type",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "mailboxes",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "allow_hard_delete",
+        "type": "bool",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "host",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "port",
+        "type": "Option<u16>",
+        "attributes": []
+      },
+      {
+        "name": "ca_file",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "password_files",
+        "type": "BTreeMap<String, String>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "tenant",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "client_id",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "secret_file",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "token_file",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "endpoint",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "username",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "password_file",
+        "type": "Option<String>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/security/model.rs",
+    "type": "Config",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "data_dir",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "storage_key_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "workspace",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "instance",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "origin",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "hostname",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "tls_cert",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "tls_key",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "acme",
+        "type": "Option<crate::certificates::AcmeSettings>",
+        "attributes": []
+      },
+      {
+        "name": "control_key_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "smtp_listen",
+        "type": "(IpAddr, u16)",
+        "attributes": []
+      },
+      {
+        "name": "https_listen",
+        "type": "(IpAddr, u16)",
+        "attributes": []
+      },
+      {
+        "name": "require_inbound_tls",
+        "type": "bool",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "routes",
+        "type": "BTreeMap<String, Route>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "connectors",
+        "type": "BTreeMap<String, Connector>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "recipient_directory",
+        "type": "Option<super::directory::Microsoft365>",
+        "attributes": []
+      },
+      {
+        "name": "admin_origin",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "dns_server",
+        "type": "Option<SocketAddr>",
+        "attributes": []
+      },
+      {
+        "name": "trusted_admin",
+        "type": "Option<Actor>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/security/model.rs",
+    "type": "Actor",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "id",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "permissions",
+        "type": "Vec<String>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "domains",
+        "type": "Vec<String>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "mailboxes",
+        "type": "Vec<String>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "mailbox",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "revision",
+        "type": "u64",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "src/security/model.rs",
+    "type": "Command",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "action",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "data",
+        "type": "Value",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "request_id",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/security_remote.rs",
+    "type": "Remote",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "label",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "origin",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "key_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "ca_file",
+        "type": "Option<String>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/security_remote.rs",
+    "type": "Request",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "instance",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "command",
+        "type": "Value",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/store.rs",
+    "type": "Op",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "key",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "value",
+        "type": "Option<Vec<u8>>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/web.rs",
+    "type": "Login",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "username",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "password",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/web.rs",
+    "type": "Change",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "attributes": []
+      },
+      {
+        "name": "expected_revision",
+        "type": "u64",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/web.rs",
+    "type": "Account",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "email",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "password",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/webmail.rs",
+    "type": "Login",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "username",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "password",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/webmail.rs",
+    "type": "Command",
+    "kind": "enum",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(tag = \"action\", rename_all = \"kebab-case\", deny_unknown_fields)]",
+    "manual": "internally tagged webmail command"
+  },
+  {
+    "file": "src/webmail.rs",
+    "type": "Reference",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "folder",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "validity",
+        "type": "u32",
+        "attributes": []
+      },
+      {
+        "name": "uid",
+        "type": "u32",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/webmail.rs",
+    "type": "Draft",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "to",
+        "type": "Vec<String>",
+        "attributes": []
+      },
+      {
+        "name": "cc",
+        "type": "Vec<String>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "bcc",
+        "type": "Vec<String>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "subject",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "text",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "attachments",
+        "type": "Vec<Attachment>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "reply",
+        "type": "Option<Reference>",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/webmail.rs",
+    "type": "Attachment",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "name",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "data",
+        "type": "String",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/webmail.rs",
+    "type": "Receipt",
+    "kind": "struct",
+    "encode": true,
+    "decode": true,
+    "attributes": "",
+    "fields": [
+      {
+        "name": "blob",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "digest",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "created",
+        "type": "i64",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "src/witness.rs",
+    "type": "WitnessConfig",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "listen",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "tls_cert",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "tls_key",
+        "type": "String",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      },
+      {
+        "name": "acme",
+        "type": "Option<crate::certificates::AcmeSettings>",
+        "attributes": []
+      },
+      {
+        "name": "token_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "state_file",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "cluster_id",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "lease_seconds",
+        "type": "u64",
+        "attributes": []
+      }
+    ]
+  },
+  {
+    "file": "crates/native-toml/tests/contracts.rs",
+    "type": "Config",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "hostname",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "role",
+        "type": "Role",
+        "attributes": []
+      },
+      {
+        "name": "listen",
+        "type": "std::net::SocketAddr",
+        "attributes": []
+      },
+      {
+        "name": "count",
+        "type": "u16",
+        "attributes": [
+          "#[serde(default = \"default_count\")]"
+        ]
+      },
+      {
+        "name": "optional",
+        "type": "Option<String>",
+        "attributes": []
+      },
+      {
+        "name": "remotes",
+        "type": "Vec<Remote>",
+        "attributes": [
+          "#[serde(default)]"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "crates/native-toml/tests/contracts.rs",
+    "type": "Role",
+    "kind": "enum",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(rename_all = \"lowercase\")]",
+    "variants": [
+      "Primary",
+      "Standby"
+    ]
+  },
+  {
+    "file": "crates/native-toml/tests/contracts.rs",
+    "type": "Remote",
+    "kind": "struct",
+    "encode": false,
+    "decode": true,
+    "attributes": "#[serde(deny_unknown_fields)]",
+    "fields": [
+      {
+        "name": "name",
+        "type": "String",
+        "attributes": []
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "attributes": []
+      }
+    ]
+  }
+]

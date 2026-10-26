@@ -1,0 +1,22 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete/pratique-source/Cargo.toml
+workspace: /workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete/Cargo.toml
+   Compiling pratique v0.1.0 (/workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete/pratique-source)
+   Compiling pratique-additions-check v0.0.0 (/workspace/scratch/00e4cff63970/tokio-reduction/pratique-complete)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.19s
+     Running tests/async_socket.rs (target/debug/deps/async_socket-2f5bf8a45161a7db)
+
+running 10 tests
+test refused_and_dropped_tcp_connect_return_capacity ... ok
+test socket_budget_is_shared_and_returns_failed_or_dropped_reservations ... ok
+test parallel_socket_admission_never_exceeds_the_shared_cap ... ok
+test udp_ipv4_ipv6_and_connected_peer_filtering ... ok
+test executor_and_timer_can_interrupt_a_continuously_ready_task ... ok
+test cancellation_during_tcp_read_closes_the_peer_without_a_background_worker ... ok
+test udp_cancellation_closes_socket_and_releases_capacity ... ok
+test tcp_ipv4_ipv6_partial_reads_and_half_close ... ok
+test tcp_backpressure_is_cancellable_without_detached_writes ... ok
+test trickled_tcp_payload_does_not_reset_an_absolute_deadline ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+

@@ -1,0 +1,17 @@
+{
+  "stage": "chrono",
+  "before_registry": 173,
+  "after_registry": 172,
+  "before_external": 174,
+  "after_external": 173,
+  "removed_packages": [
+    {
+      "name": "chrono",
+      "version": "0.4.45"
+    }
+  ],
+  "added_registry_packages": [],
+  "retained_checksums_unchanged": true,
+  "before_lock_sha256": "50c01c3fa30e0e7d5c4861b92eee827dca0ddcce93b255844a1cd691c82c0bb4",
+  "after_lock_sha256": "8bc9435e5bb54c78404cb1c97f5a0aa3d3de423bbfdf403f373ca7e11dcb62f9"
+}

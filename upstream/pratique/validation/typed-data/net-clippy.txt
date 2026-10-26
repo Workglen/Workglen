@@ -1,0 +1,6 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /workspace/scratch/00e4cff63970/serde-reduction/pratique-check-final/pratique-source/Cargo.toml
+workspace: /workspace/scratch/00e4cff63970/serde-reduction/pratique-check-final/Cargo.toml
+    Checking pratique v0.1.0 (/workspace/scratch/00e4cff63970/serde-reduction/pratique-check-final/pratique-source)
+    Checking pratique-additions-check v0.0.0 (/workspace/scratch/00e4cff63970/serde-reduction/pratique-check-final)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.17s

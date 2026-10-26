@@ -1,0 +1,42 @@
+test_cached_tools_outside_path_are_reused (__main__.BuildFlow.test_cached_tools_outside_path_are_reused) ... ok
+test_check_lists_missing_packages_without_installing (__main__.BuildFlow.test_check_lists_missing_packages_without_installing) ... ok
+test_check_reports_missing_toolchain_without_fetch (__main__.BuildFlow.test_check_reports_missing_toolchain_without_fetch) ... ok
+test_compilation_failure_is_not_reported_as_success (__main__.BuildFlow.test_compilation_failure_is_not_reported_as_success) ... ok
+test_conflicting_modes_fail_before_tools (__main__.BuildFlow.test_conflicting_modes_fail_before_tools) ... ok
+test_default_build_fetches_before_offline_compilation (__main__.BuildFlow.test_default_build_fetches_before_offline_compilation) ... ok
+test_denied_sudo_stops_before_rust_or_cargo (__main__.BuildFlow.test_denied_sudo_stops_before_rust_or_cargo) ... ok
+test_dnf_installs_curl_when_missing (__main__.BuildFlow.test_dnf_installs_curl_when_missing) ... ok
+test_dnf_installs_missing_tools_and_reuses_minimal_curl (__main__.BuildFlow.test_dnf_installs_missing_tools_and_reuses_minimal_curl) ... ok
+test_empty_offline_cache_stops_with_recovery_command (__main__.BuildFlow.test_empty_offline_cache_stops_with_recovery_command) ... ok
+test_existing_packages_need_no_sudo (__main__.BuildFlow.test_existing_packages_need_no_sudo) ... ok
+test_existing_rustup_installs_missing_pinned_toolchain (__main__.BuildFlow.test_existing_rustup_installs_missing_pinned_toolchain) ... ok
+test_explicit_fetch_still_works (__main__.BuildFlow.test_explicit_fetch_still_works) ... ok
+test_failed_download_never_executes_partial_script (__main__.BuildFlow.test_failed_download_never_executes_partial_script) ... ok
+test_failed_download_stops_before_compilation (__main__.BuildFlow.test_failed_download_stops_before_compilation) ... ok
+test_failed_package_install_stops_before_cargo (__main__.BuildFlow.test_failed_package_install_stops_before_cargo) ... ok
+test_failed_repository_update_stops_before_install (__main__.BuildFlow.test_failed_repository_update_stops_before_install) ... ok
+test_failed_rustup_install_stops (__main__.BuildFlow.test_failed_rustup_install_stops) ... ok
+test_failed_toolchain_install_stops (__main__.BuildFlow.test_failed_toolchain_install_stops) ... ok
+test_fresh_install_bootstraps_then_fetches_and_builds (__main__.BuildFlow.test_fresh_install_bootstraps_then_fetches_and_builds) ... ok
+test_macos_headless_install_explains_required_interaction (__main__.BuildFlow.test_macos_headless_install_explains_required_interaction) ... ok
+test_macos_install_failure_stops_before_rust (__main__.BuildFlow.test_macos_install_failure_stops_before_rust) ... ok
+test_macos_offline_never_starts_tools_installer (__main__.BuildFlow.test_macos_offline_never_starts_tools_installer) ... ok
+test_macos_opens_tools_installer_and_resumes_when_ready (__main__.BuildFlow.test_macos_opens_tools_installer_and_resumes_when_ready) ... ok
+test_missing_cargo_offline_never_bootstraps (__main__.BuildFlow.test_missing_cargo_offline_never_bootstraps) ... ok
+test_missing_compiler_is_installed_before_rust_setup (__main__.BuildFlow.test_missing_compiler_is_installed_before_rust_setup) ... ok
+test_missing_sudo_stops_before_download (__main__.BuildFlow.test_missing_sudo_stops_before_download) ... ok
+test_missing_toolchain_offline_stops_before_setup_or_fetch (__main__.BuildFlow.test_missing_toolchain_offline_stops_before_setup_or_fetch) ... ok
+test_noninteractive_sudo_never_prompts (__main__.BuildFlow.test_noninteractive_sudo_never_prompts) ... ok
+test_offline_build_never_fetches_online (__main__.BuildFlow.test_offline_build_never_fetches_online) ... ok
+test_offline_missing_packages_never_run_installers (__main__.BuildFlow.test_offline_missing_packages_never_run_installers) ... ok
+test_repeated_build_reuses_installed_system_packages (__main__.BuildFlow.test_repeated_build_reuses_installed_system_packages) ... ok
+test_root_cannot_bootstrap_rust (__main__.BuildFlow.test_root_cannot_bootstrap_rust) ... ok
+test_ubuntu_installs_all_missing_prerequisites (__main__.BuildFlow.test_ubuntu_installs_all_missing_prerequisites) ... ok
+test_unknown_linux_missing_tools_has_no_install_side_effects (__main__.BuildFlow.test_unknown_linux_missing_tools_has_no_install_side_effects) ... ok
+test_unsuccessful_package_setup_is_detected_even_on_exit_zero (__main__.BuildFlow.test_unsuccessful_package_setup_is_detected_even_on_exit_zero) ... ok
+test_wrong_compiler_offline_stops_before_fetch (__main__.BuildFlow.test_wrong_compiler_offline_stops_before_fetch) ... ok
+
+----------------------------------------------------------------------
+Ran 37 tests in 0.803s
+
+OK

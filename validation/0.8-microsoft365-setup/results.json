@@ -1,0 +1,61 @@
+{
+  "scope": "Synthetic local tests only; no live Microsoft tenant, DNS changes or real mail",
+  "build_checks_skipped": false,
+  "browser_requested": true,
+  "results": [
+    {
+      "check": "first-party-dependencies",
+      "exit_code": 0,
+      "seconds": 0.18,
+      "log": "first-party-dependencies.txt"
+    },
+    {
+      "check": "rust-tests",
+      "exit_code": 0,
+      "seconds": 25.15,
+      "log": "rust-tests.txt"
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0,
+      "seconds": 0.22,
+      "log": "clippy.txt"
+    },
+    {
+      "check": "release-build",
+      "exit_code": 0,
+      "seconds": 0.12,
+      "log": "release-build.txt"
+    },
+    {
+      "check": "microsoft365-plan",
+      "exit_code": 0,
+      "seconds": 0.08,
+      "log": "microsoft365-plan.txt"
+    },
+    {
+      "check": "microsoft365-ui",
+      "exit_code": 0,
+      "seconds": 2.07,
+      "log": "microsoft365-ui.txt"
+    },
+    {
+      "check": "destinations-ui",
+      "exit_code": 0,
+      "seconds": 6.97,
+      "log": "destinations-ui.txt"
+    },
+    {
+      "check": "directory-ui",
+      "exit_code": 0,
+      "seconds": 5.73,
+      "log": "directory-ui.txt"
+    },
+    {
+      "check": "native-network",
+      "exit_code": 0,
+      "seconds": 9.97,
+      "log": "native-network.txt"
+    }
+  ]
+}

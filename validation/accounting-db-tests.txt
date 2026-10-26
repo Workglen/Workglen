@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running tests/accounting_db.rs (/workspace/scratch/4eac8ae55074/portmail/target/debug/deps/accounting_db-63d777f4eac5bfa3)
+
+running 1 test
+Accounting scenario passed: cutover, exact ledger, replay guards, statement preview/commit, multiple banks, card signs, matching, payments, exclusion, locking, immutability and module lifecycle.
+test accounting_transactions_and_banking ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.49s
+

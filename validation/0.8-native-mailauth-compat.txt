@@ -1,0 +1,10 @@
+
+running 3 tests
+test signing_adapters_match_the_previous_provider_and_independent_signature ... ok
+712 mixed/small-order comparisons, 88 valid mixed-order signatures
+test strict_ed25519_matches_previous_dalek_on_mixed_and_small_order_points ... ok
+11772 old/new provider comparisons passed
+test same_signatures_hashes_and_malformed_inputs_as_previous_provider ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.44s
+

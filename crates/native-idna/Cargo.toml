@@ -1,0 +1,11 @@
+[package]
+name = "workglen-idna"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 AND Unicode-3.0"
+description = "First-party UTS 46 domain processing using attributed Unicode 18 data"
+[dependencies]
+pratique = { path = "../../vendor/pratique", default-features = false }
+[lints.rust]
+unsafe_code = "forbid"
+

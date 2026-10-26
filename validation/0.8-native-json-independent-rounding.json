@@ -1,0 +1,9 @@
+{
+  "reviewed_differences": 416,
+  "checks": {
+    "nearest_even_f64": 414,
+    "ordinary_object_keys": 2
+  },
+  "independent_checks": "Exact rational distance to adjacent IEEE-754 values and CPython parsing/object preservation",
+  "passed": true
+}

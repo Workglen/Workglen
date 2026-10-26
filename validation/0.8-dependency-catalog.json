@@ -1,0 +1,427 @@
+{
+  "date": "2026-10-26",
+  "cargo_lock_sha256": "147130e6bb8c1a69501a628151743f95c1a728f2c416d095ba332f282568690f",
+  "external_package_versions": 15,
+  "registry_package_versions": 15,
+  "direct_external_crates": 3,
+  "scope": "All-target resolved Cargo graph; not a count of Linux runtime libraries",
+  "first_party_packages": [
+    {
+      "name": "lazaret-pg",
+      "version": "0.1.0",
+      "purpose": "Native PostgreSQL wire client translated from Lazaret, using Pratique TLS"
+    },
+    {
+      "name": "pratique",
+      "version": "0.1.0",
+      "purpose": "A from-scratch HTTPS client for Rust with zero dependencies: TLS 1.3 (and 1.2), X.509 validation and HTTP/1.1, std only"
+    },
+    {
+      "name": "workglen-dns",
+      "version": "0.1.0",
+      "purpose": "Bounded first-party recursive DNS client"
+    },
+    {
+      "name": "workglen-idna",
+      "version": "0.1.0",
+      "purpose": "First-party UTS 46 domain processing using attributed Unicode 18 data"
+    },
+    {
+      "name": "workglen-mail",
+      "version": "0.8.0",
+      "purpose": "Modular Linux mail and accounting server using Pratique, redb and BYO PostgreSQL"
+    },
+    {
+      "name": "workglen-mime",
+      "version": "0.1.0",
+      "purpose": "Bounded first-party email and MIME parsing for Workglen"
+    },
+    {
+      "name": "workglen-toml",
+      "version": "0.1.0",
+      "purpose": "Bounded first-party TOML configuration parser with first-party typed decoding"
+    }
+  ],
+  "packages": [
+    {
+      "name": "argon2",
+      "version": "0.5.3",
+      "relationship": "direct",
+      "purpose": "Memory-hard password hashing and password verification.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "workglen-mail",
+          "version": "0.8.0",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [
+        "alloc",
+        "password-hash"
+      ],
+      "procedural_macro": false
+    },
+    {
+      "name": "base64ct",
+      "version": "1.8.3",
+      "relationship": "transitive",
+      "purpose": "Constant-time Base64 for password-hash/PHC encoding; distinct from the removed mail codec.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "argon2",
+          "version": "0.5.3",
+          "edge_kind": "normal",
+          "target_condition": null
+        },
+        {
+          "name": "password-hash",
+          "version": "0.5.0",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [
+        "alloc"
+      ],
+      "procedural_macro": false
+    },
+    {
+      "name": "blake2",
+      "version": "0.10.6",
+      "relationship": "transitive",
+      "purpose": "BLAKE2 hashing used inside Argon2 password hashing.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "argon2",
+          "version": "0.5.3",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [],
+      "procedural_macro": false
+    },
+    {
+      "name": "block-buffer",
+      "version": "0.10.4",
+      "relationship": "transitive",
+      "purpose": "Fixed-block buffering for the password-hash cryptography stack.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "digest",
+          "version": "0.10.7",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [],
+      "procedural_macro": false
+    },
+    {
+      "name": "cpufeatures",
+      "version": "0.2.17",
+      "relationship": "transitive",
+      "purpose": "Runtime CPU-instruction detection for optimized cryptographic operations.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "argon2",
+          "version": "0.5.3",
+          "edge_kind": "normal",
+          "target_condition": "cfg(any(target_arch = \"x86\", target_arch = \"x86_64\"))"
+        }
+      ],
+      "enabled_features": [],
+      "procedural_macro": false
+    },
+    {
+      "name": "crypto-common",
+      "version": "0.1.7",
+      "relationship": "transitive",
+      "purpose": "Shared hash/cryptographic traits for the Argon2 dependency chain.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "digest",
+          "version": "0.10.7",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [],
+      "procedural_macro": false
+    },
+    {
+      "name": "digest",
+      "version": "0.10.7",
+      "relationship": "transitive",
+      "purpose": "Hash-function traits for BLAKE2/Argon2.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "blake2",
+          "version": "0.10.6",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [
+        "block-buffer",
+        "core-api",
+        "default",
+        "mac",
+        "subtle"
+      ],
+      "procedural_macro": false
+    },
+    {
+      "name": "generic-array",
+      "version": "0.14.7",
+      "relationship": "transitive",
+      "purpose": "Fixed-size array abstractions for the password-hash stack.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "block-buffer",
+          "version": "0.10.4",
+          "edge_kind": "normal",
+          "target_condition": null
+        },
+        {
+          "name": "crypto-common",
+          "version": "0.1.7",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [
+        "more_lengths"
+      ],
+      "procedural_macro": false
+    },
+    {
+      "name": "libc",
+      "version": "0.2.191",
+      "relationship": "transitive",
+      "purpose": "Platform C/OS interfaces for sockets, files, entropy and memory operations.",
+      "used_through_direct_dependencies": [
+        "argon2",
+        "redb"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "cpufeatures",
+          "version": "0.2.17",
+          "edge_kind": "normal",
+          "target_condition": "aarch64-linux-android"
+        },
+        {
+          "name": "cpufeatures",
+          "version": "0.2.17",
+          "edge_kind": "normal",
+          "target_condition": "cfg(all(target_arch = \"aarch64\", target_os = \"linux\"))"
+        },
+        {
+          "name": "cpufeatures",
+          "version": "0.2.17",
+          "edge_kind": "normal",
+          "target_condition": "cfg(all(target_arch = \"aarch64\", target_vendor = \"apple\"))"
+        },
+        {
+          "name": "cpufeatures",
+          "version": "0.2.17",
+          "edge_kind": "normal",
+          "target_condition": "cfg(all(target_arch = \"loongarch64\", target_os = \"linux\"))"
+        },
+        {
+          "name": "redb",
+          "version": "3.1.3",
+          "edge_kind": "normal",
+          "target_condition": "cfg(target_os = \"wasi\")"
+        }
+      ],
+      "enabled_features": [
+        "default",
+        "std"
+      ],
+      "procedural_macro": false
+    },
+    {
+      "name": "password-hash",
+      "version": "0.5.0",
+      "relationship": "transitive",
+      "purpose": "Password-hash/PHC string parsing, formatting and verification interfaces.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "argon2",
+          "version": "0.5.3",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [
+        "alloc",
+        "default",
+        "rand_core"
+      ],
+      "procedural_macro": false
+    },
+    {
+      "name": "rand_core",
+      "version": "0.6.4",
+      "relationship": "transitive",
+      "purpose": "Random-number-generator traits used by the remaining entropy/password/DNS graph.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "password-hash",
+          "version": "0.5.0",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [],
+      "procedural_macro": false
+    },
+    {
+      "name": "redb",
+      "version": "3.1.3",
+      "relationship": "direct",
+      "purpose": "Transactional embedded database; Workglen adds its own Mail Security encryption layer.",
+      "used_through_direct_dependencies": [
+        "redb"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "workglen-mail",
+          "version": "0.8.0",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [],
+      "procedural_macro": false
+    },
+    {
+      "name": "subtle",
+      "version": "2.6.1",
+      "relationship": "direct",
+      "purpose": "Constant-time comparisons/selection for secrets and password primitives.",
+      "used_through_direct_dependencies": [
+        "argon2",
+        "subtle"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "digest",
+          "version": "0.10.7",
+          "edge_kind": "normal",
+          "target_condition": null
+        },
+        {
+          "name": "password-hash",
+          "version": "0.5.0",
+          "edge_kind": "normal",
+          "target_condition": null
+        },
+        {
+          "name": "workglen-mail",
+          "version": "0.8.0",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [
+        "default",
+        "i128",
+        "std"
+      ],
+      "procedural_macro": false
+    },
+    {
+      "name": "typenum",
+      "version": "1.20.1",
+      "relationship": "transitive",
+      "purpose": "Compile-time numeric types for fixed-size cryptographic buffers.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "crypto-common",
+          "version": "0.1.7",
+          "edge_kind": "normal",
+          "target_condition": null
+        },
+        {
+          "name": "generic-array",
+          "version": "0.14.7",
+          "edge_kind": "normal",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [],
+      "procedural_macro": false
+    },
+    {
+      "name": "version_check",
+      "version": "0.9.5",
+      "relationship": "transitive",
+      "purpose": "Build-time Rust version/feature checks.",
+      "used_through_direct_dependencies": [
+        "argon2"
+      ],
+      "source": "crates.io registry",
+      "immediate_parents": [
+        {
+          "name": "generic-array",
+          "version": "0.14.7",
+          "edge_kind": "build",
+          "target_condition": null
+        }
+      ],
+      "enabled_features": [],
+      "procedural_macro": false
+    }
+  ]
+}

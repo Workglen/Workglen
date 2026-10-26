@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running `/workspace/scratch/00e4cff63970/portable-auth-oracle/target/debug/portable-protocol-oracle /workspace/scratch/00e4cff63970/portable-auth-oracle/native-protocols.json`
+Prior independent engine verified 2 native protocol messages

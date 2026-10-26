@@ -1,0 +1,2 @@
+    Checking workglen-mail v0.8.0 (/workspace/scratch/00e4cff63970/source/workglen)
+    Finished `release` profile [optimized] target(s) in 0.16s

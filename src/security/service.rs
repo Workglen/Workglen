@@ -1,0 +1,1691 @@
+use super::{db::*, model::*, scan};
+
+use crate::error::{Result, bail, ensure};
+
+use crate::encoding::STANDARD;
+
+use pratique::json_value::{Value, json};
+
+use std::{collections::BTreeSet, os::unix::fs::PermissionsExt, sync::Arc};
+
+pub struct Service {
+    pub config: Config,
+    pub db: Arc<Db>,
+    pub checker: crate::auth::Checker,
+    pub certificates: std::sync::OnceLock<crate::certificates::ManagedTls>,
+    _lock: std::fs::File,
+}
+
+pub fn event(
+    t: &mut Table,
+    a: &Actor,
+    action: &str,
+    rid: &str,
+    scope: &str,
+    mut data: Value,
+) -> Result<()> {
+    data["request_id"] = json!(rid);
+
+    audit(t, &a.id, action, scope, data)
+}
+
+pub fn public(m: &Value) -> Value {
+    let mut out = json!({});
+
+    for k in [
+        "id",
+        "recipient",
+        "arrived",
+        "state",
+        "revision",
+        "subject",
+        "sender",
+        "releasable",
+        "expires",
+        "hold",
+        "verdict",
+        "rule_version",
+    ] {
+        out[k] = m[k].clone();
+    }
+
+    out
+}
+
+pub fn active(t: &Table) -> Result<Value> {
+    let id = must(t, "active")?;
+
+    ensure!(id.is_u64(), "No active rules");
+
+    must(t, &format!("rule/{id}"))
+}
+
+impl Service {
+    pub fn open(config: Config) -> Result<Arc<Self>> {
+        config.validate()?;
+
+        std::fs::create_dir_all(&config.data_dir)?;
+
+        std::fs::set_permissions(&config.data_dir, std::fs::Permissions::from_mode(0o700))?;
+
+        let lock = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(std::path::Path::new(&config.data_dir).join("security.lock"))?;
+
+        lock.try_lock()?;
+
+        crate::encrypted_store::separate_key(
+            std::path::Path::new(&config.data_dir),
+            std::path::Path::new(&config.storage_key_file),
+        )?;
+        let storage_key =
+            crate::encrypted_store::Key::load(std::path::Path::new(&config.storage_key_file))?;
+        let db = Db::open(&config.db_path(), storage_key)?;
+
+        std::fs::set_permissions(config.db_path(), std::fs::Permissions::from_mode(0o600))?;
+
+        db.write(|t|{
+let binding=json!({
+"workspace":config.workspace,"instance":config.instance,"schema":2}
+);
+if let Some(old)=get(t,"installation")?{
+ensure!(old==binding,"Store workspace, instance or schema mismatch");
+}
+else{
+ensure!(get(t,"settings")?.is_none(),"Unbound database");
+put(t,"installation",&binding)?;
+put(t,"settings",&settings())?;
+put(t,"rule/1",&json!({
+"id":1,"state":"development","rules":rules(),"author":"bootstrap","created":now()}
+))?;
+put(t,"rule_next",&json!(2))?;
+put(t,"active",&Value::Null)?;
+audit(t,"bootstrap","initialize","",json!({
+"schema":2,"engine":scan::ENGINE}
+))?;
+}
+for mut j in list(t,"job/")?{
+if j["state"]=="running"{
+j["state"]=json!("uncertain");
+j["error"]=json!("Service restarted during an external operation; review before retry");
+put(t,&format!("job/{}",s(&j,"id")?),&j)?;
+audit(t,"recovery","job-uncertain",s(&j["data"],"recipient")?,json!({
+"job":j["id"]}
+))?;
+}
+}
+if let Some(mut task) = get(t, "destination/current")?
+    && task["state"] == "running" {
+    task["state"] = json!("failed");
+    task["error"] = json!("Connection check interrupted. Test again; saved destinations are unchanged.");
+    put(t, "destination/current", &task)?;
+    audit(t, "recovery", "delivery-check-interrupted", "", json!({"id":task["id"]}))?;
+}
+if let Some(mut task) = get(t, "directory/current")?
+    && task["state"] == "running" {
+        task["state"] = json!("failed");
+        task["error"] = json!("Discovery interrupted by restart. Discover again; accepted recipients are unchanged.");
+        put(t, "directory/current", &task)?;
+        audit(t, "recovery", "recipient-discovery-interrupted", "", json!({"id":task["id"]}))?;
+}
+Ok(())}
+)?;
+
+        let checker = crate::auth::Checker::new(config.dns_server)?;
+
+        Ok(Arc::new(Self {
+            config,
+            db: Arc::new(db),
+            checker,
+            certificates: std::sync::OnceLock::new(),
+            _lock: lock,
+        }))
+    }
+
+    pub fn start_tls(self: &Arc<Self>) -> Result<()> {
+        ensure!(self.certificates.get().is_none(), "TLS already started");
+        let db = self.db.clone();
+        let manager = crate::certificates::ManagedTls::start(
+            &self.config.tls_cert,
+            &self.config.tls_key,
+            self.config.acme.as_ref(),
+            move |kind| {
+                if let Err(e) = db.write(|t| {
+                    audit(
+                        t,
+                        "certificate-manager",
+                        "tls-certificate-event",
+                        "",
+                        json!({"event":kind}),
+                    )
+                }) {
+                    eprintln!("TLS audit write failed: {e}");
+                }
+            },
+        )?;
+        self.certificates
+            .set(manager)
+            .map_err(|_| crate::error!("TLS already started"))
+    }
+
+    pub fn tls(&self) -> Result<Arc<pratique::tls::server::ServerConfig>> {
+        Ok(self
+            .certificates
+            .get()
+            .ok_or_else(|| crate::error!("TLS has not started"))?
+            .tls
+            .clone())
+    }
+
+    fn tls_status(&self) -> Value {
+        self.certificates.get().map(|c| c.status()).unwrap_or_else(|| json!({"mode":if self.config.acme.is_some(){"letsencrypt"}else{"manual"},"ready":false,"running":false}))
+    }
+
+    pub fn settings(&self) -> Result<Value> {
+        self.db
+            .get("settings")?
+            .ok_or_else(|| crate::error!("Settings missing"))
+    }
+
+    pub fn bootstrap(&self, name: &str, password_hash: &str) -> Result<()> {
+        key(name)?;
+
+        argon2::PasswordHash::new(password_hash)
+            .map_err(|_| crate::error!("Invalid password hash"))?;
+
+        self.db.write(|t| {
+            ensure!(get(t, "bootstrapped")?.is_none(), "Already bootstrapped");
+
+            let mut actor = pratique::json_value::to_value(Actor::owner(name))?;
+
+            actor["revision"] = json!(1);
+
+            actor["enabled"] = json!(true);
+
+            actor["hash"] = json!(password_hash);
+
+            put(t, &format!("identity/{name}"), &actor)?;
+
+            put(t, "bootstrapped", &json!(true))?;
+
+            audit(
+                t,
+                "local-console",
+                "bootstrap-identity",
+                "",
+                json!({
+                "identity":name}
+                ),
+            )
+        })
+    }
+
+    pub fn local_actor(&self, name: &str) -> Result<Actor> {
+        key(name)?;
+
+        let u = self
+            .db
+            .get(&format!("identity/{name}"))?
+            .ok_or_else(|| crate::error!("Sign in to continue"))?;
+
+        ensure!(u["enabled"] == true, "Identity disabled");
+
+        Ok(pratique::json_value::from_value(u)?)
+    }
+
+    pub fn control(&self, raw: &[u8], signature: &str) -> Result<Value> {
+        ensure!(raw.len() <= MAX_BODY, "Command too large");
+
+        use pratique::crypto::{hmac::Hmac, sha2::Sha256};
+        use subtle::ConstantTimeEq;
+        let key = crate::config::secret(&self.config.control_key_file)?;
+        let expected = Hmac::<Sha256>::mac(key.as_bytes(), raw)
+            .iter()
+            .map(|x| format!("{x:02x}"))
+            .collect::<String>();
+
+        ensure!(
+            bool::from(expected.as_bytes().ct_eq(signature.as_bytes())),
+            "Control signature invalid"
+        );
+
+        let e: Value = pratique::json_value::from_slice(raw)?;
+
+        ensure!(
+            e["version"] == 1
+                && e["workspace"] == self.config.workspace
+                && e["audience"] == self.config.instance,
+            "Wrong protocol, workspace or audience"
+        );
+
+        let at = e["at"]
+            .as_i64()
+            .ok_or_else(|| crate::error!("Invalid timestamp"))?;
+
+        ensure!(now().abs_diff(at) <= 60, "Expired command");
+
+        let nonce = s(&e, "nonce")?;
+
+        ensure!(
+            nonce.len() == 32 && nonce.bytes().all(|x| x.is_ascii_hexdigit()),
+            "Invalid nonce"
+        );
+
+        let a: Actor = pratique::json_value::from_value(e["actor"].clone())?;
+
+        ensure!(
+            !a.id.is_empty() && a.id.len() <= 128 && a.mailbox.is_none(),
+            "Invalid control actor"
+        );
+
+        let trust = self
+            .config
+            .trusted_admin
+            .clone()
+            .unwrap_or_else(|| Actor::owner("central"));
+
+        ensure!(
+            a.permissions.iter().all(|p| trust.permissions.contains(p)),
+            "Issuer permission ceiling exceeded"
+        );
+
+        for (scope, ceiling) in [
+            (&a.domains, &trust.domains),
+            (&a.mailboxes, &trust.mailboxes),
+        ] {
+            ensure!(
+                ceiling.contains(&"*".into()) || scope.iter().all(|s| ceiling.contains(s)),
+                "Issuer scope ceiling exceeded"
+            );
+        }
+
+        self.db.write(|t| {
+            for (k, v) in keyed(t, "nonce/")? {
+                if v.as_i64().unwrap_or(0) < now() {
+                    remove(t, &k)?;
+                }
+            }
+
+            ensure!(
+                list(t, "nonce/")?.len() < 10000,
+                "Control request capacity reached"
+            );
+
+            let k = format!("nonce/{nonce}");
+
+            ensure!(get(t, &k)?.is_none(), "Replay rejected");
+
+            put(t, &k, &json!(now() + 120))
+        })?;
+
+        self.command(&a, pratique::json_value::from_value(e["command"].clone())?)
+    }
+
+    pub fn command(&self, a: &Actor, c: Command) -> Result<Value> {
+        let permission = permission(&c.action).ok_or_else(|| crate::error!("Unknown command"))?;
+
+        if a.mailbox.is_some() {
+            ensure!(
+                ["digest-review", "digest-action", "content"].contains(&c.action.as_str()),
+                "Mailbox endpoint only supports digest review"
+            );
+        } else {
+            a.require(permission, None)?;
+        }
+
+        ensure!(
+            (16..=64).contains(&c.request_id.len())
+                && c.request_id
+                    .bytes()
+                    .all(|x| x.is_ascii_hexdigit() || x == b'-'),
+            "Stable request ID required"
+        );
+
+        let fingerprint = hash(&pratique::json_value::to_vec(&json!({
+        "actor":a,"command":c}
+        ))?);
+
+        self.db.write(|t| {
+            let receipt_key = format!("receipt/{}", c.request_id);
+
+            if let Some(r) = get(t, &receipt_key)? {
+                ensure!(
+                    r["hash"] == fingerprint,
+                    "Request ID reused for a different command"
+                );
+
+                return Ok(r["result"].clone());
+            }
+
+            let result = self.execute(t, a, &c.action, &c.data, &c.request_id)?;
+
+            if ![
+                "status",
+                "setup",
+                "recipient-discovery",
+                "delivery-status",
+                "rules",
+                "messages",
+                "content",
+                "digests",
+                "digest-review",
+                "jobs",
+                "audit",
+                "identities",
+                "remediation-review",
+                "learning",
+            ]
+            .contains(&c.action.as_str())
+            {
+                ensure!(
+                    list(t, "receipt/")?.len() < 100000,
+                    "Command receipt capacity reached; maintenance required"
+                );
+
+                put(
+                    t,
+                    &receipt_key,
+                    &json!({
+                    "hash":fingerprint,"result":result,"at":now()}
+                    ),
+                )?;
+            }
+
+            Ok(result)
+        })
+    }
+
+    fn execute(
+        &self,
+        t: &mut Table,
+        a: &Actor,
+        action: &str,
+        d: &Value,
+        rid: &str,
+    ) -> Result<Value> {
+        let settings = must(t, "settings")?;
+
+        match action {
+            "delivery-discover" | "delivery-test" => self.destination_start(t, a, action, d, rid),
+            "delivery-status" => self.destination_status(t, a),
+            "delivery-save" => self.destination_save(t, a, d, rid),
+            "recipient-discover" => self.directory_start(t, a, d, rid),
+            "recipient-discovery" => self.directory_status(t, a),
+            "recipient-apply" => {
+                let (task, changes) = self.directory_changes(t, a, d)?;
+                let result = self.execute(
+                    t,
+                    a,
+                    "configure",
+                    &json!({
+                        "expected_revision":d["expected_revision"], "settings":changes
+                    }),
+                    rid,
+                )?;
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    "",
+                    json!({"discovery":task["id"],
+                    "source":"microsoft365", "discovered":arr(&task,"addresses")?.len(),
+                    "removed":0, "revision":result["revision"]}),
+                )?;
+                let mut task = task;
+                task["state"] = json!("applied");
+                put(t, "directory/current", &task)?;
+                Ok(result)
+            }
+            "status" => {
+                let mut counts = json!({});
+
+                let mut jobs = json!({});
+
+                let mut hashes = BTreeSet::new();
+
+                for m in list(t, "message/")? {
+                    if a.visible(s(&m, "recipient")?) {
+                        let state = s(&m, "state")?;
+
+                        counts[state] = json!(counts[state].as_u64().unwrap_or(0) + 1);
+
+                        hashes.insert(s(&m, "hash")?.to_string());
+                    }
+                }
+
+                for j in list(t, "job/")? {
+                    if a.visible(s(&j["data"], "recipient")?) {
+                        let state = s(&j, "state")?;
+
+                        jobs[state] = json!(jobs[state].as_u64().unwrap_or(0) + 1);
+                    }
+                }
+
+                use redb::ReadableTable;
+
+                let bytes: usize = hashes
+                    .iter()
+                    .filter_map(|h| {
+                        t.get(format!("blob/{h}").as_str())
+                            .ok()
+                            .flatten()
+                            .map(|b| b.value().len())
+                    })
+                    .sum();
+
+                Ok(json!({
+                "instance":self.config.instance,"workspace":self.config.workspace,"version":1,"storage_schema":2,"tls":self.tls_status(),"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"at":now(),"enabled":settings["enabled"],"active":must(t,"active")?,"messages":counts,"jobs":jobs,"bytes":bytes,"capabilities":["native-inspection","smtp-gateway","rules","quarantine","digests","workglen","graph","ews","ai-instructions"],"engine":scan::ENGINE}
+                ))
+            }
+
+            "setup" => {
+                a.global(&settings)?;
+
+                Ok(json!({
+                "settings":settings,"admin_origin":self.config.admin_origin,"recipient_directory":{"configured":self.config.recipient_directory.is_some(),"provider":"microsoft365","mode":"review-and-add"},"routes":self.destination_summaries(&settings)?,"connector_profiles":self.config.connectors.iter().map(|(k,c)|(k.clone(),json!({
+                "type":c.r#type,"mailboxes":c.mailboxes}
+                ))).collect::<pratique::json_value::Map<_,_>>(),"origin":self.config.origin,"instance":self.config.instance,"tls":self.tls_status(),"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"tests":get(t,"connection_tests")?.unwrap_or(json!({
+                }
+                )),"native_scanner":{
+                "engine":scan::ENGINE,"archives":["ZIP stored/deflate","GZIP","USTAR regular files"],"unsupported":"Administrator-only quarantine","external_services":false}
+                }
+                ))
+            }
+
+            "configure" => {
+                a.global(&settings)?;
+
+                ensure!(
+                    d["expected_revision"] == settings["revision"],
+                    "Configuration changed; reload"
+                );
+
+                let changes = d["settings"]
+                    .as_object()
+                    .ok_or_else(|| crate::error!("Settings must be an object"))?;
+
+                let mut new = settings.clone();
+
+                for (k, v) in changes {
+                    ensure!(
+                        settings.get(k).is_some()
+                            && !["revision", "retrospective_default", "delivery_destinations"]
+                                .contains(&k.as_str()),
+                        "Unknown or protected setting"
+                    );
+
+                    new[k] = v.clone();
+                }
+
+                self.validate_settings(&new)?;
+
+                a.global(&new)?;
+
+                if new["enabled"] == true
+                    && (settings["enabled"] != true
+                        || self.connection_fingerprint(&new)?
+                            != self.connection_fingerprint(&settings)?)
+                {
+                    active(t)?;
+
+                    let tests = must(t, "connection_tests")?;
+
+                    ensure!(
+                        tests["ok"] == true
+                            && tests["fingerprint"] == self.connection_fingerprint(&new)?
+                            && now().saturating_sub(tests["at"].as_i64().unwrap_or(0)) < 3600,
+                        "Run successful connection tests for these settings first"
+                    );
+                }
+
+                new["revision"] = json!(n(&settings, "revision")? + 1);
+
+                put(t, "settings", &new)?;
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    "",
+                    json!({
+                    "before":settings,"after":new}
+                    ),
+                )?;
+
+                Ok(json!({
+                "revision":new["revision"],"enabled":new["enabled"]}
+                ))
+            }
+
+            "connection-test" => {
+                a.global(&settings)?;
+
+                let result = self.connection_tests(&settings)?;
+
+                put(t, "connection_tests", &result)?;
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    "",
+                    json!({
+                    "ok":result["ok"]}
+                    ),
+                )?;
+
+                Ok(result)
+            }
+
+            "rules" => {
+                let mut rows = list(t, "rule/")?;
+
+                rows.sort_by_key(|v| std::cmp::Reverse(v["id"].as_u64().unwrap_or(0)));
+
+                rows.truncate(100);
+
+                for v in &mut rows {
+                    if v.get("test").is_some()
+                        && (a.global(&settings).is_err()
+                            || (!a.permissions.contains(&"content".into())
+                                && v["test"]["actor"] != a.id))
+                    {
+                        v["test"].as_object_mut().unwrap().remove("messages");
+
+                        v["test"]["sample_details_restricted"] = json!(true);
+                    }
+                }
+
+                Ok(json!({
+                "active":must(t,"active")?,"versions":rows}
+                ))
+            }
+
+            "draft" => {
+                a.global(&settings)?;
+
+                scan::validate_rules(&d["rules"])?;
+
+                let version = must(t, "rule_next")?.as_u64().unwrap_or(0);
+
+                ensure!(version < 10000, "Rule history capacity reached");
+
+                let v = json!({
+                "id":version,"state":"development","rules":d["rules"],"author":a.id,"created":now(),"based_on":d["based_on"]}
+                );
+
+                put(t, &format!("rule/{version}"), &v)?;
+
+                put(t, "rule_next", &json!(version + 1))?;
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    "",
+                    json!({
+                    "version":version}
+                    ),
+                )?;
+
+                Ok(v)
+            }
+
+            "test" => {
+                a.global(&settings)?;
+
+                let version = n(d, "version")?;
+
+                let mut v = must(t, &format!("rule/{version}"))?;
+
+                ensure!(
+                    v["state"] == "development",
+                    "Only Development can enter Test"
+                );
+
+                let ids = d["message_ids"].as_array().cloned().unwrap_or_default();
+
+                let samples = d["samples"].as_array().cloned().unwrap_or_default();
+
+                ensure!(
+                    (1..=50).contains(&(ids.len() + samples.len())),
+                    "Select 1–50 samples"
+                );
+
+                let mut corpus = Vec::new();
+
+                for i in ids {
+                    let m = message(
+                        t,
+                        i.as_str()
+                            .ok_or_else(|| crate::error!("Invalid sample ID"))?,
+                    )?;
+
+                    a.require("content", Some(s(&m, "recipient")?))?;
+
+                    corpus.push((m["id"].clone(), body(t, &m)?, m["engines"].clone()));
+                }
+
+                for (i, b) in samples.iter().enumerate() {
+                    corpus.push((
+                        json!(format!("sample-{i}")),
+                        STANDARD.decode(
+                            b.as_str()
+                                .ok_or_else(|| crate::error!("Invalid encoded sample"))?,
+                        )?,
+                        json!({}),
+                    ));
+                }
+
+                let old = active(t).ok();
+
+                let mut report = Vec::new();
+
+                for (id, raw, e) in corpus {
+                    let new = self.evaluate(t, &raw, &v["rules"], &settings, &e)?;
+
+                    let old = old
+                        .as_ref()
+                        .map(|v| self.evaluate(t, &raw, &v["rules"], &settings, &e))
+                        .transpose()?;
+
+                    report.push(json!({
+"id":id,"hash":hash(&raw),"changed":old.as_ref().is_none_or(|x|x["action"]!=new["action"]),"proposed":new,"active":old}
+));
+                }
+
+                v["state"] = json!("test");
+
+                v["tested_at"] = json!(now());
+
+                v["test"] = json!({
+                "actor":a.id,"messages":report,"count":report.len(),"complete":true,"scope":"selected samples only","settings_revision":settings["revision"],"engine":scan::ENGINE}
+                );
+
+                put(t, &format!("rule/{version}"), &v)?;
+
+                put(t, "shadow", &json!(version))?;
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    "",
+                    json!({
+                    "version":version,"count":report.len()}
+                    ),
+                )?;
+
+                Ok(v)
+            }
+
+            "activate" | "rollback" => {
+                a.global(&settings)?;
+
+                let previous = must(t, "active")?;
+
+                ensure!(d["expected_active"] == previous, "Active version changed");
+
+                ensure!(d["confirm"] == true, "Confirm activation");
+
+                let version = n(d, "version")?;
+
+                let mut v = must(t, &format!("rule/{version}"))?;
+
+                ensure!(
+                    v["state"] == "test" || v["state"] == "active",
+                    "Test version before activation"
+                );
+
+                if action == "rollback" {
+                    ensure!(
+                        v.get("published_at").is_some(),
+                        "Rollback requires a previously published version"
+                    );
+                }
+
+                v["state"] = json!("active");
+
+                if v.get("published_at").is_none() {
+                    v["published_at"] = json!(now());
+                }
+
+                v["activated_by"] = json!(a.id);
+
+                put(t, &format!("rule/{version}"), &v)?;
+
+                put(t, "active", &json!(version))?;
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    "",
+                    json!({
+                    "previous":previous,"version":version,"retrospective":false}
+                    ),
+                )?;
+
+                Ok(json!({
+                "active":version,"previous":previous,"retrospective":false}
+                ))
+            }
+
+            "messages" => {
+                let mut rows = list(t, "message/")?;
+
+                rows.sort_by(|a, b| {
+                    (b["arrived"].as_i64(), b["id"].as_str())
+                        .cmp(&(a["arrived"].as_i64(), a["id"].as_str()))
+                });
+
+                let before = d["cursor"]["at"]
+                    .as_i64()
+                    .or(d["before"].as_i64())
+                    .unwrap_or(now() + 1);
+
+                let last = d["cursor"]["id"].as_str().unwrap_or("");
+
+                let query = d["search"].as_str().unwrap_or("").to_lowercase();
+
+                let mut result = Vec::new();
+
+                let mut cursor = Value::Null;
+
+                let mut scanned = 0;
+
+                let candidates: Vec<_> = rows
+                    .into_iter()
+                    .filter(|m| {
+                        m["arrived"].as_i64().unwrap_or(0) < before
+                            || (m["arrived"] == before && m["id"].as_str().unwrap_or("") < last)
+                    })
+                    .collect();
+
+                for m in &candidates {
+                    scanned += 1;
+
+                    cursor = json!({
+                    "at":m["arrived"],"id":m["id"]}
+                    );
+
+                    if a.visible(s(m, "recipient")?)
+                        && format!(
+                            "{} {} {}",
+                            s(m, "subject")?,
+                            s(m, "sender")?,
+                            s(m, "recipient")?
+                        )
+                        .to_lowercase()
+                        .contains(&query)
+                    {
+                        result.push(public(m));
+                    }
+
+                    if result.len() == 200 || scanned == 2000 {
+                        break;
+                    }
+                }
+
+                if scanned == candidates.len() {
+                    cursor = Value::Null;
+                }
+
+                Ok(json!({
+                "messages":result,"limit":200,"next_cursor":cursor,"scan_limit":2000}
+                ))
+            }
+
+            "content" => {
+                let m = message(t, s(d, "id")?)?;
+
+                a.require("content", Some(s(&m, "recipient")?))?;
+
+                let parsed = scan::inspect(&body(t, &m)?)?;
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    s(&m, "recipient")?,
+                    json!({
+                    "id":m["id"]}
+                    ),
+                )?;
+
+                Ok(json!({
+                "id":m["id"],"text":parsed["text"].as_str().unwrap_or("").chars().take(200000).collect::<String>(),"hash":m["hash"],"rendering":"inert text only"}
+                ))
+            }
+
+            "release" | "discard" | "hold" | "reevaluate" => {
+                let mut m = message(t, s(d, "id")?)?;
+
+                a.require(permission(action).unwrap(), Some(s(&m, "recipient")?))?;
+
+                ensure!(m["revision"] == d["revision"], "Message changed; refresh");
+
+                ensure!(
+                    if action == "hold" {
+                        m["state"] != "expired"
+                    } else {
+                        m["state"] == "quarantined"
+                    },
+                    "Message unavailable"
+                );
+
+                match action {
+                    "hold" => {
+                        ensure!(d["hold"].is_boolean(), "Hold must be true or false");
+
+                        m["hold"] = d["hold"].clone();
+                    }
+
+                    "reevaluate" => {
+                        let v = active(t)?;
+
+                        m["verdict"] =
+                            self.evaluate(t, &body(t, &m)?, &v["rules"], &settings, &m["engines"])?;
+
+                        m["releasable"] = m["verdict"]["releasable"].clone();
+
+                        m["rule_version"] = v["id"].clone();
+                    }
+
+                    "release" => self.release(t, a, &mut m, &settings)?,
+                    _ => {
+                        ensure!(m["hold"] != true, "Retention hold prevents discard");
+
+                        m["state"] = json!("discarded");
+                    }
+                }
+
+                m["revision"] = json!(n(&m, "revision")? + 1);
+
+                save_message(t, &m)?;
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    s(&m, "recipient")?,
+                    json!({
+                    "id":m["id"],"state":m["state"],"revision":m["revision"],"hold":m["hold"],"rule_version":m["rule_version"]}
+                    ),
+                )?;
+
+                Ok(public(&m))
+            }
+
+            "digests" => {
+                let mut rows = list(t, "digest/")?;
+
+                rows.retain(|v| v["recipient"].as_str().is_some_and(|r| a.visible(r)));
+
+                rows.sort_by_key(|v| std::cmp::Reverse(v["created"].as_i64()));
+
+                rows.truncate(100);
+
+                Ok(json!(rows))
+            }
+
+            "digest-create" => {
+                let recipient = address(s(d, "recipient")?)?;
+
+                a.require("jobs", Some(&recipient))?;
+
+                self.create_digest(t, &recipient, &settings)
+            }
+
+            "digest-review" | "digest-action" => {
+                key(s(d, "id")?)?;
+
+                let mut snap = must(t, &format!("digest/{}", s(d, "id")?))?;
+
+                let recipient = s(&snap, "recipient")?.to_string();
+
+                a.require("read", Some(&recipient))?;
+
+                ensure!(
+                    snap["expires"].as_i64().unwrap_or(0) > now(),
+                    "Digest expired"
+                );
+
+                if action == "digest-review" {
+                    let mut rows = Vec::new();
+
+                    for i in arr(&snap, "ids")? {
+                        rows.push(public(&message(t, i.as_str().unwrap_or(""))?));
+                    }
+
+                    snap["messages"] = json!(rows);
+
+                    return Ok(snap);
+                }
+
+                let mode = s(d, "mode")?;
+
+                ensure!(
+                    ["release", "discard", "discard-all"].contains(&mode) && d["confirm"] == true,
+                    "Confirm digest action"
+                );
+
+                let ids = if mode == "discard-all" {
+                    arr(&snap, "releasable")?
+                } else {
+                    arr(d, "ids")?
+                };
+
+                ensure!(
+                    ids.len() <= 200
+                        && ids
+                            .iter()
+                            .all(|i| arr(&snap, "releasable").unwrap().contains(i)),
+                    "Only listed releasable spam is eligible"
+                );
+
+                let mut result = Vec::new();
+
+                let mut seen = BTreeSet::new();
+
+                for i in ids {
+                    let id = i.as_str().ok_or_else(|| crate::error!("Invalid ID"))?;
+
+                    if !seen.insert(id) {
+                        continue;
+                    }
+
+                    let mut m = message(t, id)?;
+
+                    ensure!(m["recipient"] == recipient, "Recipient mismatch");
+
+                    if m["state"] != "quarantined" {
+                        result.push(json!({
+                        "id":id,"status":m["state"]}
+                        ));
+
+                        continue;
+                    }
+
+                    if m["releasable"] != true || m["hold"] == true {
+                        result.push(json!({
+                        "id":id,"status":"administrator-review"}
+                        ));
+
+                        continue;
+                    }
+
+                    a.require(
+                        if mode == "release" {
+                            "release"
+                        } else {
+                            "discard"
+                        },
+                        Some(&recipient),
+                    )?;
+
+                    let v = active(t)?;
+
+                    let current =
+                        self.evaluate(t, &body(t, &m)?, &v["rules"], &settings, &m["engines"])?;
+
+                    if nonspam(&current) {
+                        m["verdict"] = current;
+
+                        m["releasable"] = json!(false);
+
+                        m["rule_version"] = v["id"].clone();
+
+                        result.push(json!({
+                        "id":id,"status":"administrator-review"}
+                        ));
+                    } else {
+                        if mode == "release" {
+                            self.release(t, a, &mut m, &settings)?;
+                        } else {
+                            m["state"] = json!("discarded");
+                        }
+
+                        result.push(json!({
+                        "id":id,"status":m["state"]}
+                        ));
+                    }
+
+                    m["revision"] = json!(n(&m, "revision")? + 1);
+
+                    save_message(t, &m)?;
+                }
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    &recipient,
+                    json!({
+                    "digest":snap["id"],"mode":mode,"ids":ids}
+                    ),
+                )?;
+
+                Ok(json!(result))
+            }
+
+            "jobs" => {
+                let mut rows = list(t, "job/")?;
+
+                rows.retain(|v| {
+                    v["data"]["recipient"]
+                        .as_str()
+                        .is_some_and(|r| a.visible(r))
+                });
+
+                rows.sort_by_key(|v| std::cmp::Reverse(v["due"].as_i64()));
+
+                rows.truncate(200);
+
+                Ok(json!(rows))
+            }
+
+            "job-retry" | "job-cancel" => {
+                key(s(d, "id")?)?;
+
+                let k = format!("job/{}", s(d, "id")?);
+
+                let mut j = must(t, &k)?;
+
+                a.require("jobs", Some(s(&j["data"], "recipient")?))?;
+
+                ensure!(
+                    ["failed", "uncertain", "queued", "retrying"].contains(&s(&j, "state")?),
+                    "Job cannot change in this state"
+                );
+
+                let uncertain = j["state"] == "uncertain";
+
+                ensure!(
+                    !uncertain || d["acknowledge_duplicate_risk"] == true,
+                    "Acknowledge uncertain delivery/removal risk"
+                );
+
+                if action == "job-cancel"
+                    && j["kind"] == "delivery"
+                    && j["data"]["released"] == true
+                    && !uncertain
+                {
+                    let mut m = message(t, s(&j["data"], "message")?)?;
+
+                    if m["state"] == "release-queued" {
+                        m["state"] = json!("quarantined");
+
+                        m["revision"] = json!(n(&m, "revision")? + 1);
+
+                        save_message(t, &m)?;
+                    }
+                }
+
+                j["state"] = json!(if action == "job-retry" {
+                    "queued"
+                } else {
+                    "cancelled"
+                });
+
+                j["due"] = json!(now());
+
+                j["attempts"] = json!(0);
+
+                put(t, &k, &j)?;
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    s(&j["data"], "recipient")?,
+                    json!({
+                    "job":j["id"],"state":j["state"]}
+                    ),
+                )?;
+
+                Ok(json!({
+                "state":j["state"]}
+                ))
+            }
+
+            "audit" => {
+                let after = d["after"].as_u64().unwrap_or(0);
+
+                let rows: Vec<_> = list(t, "audit/")?
+                    .into_iter()
+                    .filter(|e| e["seq"].as_u64().unwrap_or(0) > after)
+                    .take(1000)
+                    .collect();
+
+                let next = rows
+                    .last()
+                    .map(|v| v["seq"].clone())
+                    .unwrap_or(json!(after));
+
+                let events: Vec<_> = rows
+                    .into_iter()
+                    .filter(|e| {
+                        e["scope"].as_str().is_some_and(|s| {
+                            if s.is_empty() {
+                                a.domains.contains(&"*".into()) && a.mailboxes.contains(&"*".into())
+                            } else {
+                                a.visible(s)
+                            }
+                        })
+                    })
+                    .collect();
+
+                Ok(json!({
+                "events":events,"next_after":next,"filtered":true}
+                ))
+            }
+
+            "identities" => {
+                a.global(&settings)?;
+
+                let mut rows = Vec::new();
+
+                for (k, mut v) in keyed(t, "identity/")? {
+                    v.as_object_mut().unwrap().remove("hash");
+
+                    v["username"] = json!(k.trim_start_matches("identity/"));
+
+                    rows.push(v);
+                }
+
+                Ok(json!(rows))
+            }
+
+            "identity-set" => {
+                a.global(&settings)?;
+
+                let name = s(d, "username")?;
+
+                key(name)?;
+
+                let k = format!("identity/{name}");
+
+                let old = get(t, &k)?.unwrap_or(Value::Null);
+
+                ensure!(
+                    d["expected_revision"] == old["revision"],
+                    "Identity changed"
+                );
+
+                let mut u = d.clone();
+
+                u["id"] = json!(name);
+
+                let actor: Actor = pratique::json_value::from_value(u.clone())?;
+
+                ensure!(
+                    actor
+                        .permissions
+                        .iter()
+                        .all(|p| PERMISSIONS.contains(&p.as_str())),
+                    "Unknown permission"
+                );
+
+                for d in &actor.domains {
+                    ensure!(d == "*" || crate::config::domain(d), "Invalid domain scope");
+                }
+
+                for m in &actor.mailboxes {
+                    if m != "*" {
+                        address(m)?;
+                    }
+                }
+
+                if let Some(m) = &actor.mailbox {
+                    address(m)?;
+
+                    ensure!(
+                        settings["mailboxes"].get(m).is_some(),
+                        "Mailbox must be administered"
+                    );
+                }
+
+                ensure!(d["enabled"].is_boolean(), "Invalid enabled value");
+
+                let new_hash = if let Some(p) = d["password"].as_str().filter(|s| !s.is_empty()) {
+                    crate::auth::hash(p)?
+                } else {
+                    s(&old, "hash")?.into()
+                };
+
+                ensure!(
+                    name != a.id
+                        || (d["enabled"] == true
+                            && actor.mailbox.is_none()
+                            && actor.permissions.contains(&"configure".into())
+                            && actor.domains.contains(&"*".into())
+                            && actor.mailboxes.contains(&"*".into())),
+                    "Do not remove your own administration access"
+                );
+
+                let mut saved = pratique::json_value::to_value(actor)?;
+
+                saved["enabled"] = d["enabled"].clone();
+
+                saved["revision"] = json!(old["revision"].as_u64().unwrap_or(0) + 1);
+
+                let mut before = old.clone();
+
+                if let Some(o) = before.as_object_mut() {
+                    o.remove("hash");
+                }
+
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    "",
+                    json!({
+                    "identity":name,"before":before,"after":saved,"password_changed":d["password"].as_str().is_some_and(|s|!s.is_empty())}
+                    ),
+                )?;
+
+                saved["hash"] = json!(new_hash);
+
+                put(t, &k, &saved)?;
+
+                Ok(json!({
+                "revision":saved["revision"]}
+                ))
+            }
+
+            "learning" | "learn" | "learning-reset" => {
+                super::learning::command(t, a, action, d, rid)
+            }
+
+            _ if action.starts_with("remediation-") => {
+                super::connectors::command(self, t, a, action, d, rid)
+            }
+
+            _ => bail!("Unsupported action"),
+        }
+    }
+
+    pub fn validate_settings(&self, v: &Value) -> Result<()> {
+        let destinations = self.delivery_routes(v)?;
+        ensure!(v["enabled"].is_boolean(), "Invalid enabled flag");
+
+        let domains = arr(v, "domains")?;
+
+        ensure!(
+            (1..=100).contains(&domains.len())
+                && domains
+                    .iter()
+                    .all(|d| d.as_str().is_some_and(crate::config::domain)),
+            "Add 1–100 accepted domains"
+        );
+
+        let routes = v["routes"]
+            .as_object()
+            .ok_or_else(|| crate::error!("Invalid routes"))?;
+
+        ensure!(
+            routes.len() == domains.len()
+                && domains.iter().all(|d| routes
+                    .get(d.as_str().unwrap())
+                    .and_then(Value::as_str)
+                    .is_some_and(|r| destinations.contains_key(r))),
+            "Choose a saved delivery destination for every domain in Setup → Mail flow"
+        );
+
+        let boxes = v["mailboxes"]
+            .as_object()
+            .ok_or_else(|| crate::error!("Invalid mailboxes"))?;
+
+        ensure!(
+            (1..=10000).contains(&boxes.len()),
+            "Add 1–10,000 recipients"
+        );
+
+        for (a, p) in boxes {
+            ensure!(
+                address(a)? == *a && domains.contains(&json!(a.rsplit('@').next().unwrap_or(""))),
+                "Recipient outside accepted domains"
+            );
+
+            let obj = p
+                .as_object()
+                .ok_or_else(|| crate::error!("Invalid mailbox preference"))?;
+
+            ensure!(
+                obj.keys()
+                    .all(|k| ["enabled", "digest_hours"].contains(&k.as_str()))
+                    && p.get("enabled").is_none_or(Value::is_boolean)
+                    && p.get("digest_hours")
+                        .is_none_or(|v| v.as_u64().is_some_and(|x| x <= 168)),
+                "Invalid mailbox preferences"
+            );
+        }
+
+        ensure!(
+            (1..=365).contains(&n(v, "retention_days")?) && n(v, "digest_hours")? <= 168,
+            "Invalid retention or digest interval"
+        );
+
+        ensure!(
+            (100..=1000000).contains(&n(v, "max_messages")?)
+                && (MAX_MESSAGE as u64..=1024u64.pow(3)).contains(&n(v, "max_bytes")?)
+                && (100..=1000000).contains(&n(v, "max_jobs")?),
+            "Invalid capacity"
+        );
+
+        if !s(v, "digest_sender")?.is_empty() {
+            address(s(v, "digest_sender")?)?;
+        }
+
+        ensure!(
+            arr(v, "protected_people")?.len() <= 500 && arr(v, "protected_domains")?.len() <= 500,
+            "Protected identity capacity"
+        );
+
+        for p in arr(v, "protected_people")? {
+            address(s(p, "address")?)?;
+
+            ensure!(
+                !s(p, "name")?.is_empty() && s(p, "name")?.len() <= 128,
+                "Invalid protected name"
+            );
+        }
+
+        for d in arr(v, "protected_domains")? {
+            ensure!(
+                d.as_str().is_some_and(crate::config::domain),
+                "Invalid protected domain"
+            );
+        }
+
+        for (name, enabled) in v["connectors"]
+            .as_object()
+            .ok_or_else(|| crate::error!("Invalid connectors"))?
+        {
+            ensure!(
+                self.config.connectors.contains_key(name) && enabled.is_boolean(),
+                "Choose a provisioned connector"
+            );
+        }
+
+        Ok(())
+    }
+
+    pub fn connection_fingerprint(&self, v: &Value) -> Result<String> {
+        Ok(hash(&pratique::json_value::to_vec(&json!({
+        "domains":v["domains"],"routes":v["routes"],"mailboxes":v["mailboxes"],"connectors":v["connectors"],"route_config":self.delivery_routes(v)?,"connector_config":self.config.connectors,"engine":scan::ENGINE}
+        ))?))
+    }
+
+    pub fn connection_tests(&self, v: &Value) -> Result<Value> {
+        let mut results = Vec::new();
+        let destinations = self.delivery_routes(v)?;
+
+        let names: BTreeSet<_> = v["routes"]
+            .as_object()
+            .map(|o| o.values().filter_map(Value::as_str).collect())
+            .unwrap_or_default();
+
+        for name in names {
+            let ok = super::transport::probe(
+                destinations
+                    .get(name)
+                    .ok_or_else(|| crate::error!("Unknown route"))?,
+            )
+            .is_ok();
+
+            results.push(json!({
+            "name":name,"ok":ok,"detail":if ok{
+            "TLS greeting and authentication succeeded; no mail sent"}
+            else{
+            "SMTP connection failed; check host, certificate and credentials"}
+            }
+            ));
+        }
+
+        let sample=b"From: test@example.invalid\r\nSubject: Native scan self-check\r\n\r\nHarmless content.\r\n";
+
+        let ok = scan::evaluate(sample, &rules(), v, &json!({})).is_ok();
+
+        results.push(json!({
+"name":"native-inspection","ok":ok,"detail":"Embedded detector self-check; no external scanner"}
+));
+
+        for (name, enabled) in v["connectors"]
+            .as_object()
+            .ok_or_else(|| crate::error!("Invalid connectors"))?
+        {
+            if enabled.as_bool() == Some(true) {
+                let ok = super::connectors::probe(self, name).is_ok();
+
+                results.push(json!({
+"name":name,"ok":ok,"detail":"Read-only mailbox connection test; no content removed"}
+));
+            }
+        }
+
+        Ok(json!({
+        "ok":results.iter().all(|v|v["ok"]==true),"results":results,"at":now(),"fingerprint":self.connection_fingerprint(v)?}
+        ))
+    }
+
+    pub fn capacity(
+        &self,
+        t: &Table,
+        v: &Value,
+        bytes: usize,
+        count: usize,
+        jobs: usize,
+    ) -> Result<()> {
+        let rows = list(t, "message/")?;
+
+        let count = rows
+            .iter()
+            .filter(|m| {
+                !["expired", "discarded", "delivered"].contains(&m["state"].as_str().unwrap_or(""))
+            })
+            .count()
+            + count;
+
+        ensure!(
+            count <= n(v, "max_messages")? as usize,
+            "Message capacity reached"
+        );
+
+        use redb::ReadableTable;
+
+        let mut used = bytes;
+
+        for entry in t.range("blob/".."blob0")? {
+            used = used.saturating_add(entry?.1.value().len());
+        }
+
+        ensure!(
+            used as u64 <= n(v, "max_bytes")?,
+            "Content capacity reached"
+        );
+
+        let pending = list(t, "job/")?
+            .iter()
+            .filter(|j| j["state"] != "succeeded" && j["state"] != "cancelled")
+            .count();
+
+        ensure!(
+            pending + jobs <= n(v, "max_jobs")? as usize,
+            "Job capacity reached"
+        );
+
+        Ok(())
+    }
+
+    pub fn release(&self, t: &mut Table, a: &Actor, m: &mut Value, settings: &Value) -> Result<()> {
+        let v = active(t)?;
+
+        let verdict = self.evaluate(t, &body(t, m)?, &v["rules"], settings, &m["engines"])?;
+
+        ensure!(
+            !nonspam(&verdict),
+            "Current mandatory/security checks prevent release; administrator review required"
+        );
+
+        if a.mailbox.is_some() {
+            ensure!(m["releasable"] == true, "Administrator-only item");
+        }
+
+        self.capacity(t, settings, 0, 0, 1)?;
+
+        let jid = format!("release-{}-{}", s(m, "id")?, n(m, "revision")?);
+
+        job(
+            t,
+            "delivery",
+            json!({
+            "recipient":m["recipient"],"message":m["id"],"released":true}
+            ),
+            &jid,
+        )?;
+
+        m["state"] = json!("release-queued");
+
+        m["release_job"] = json!(jid);
+
+        Ok(())
+    }
+
+    pub fn create_digest(&self, t: &mut Table, recipient: &str, v: &Value) -> Result<Value> {
+        ensure!(
+            v["mailboxes"].get(recipient).is_some() && !s(v, "digest_sender")?.is_empty(),
+            "Configure digest sender and mailbox first"
+        );
+
+        let mut rows: Vec<_> = list(t, "message/")?
+            .into_iter()
+            .filter(|m| m["recipient"] == recipient && m["state"] == "quarantined")
+            .collect();
+
+        rows.sort_by(|a, b| {
+            (b["arrived"].as_i64(), b["id"].as_str())
+                .cmp(&(a["arrived"].as_i64(), a["id"].as_str()))
+        });
+
+        if rows.is_empty() {
+            return Ok(json!({
+            "empty":true}
+            ));
+        }
+
+        let truncated = rows.len() > 200;
+
+        rows.truncate(200);
+
+        self.capacity(t, v, 0, 0, 1)?;
+
+        let id = id();
+
+        let snap = json!({
+        "id":id,"recipient":recipient,"created":now(),"expires":now()+7*86400,"truncated":truncated,"ids":rows.iter().map(|m|m["id"].clone()).collect::<Vec<_>>(),"releasable":rows.iter().filter(|m|m["releasable"]==true&&m["hold"]!=true).map(|m|m["id"].clone()).collect::<Vec<_>>()}
+        );
+
+        put(t, &format!("digest/{id}"), &snap)?;
+
+        job(
+            t,
+            "digest",
+            json!({
+            "recipient":recipient,"digest":id}
+            ),
+            &format!("digest-{id}"),
+        )?;
+
+        audit(
+            t,
+            "scheduler",
+            "digest-created",
+            recipient,
+            json!({
+            "digest":id,"count":rows.len()}
+            ),
+        )?;
+
+        Ok(snap)
+    }
+
+    pub fn evaluate(
+        &self,
+        t: &Table,
+        raw: &[u8],
+        rules: &Value,
+        settings: &Value,
+        evidence: &Value,
+    ) -> Result<Value> {
+        let mut evidence = if evidence.is_object() {
+            evidence.clone()
+        } else {
+            json!({})
+        };
+
+        evidence["learned_spam_score"] = json!(super::learning::score(t, raw)?);
+
+        scan::evaluate(raw, rules, settings, &evidence)
+    }
+
+    pub fn verify_audit(&self) -> Result<Value> {
+        self.db.write(|t| {
+            let mut previous = "0".repeat(64);
+
+            let mut seq = 0;
+
+            for mut e in list(t, "audit/")? {
+                seq += 1;
+
+                ensure!(
+                    e["seq"] == seq && e["previous"] == previous,
+                    "Audit sequence or chain mismatch"
+                );
+
+                let expected = s(&e, "hash")?.to_string();
+
+                e.as_object_mut().unwrap().remove("hash");
+
+                ensure!(
+                    hash(&pratique::json_value::to_vec(&e)?) == expected,
+                    "Audit event hash mismatch"
+                );
+
+                previous = expected;
+            }
+
+            ensure!(
+                get(t, "audit_head")?.unwrap_or(json!("0".repeat(64))) == previous,
+                "Audit head mismatch"
+            );
+
+            Ok(json!({
+            "events":seq,"head":previous,"verified":true}
+            ))
+        })
+    }
+}
+
+pub fn nonspam(v: &Value) -> bool {
+    v["matches"].as_array().is_some_and(|a| {
+        a.iter()
+            .any(|m| m["action"] == "quarantine" && m["type"] != "spam")
+    })
+}

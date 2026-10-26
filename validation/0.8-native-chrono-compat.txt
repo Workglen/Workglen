@@ -1,0 +1,1 @@
+Chrono/native comparisons passed: 313698 Gregorian validity/day conversions, 90148 timestamps/formats, 19134 date/IMAP parser cases, 10672 RFC2822 cases

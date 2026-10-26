@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-25",
+  "target": "Linux x86-64",
+  "rust": "1.99.1",
+  "status": "Hickory and URL replacements complete for Workglen call sites; mail-auth replacement partial",
+  "active_native": [
+    "DNS",
+    "HTTP(S) URLs and form encoding",
+    "outbound DKIM signing"
+  ],
+  "retained_external": [
+    "mail-auth inbound authentication",
+    "mail-auth DKIM2",
+    "mail-auth optional ARC",
+    "IDNA Unicode normalization"
+  ],
+  "external_versions_before": 173,
+  "external_versions_after": 96,
+  "registry_versions_after": 95,
+  "registry_added_or_upgraded": [],
+  "retained_checksums_unchanged": true,
+  "tests": {
+    "workspace_passed": 189,
+    "workspace_ignored_optional_postgres": 4,
+    "native_auth_candidate_passed": 6,
+    "outbound_loopback_passed": 54,
+    "mail_loopback_passed": 119,
+    "url_parser_comparisons": 106600,
+    "url_mismatches": 0,
+    "form_encoding_byte_values": 256,
+    "url_setter_cases": 6,
+    "release_clippy_warnings_denied": "passed",
+    "release_build": "passed",
+    "optional_arc_compile": "passed"
+  },
+  "live_deployment": false,
+  "live_provider_validation": false,
+  "cargo_lock_sha256": "dc17c1c94269045af76a08a1c3460be264efffaad3a040e45bfe2776c95619df",
+  "release_binary_sha256": "053bdd4e676b2f173fdc8a362e37ef116fc37d7ad3bbe96ed57332c1e4f2896a",
+  "commands": [
+    "cargo test --offline --locked --workspace",
+    "cargo test --offline --locked --features native-auth-candidate --test native_mailauth",
+    "cargo clippy --release --offline --locked --workspace --all-targets --features native-auth-candidate -- -D warnings",
+    "cargo build --release --offline --locked",
+    "cargo check --offline --locked --features mail-auth/arc",
+    "python3 tools/outbound-integration.py --binary target/release/workglen --work <synthetic-temp-dir>",
+    "python3 tools/integration.py --binary target/release/workglen --work <synthetic-temp-dir>"
+  ],
+  "provenance": "vendor/mail-auth retains upstream notices and a reapplicable cumulative patch; no reclassification as first-party"
+}

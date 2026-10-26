@@ -1,0 +1,35 @@
+   Compiling rustix v1.1.5
+   Compiling bitflags v2.13.2
+   Compiling gethostname v1.1.0
+   Compiling mail-builder v1.0.0
+   Compiling mail-auth v0.13.3
+   Compiling workglen-mail v0.8.0 (/tmp/workglen-memory-validation-08466ao5/source)
+   Compiling fastrand v2.5.0
+   Compiling tempfile v3.27.0
+    Finished `release` profile [optimized] target(s) in 44.68s
+     Running tests/core.rs (/tmp/workglen-memory-validation-08466ao5/target/release/deps/core-0648dd9f3447f7e7)
+
+running 12 tests
+test acceptance_rejects_mime_floods_and_shapes_that_imap_cannot_render ... ok
+test address_and_header_injection_are_rejected ... ok
+test imap_quoted_and_section_grammar_and_reversed_uid_sets ... ok
+test smtp_ehlo_accepts_address_literals_without_injection ... ok
+test witness_never_overlaps_leases_and_waits_after_restart ... ok
+test quota_failure_does_not_commit_body_or_sequence ... ok
+test gc_preserves_shared_message_body ... ok
+test missing_deployment_marker_cannot_allow_an_unfenced_writer ... ok
+test uid_state_survives_restart_and_changes_on_promotion ... ok
+test deployment_transitions_require_seeded_data_and_explicit_demotion ... ok
+test journal_replay_is_atomic_and_rejects_gaps ... ok
+test backup_has_consistent_metadata_and_read_only_export ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/pratique_crypto.rs (/tmp/workglen-memory-validation-08466ao5/target/release/deps/pratique_crypto-4319e9cf8e9c556c)
+
+running 2 tests
+test hmac_sha256_rfc4231_case_one ... ok
+test aes256_gcm_known_answer_and_authentication_failure ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

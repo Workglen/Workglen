@@ -1,0 +1,20 @@
+[package]
+name = "lazaret-pg"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+description = "Native PostgreSQL wire client translated from Lazaret, using Pratique TLS"
+
+[dependencies]
+pratique = { path = "../pratique", default-features = false, features = ["net"] }
+
+[features]
+default = []
+with-json = []
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dev-dependencies]
+pratique = { path = "../pratique", default-features = false, features = ["net", "server"] }

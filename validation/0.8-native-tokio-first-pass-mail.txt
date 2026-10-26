@@ -1,0 +1,22 @@
+PASS single mode serves without any witness or peer
+PASS CLI disables Mail in single-node mode
+PASS single-mode restart preserves transaction sequence
+PASS module disabled state survives restart
+{
+  "passed": [
+    "single mode serves without any witness or peer",
+    "CLI disables Mail in single-node mode",
+    "single-mode restart preserves transaction sequence",
+    "module disabled state survives restart"
+  ],
+  "checks": 4,
+  "peak_rss_kib_by_node": {
+    "node1": 28732
+  }
+}
+Traceback (most recent call last):
+  File "/workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/tools/integration.py", line 348, in <module>
+    until(lambda:status(C1).get('primary') and status(C2).get('ready'))
+  File "/workspace/scratch/00e4cff63970/tokio-reduction/source/workglen/tools/integration.py", line 152, in until
+    raise AssertionError('Timed out waiting for '+str(fn))
+AssertionError: Timed out waiting for <function <lambda> at 0x7f5d87c05800>

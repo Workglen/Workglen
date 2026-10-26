@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-26",
+  "reference": "toml 0.9.12+spec-1.1.0",
+  "input_generator": "tools/generate-toml-fixtures.py",
+  "driver": "tools/toml-reference.rs",
+  "schemas": "tools/toml-schema-reference.rs",
+  "cases": 5748,
+  "mismatches": 0,
+  "snapshots_sha256": "89cb7285e008fb296d7f30a31f1ca9a8a16e2cebb0701b8e43112ffa464823e7",
+  "former_lock_sha256": "5dcf17fa224b8d6a963e7e485d240523ca14ea3193a8e77316409930fb4592ab",
+  "native_lock_sha256": "0007cf2c7ee348b8bfe83bf4cceeb4a0897f9a33e85bbfa3c58db3886872c5e3",
+  "notes": "Expected results generated only with the isolated former parser; native outputs were compared without rewriting expected values."
+}

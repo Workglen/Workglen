@@ -1,0 +1,19 @@
+{
+  "passed": 14,
+  "checks": [
+    "standalone admin sign-in and live overview",
+    "standalone administrator gets configured Admin destination",
+    "encrypted storage status explains supplied/generated keys and separate backup",
+    "TLS certificate availability and expiry are visible",
+    "guided TLS setup explains DNS, port 80, staging and automatic renewal",
+    "seven-step setup with rationale and preserved options",
+    "AI instruction rule defaults to quarantine and explains coverage",
+    "draft and identification-only test report",
+    "quarantine evidence inspection",
+    "recipient-scoped digest bulk action excludes administrator-only items",
+    "central console switches independently hosted gateway",
+    "central Back to Admin works at mobile width without losing session",
+    "Mail administration returns to Admin module overview",
+    "no browser script errors"
+  ]
+}

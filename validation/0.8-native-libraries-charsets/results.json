@@ -1,0 +1,9 @@
+{
+  "cases": 2883056,
+  "label_groups": 259,
+  "mismatches": 0,
+  "former": "encoding_rs 0.8.42 through pinned Workglen MIME adapter",
+  "native": "first-party WHATWG decoder with existing MIME label/UTF behavior",
+  "golden_sha256": "54f4852b8f2191da503e946238df0ee594d598f14420955ead8062f927e2bc07",
+  "scope": "Deterministic byte sweeps and synthetic states, not universal conformance or a security audit"
+}

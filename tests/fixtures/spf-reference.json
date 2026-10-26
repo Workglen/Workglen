@@ -1,0 +1,242 @@
+[
+  {
+    "expected": "Pass",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 +all"
+  },
+  {
+    "expected": "Pass",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 +all"
+  },
+  {
+    "expected": "Pass",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 +all"
+  },
+  {
+    "expected": "Pass",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 +all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 -all"
+  },
+  {
+    "expected": "SoftFail",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 ~all"
+  },
+  {
+    "expected": "SoftFail",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 ~all"
+  },
+  {
+    "expected": "SoftFail",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 ~all"
+  },
+  {
+    "expected": "SoftFail",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 ~all"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 ?all"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 ?all"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 ?all"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 ?all"
+  },
+  {
+    "expected": "Pass",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 ip4:192.0.2.0/24 -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 ip4:192.0.2.0/24 -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 ip4:192.0.2.0/24 -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 ip4:192.0.2.0/24 -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 ip6:2001:db8::/32 -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 ip6:2001:db8::/32 -all"
+  },
+  {
+    "expected": "Pass",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 ip6:2001:db8::/32 -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 ip6:2001:db8::/32 -all"
+  },
+  {
+    "expected": "Pass",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 include:other.test -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 include:other.test -all"
+  },
+  {
+    "expected": "Pass",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 include:other.test -all"
+  },
+  {
+    "expected": "Fail",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 include:other.test -all"
+  },
+  {
+    "expected": "Pass",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 redirect=other.test"
+  },
+  {
+    "expected": "SoftFail",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 redirect=other.test"
+  },
+  {
+    "expected": "Pass",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 redirect=other.test"
+  },
+  {
+    "expected": "SoftFail",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 redirect=other.test"
+  },
+  {
+    "expected": "Pass",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 ip4:0.0.0.0/0"
+  },
+  {
+    "expected": "Pass",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 ip4:0.0.0.0/0"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 ip4:0.0.0.0/0"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 ip4:0.0.0.0/0"
+  },
+  {
+    "expected": "Pass",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 ip6:::/0"
+  },
+  {
+    "expected": "Pass",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 ip6:::/0"
+  },
+  {
+    "expected": "Pass",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 ip6:::/0"
+  },
+  {
+    "expected": "Pass",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 ip6:::/0"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "192.0.2.1",
+    "record": "v=spf1"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "198.51.100.1",
+    "record": "v=spf1"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "2001:db8::1",
+    "record": "v=spf1"
+  },
+  {
+    "expected": "Neutral",
+    "ip": "2001:db9::1",
+    "record": "v=spf1"
+  },
+  {
+    "expected": "Fail",
+    "ip": "192.0.2.1",
+    "record": "v=spf1 -all redirect=other.test"
+  },
+  {
+    "expected": "Fail",
+    "ip": "198.51.100.1",
+    "record": "v=spf1 -all redirect=other.test"
+  },
+  {
+    "expected": "Fail",
+    "ip": "2001:db8::1",
+    "record": "v=spf1 -all redirect=other.test"
+  },
+  {
+    "expected": "Fail",
+    "ip": "2001:db9::1",
+    "record": "v=spf1 -all redirect=other.test"
+  }
+]

@@ -1,0 +1,27 @@
+[Unit]
+Description=Workglen Mail independent lease witness
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=workglen
+Group=workglen
+UMask=0077
+StateDirectory=workglen-witness
+ExecStart=/usr/local/bin/workglen witness /etc/workglen/witness.toml
+Restart=on-failure
+RestartSec=3
+MemoryMax=96M
+MemorySwapMax=0
+TasksMax=24
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

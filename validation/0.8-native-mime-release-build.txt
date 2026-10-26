@@ -1,0 +1,13 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling memchr v2.8.3
+   Compiling workglen-idna v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-idna)
+   Compiling workglen-mime v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-mime)
+   Compiling serde_json v1.0.154
+   Compiling workglen-dns v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/crates/native-dns)
+   Compiling syn v3.0.9
+   Compiling lazaret-pg v0.1.0 (/workspace/scratch/00e4cff63970/source/workglen/vendor/lazaret-pg)
+   Compiling serde_derive v1.0.229
+   Compiling serde v1.0.229
+   Compiling workglen-mail v0.8.0 (/workspace/scratch/00e4cff63970/source/workglen)
+    Finished `release` profile [optimized] target(s) in 19.57s

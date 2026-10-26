@@ -1,0 +1,25 @@
+     Locking 24 packages to highest Rust 1.99.1 compatible versions
+   Compiling proc-macro2 v1.0.107
+   Compiling rustversion v1.0.23
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling zmij v1.0.23
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.3
+   Compiling serde_core v1.0.229
+   Compiling memchr v2.8.3
+   Compiling cfg-if v1.0.5
+   Compiling simdutf8 v0.1.5
+   Compiling scopeguard v1.2.0
+   Compiling multiversion_no_op v1.0.0
+   Compiling serde_json v1.0.154
+   Compiling core_detect v1.0.0
+   Compiling itoa v1.0.18
+   Compiling indexmap v2.14.2
+   Compiling encoding_rs v0.8.42
+   Compiling syn v2.0.119
+   Compiling hashify v0.2.9
+   Compiling mail-parser v0.11.9
+   Compiling mime-reference v0.0.0 (/workspace/scratch/00e4cff63970/portable-mime-oracle/former)
+    Finished `release` profile [optimized] target(s) in 8.34s
+     Running `/workspace/scratch/00e4cff63970/portable-mime-oracle/target/release/mime-reference`

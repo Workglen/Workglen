@@ -1,0 +1,149 @@
+{
+  "provenance": "Independent Python cryptography signatures; deterministic public seed 00..1f; closed DNS",
+  "cases": [
+    {
+      "label": "quoted identity",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; i=user@d=6Bim.test; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=YzvpNNJBUynD2mxc4JdP68RATI0I9LilNuG9c6u+5jqTYYS+K/lskSLsGo+kI5ny1mbSFoYc+OGZsqxZiWOuDQ==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Pass",
+      "now": 150
+    },
+    {
+      "label": "subdomain identity",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; i=user@sub.dkim.test; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=ySP9682sLAVXH9GjACKcPbSvWStSyrDIdZLTpDG8beY1r7l3SEF2kriA64VPHGaRmsfHByc/9IJ8qpm+H7rwDA==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Pass",
+      "now": 150
+    },
+    {
+      "label": "strict identity rejects subdomain",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; i=user@sub.dkim.test; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=ySP9682sLAVXH9GjACKcPbSvWStSyrDIdZLTpDG8beY1r7l3SEF2kriA64VPHGaRmsfHByc/9IJ8qpm+H7rwDA==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=;t=s",
+      "dns": {},
+      "expected": "Fail",
+      "now": 150
+    },
+    {
+      "label": "key hash restriction",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject;  bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=c5rB9dIk0hAXgPcVUrYguRt+vyWKj2bO53X6jLBvZZyJQXTMX//jjpXkN6e3h7bDd8pMOEIQRqCPu/nDDkTpAQ==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=;h=sha1",
+      "dns": {},
+      "expected": "Fail",
+      "now": 150
+    },
+    {
+      "label": "key service restriction",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject;  bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=c5rB9dIk0hAXgPcVUrYguRt+vyWKj2bO53X6jLBvZZyJQXTMX//jjpXkN6e3h7bDd8pMOEIQRqCPu/nDDkTpAQ==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=;s=other",
+      "dns": {},
+      "expected": "Fail",
+      "now": 150
+    },
+    {
+      "label": "expiry before deadline",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; t=100; x=200; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=vMu2GRQ8rsGwfQWV78oNWsx7zSRNuVqQH2sfW7+L1wCcv56PFfKUai7iy0nHe+j4GSISVBQMoVmUM4TT67UeCQ==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Pass",
+      "now": 150
+    },
+    {
+      "label": "expired",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; t=100; x=200; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=vMu2GRQ8rsGwfQWV78oNWsx7zSRNuVqQH2sfW7+L1wCcv56PFfKUai7iy0nHe+j4GSISVBQMoVmUM4TT67UeCQ==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Fail",
+      "now": 250
+    },
+    {
+      "label": "invalid interval",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; t=200; x=100; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=HGPpm5xTMpe1dGsjxup6h2dVFNqgKtLtmQeWtHbg/CbUl3Ylr8SZEe9rYS2VkANFRt42qe2b4qCFVdJ1JQKLBA==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Fail",
+      "now": 50
+    },
+    {
+      "label": "partial body",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; l=3; bh=t4nCTc22jEQ3sEwYa/I5pyB+dXP7GyKnSf4ae42W0pI=; b=V9+dled8xvrYrjSlB6U2EnXC9XrsSYsBQAwYshQFfbwWKJ3m0gT7YPHYtCHVYKnjqD0seQZOL99h79KAFhuACA==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Pass",
+      "now": 150
+    },
+    {
+      "label": "body shorter than l",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; l=100; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=/cXNnY0GFTCy8YyP1mFgZZjeo+7DeDqIoSagRk0H5sn8WToj1RebhYD3nqT9QEOK49IHXRdM3CKD3Wge1DlkBw==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Fail",
+      "now": 150
+    },
+    {
+      "label": "ATPS none",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; atps=author.test; atpsh=none; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=aTSOGrRNyftfLGjaIRrV8iwPaL2QXct7qAM9BOSQAeymmBCvku4miAa8aPFTl/gEofgyqVkvD7pNMordZcFbBA==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {
+        "dkim.test._atps.author.test": "v=ATPS1"
+      },
+      "expected": "Pass",
+      "now": 150
+    },
+    {
+      "label": "ATPS sha1",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; atps=author.test; atpsh=sha1; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=amDxRfkiRxIFYDI3JUdl3tdiTvX4DfUIdek4PQQOpAGhmaxqgrdXryxFU7elr+38b+zYwo/aDJAdxwNTz+I5AA==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {
+        "bg23sqaxvuuygo6jhjcw3q2x24xskw5g._atps.author.test": "v=ATPS1"
+      },
+      "expected": "Pass",
+      "now": 150
+    },
+    {
+      "label": "ATPS sha256",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; atps=author.test; atpsh=sha256; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=j48ngOrJDP2e+L+Le/06TwbO0wQ1JP7ldKZR8sUbRBU8d8OcqTLcspkduGaG30YCtow2n09B916xqdWDl0x0Cw==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {
+        "fsoa6uodd6p6gdmbycfh2es6uqrgbxlcqrbf66gam2bimahy45sq._atps.author.test": "v=ATPS1"
+      },
+      "expected": "Pass",
+      "now": 150
+    },
+    {
+      "label": "missing ATPS authorization",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; atps=author.test; atpsh=none; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=aTSOGrRNyftfLGjaIRrV8iwPaL2QXct7qAM9BOSQAeymmBCvku4miAa8aPFTl/gEofgyqVkvD7pNMordZcFbBA==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Fail",
+      "now": 150
+    },
+    {
+      "label": "temporary ATPS",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; atps=author.test; atpsh=none; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=aTSOGrRNyftfLGjaIRrV8iwPaL2QXct7qAM9BOSQAeymmBCvku4miAa8aPFTl/gEofgyqVkvD7pNMordZcFbBA==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {
+        "dkim.test._atps.author.test": "TIMEOUT"
+      },
+      "expected": "Temporary",
+      "now": 150
+    },
+    {
+      "label": "unknown ATPS hash ignored",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; atps=author.test; atpsh=unknown; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=fqd+GkrT1O/RndnDpYCSd2BJ+rDP/J6XlKnOt7E5X6Loarm5Qnpwz7wz1DpJa8+H/Fz+dR0mlWEMPqlaxYL4AQ==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Pass",
+      "now": 150
+    },
+    {
+      "label": "unrelated ATPS author ignored",
+      "raw": "DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=dkim.test; s=test; h=from:subject; atps=other.test; atpsh=none; bh=yGIXoM91E1DiKjvCBcC8NlWyw54TdfMQ08sdtwtOO4I=; b=T2aA2VGkEvxtgW4t83qisg/eUeqldnpcb/ep0MrA9M2cvPAqkRpL8TFbEmr9rtG4+kbdfVMfXTDOjOOTi/OVDg==\r\nFrom: a@author.test\r\nSubject: Extension fixture\r\n\r\nHello world\r\n",
+      "record": "v=DKIM1;k=ed25519;p=A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "dns": {},
+      "expected": "Pass",
+      "now": 150
+    }
+  ]
+}

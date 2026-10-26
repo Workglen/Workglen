@@ -1,0 +1,191 @@
+{
+  "date": "2026-10-25",
+  "baseline": "source version 29, native DNS/URL checkpoint",
+  "before_external_versions": 96,
+  "after_external_versions": 51,
+  "added_registry_versions": [],
+  "retained_checksums_unchanged": true,
+  "removed": [
+    {
+      "name": "bumpalo",
+      "version": "3.20.3"
+    },
+    {
+      "name": "displaydoc",
+      "version": "0.2.7"
+    },
+    {
+      "name": "futures-core",
+      "version": "0.3.34"
+    },
+    {
+      "name": "futures-task",
+      "version": "0.3.34"
+    },
+    {
+      "name": "futures-util",
+      "version": "0.3.34"
+    },
+    {
+      "name": "getrandom",
+      "version": "0.2.17"
+    },
+    {
+      "name": "getrandom",
+      "version": "0.4.3"
+    },
+    {
+      "name": "hashify",
+      "version": "0.2.9"
+    },
+    {
+      "name": "icu_collections",
+      "version": "2.4.0"
+    },
+    {
+      "name": "icu_locale_core",
+      "version": "2.4.0"
+    },
+    {
+      "name": "icu_normalizer",
+      "version": "2.4.0"
+    },
+    {
+      "name": "icu_normalizer_data",
+      "version": "2.4.0"
+    },
+    {
+      "name": "icu_properties",
+      "version": "2.4.0"
+    },
+    {
+      "name": "icu_properties_data",
+      "version": "2.4.0"
+    },
+    {
+      "name": "icu_provider",
+      "version": "2.4.0"
+    },
+    {
+      "name": "idna",
+      "version": "1.1.0"
+    },
+    {
+      "name": "idna_adapter",
+      "version": "1.2.2"
+    },
+    {
+      "name": "js-sys",
+      "version": "0.3.106"
+    },
+    {
+      "name": "litemap",
+      "version": "0.8.3"
+    },
+    {
+      "name": "mail-auth",
+      "version": "0.13.3"
+    },
+    {
+      "name": "mail-parser",
+      "version": "0.11.9"
+    },
+    {
+      "name": "once_cell",
+      "version": "1.21.4"
+    },
+    {
+      "name": "potential_utf",
+      "version": "0.1.6"
+    },
+    {
+      "name": "r-efi",
+      "version": "6.0.0"
+    },
+    {
+      "name": "rustls-pki-types",
+      "version": "1.15.1"
+    },
+    {
+      "name": "slab",
+      "version": "0.4.12"
+    },
+    {
+      "name": "smallvec",
+      "version": "1.16.4"
+    },
+    {
+      "name": "stable_deref_trait",
+      "version": "1.2.1"
+    },
+    {
+      "name": "syn",
+      "version": "2.0.119"
+    },
+    {
+      "name": "synstructure",
+      "version": "0.14.0"
+    },
+    {
+      "name": "tinystr",
+      "version": "0.8.5"
+    },
+    {
+      "name": "utf8_iter",
+      "version": "1.0.4"
+    },
+    {
+      "name": "wasm-bindgen",
+      "version": "0.2.129"
+    },
+    {
+      "name": "wasm-bindgen-macro",
+      "version": "0.2.129"
+    },
+    {
+      "name": "wasm-bindgen-macro-support",
+      "version": "0.2.129"
+    },
+    {
+      "name": "wasm-bindgen-shared",
+      "version": "0.2.129"
+    },
+    {
+      "name": "writeable",
+      "version": "0.6.4"
+    },
+    {
+      "name": "yoke",
+      "version": "0.8.4"
+    },
+    {
+      "name": "yoke-derive",
+      "version": "0.8.4"
+    },
+    {
+      "name": "zerofrom",
+      "version": "0.1.8"
+    },
+    {
+      "name": "zerofrom-derive",
+      "version": "0.1.8"
+    },
+    {
+      "name": "zeroize",
+      "version": "1.9.1"
+    },
+    {
+      "name": "zerotrie",
+      "version": "0.2.5"
+    },
+    {
+      "name": "zerovec",
+      "version": "0.11.9"
+    },
+    {
+      "name": "zerovec-derive",
+      "version": "0.11.7"
+    }
+  ],
+  "cargo_lock_sha256": "ce869306d8e9c7753dc0ec58310c9a251685d697b3db44387a2242d91549deca"
+}

@@ -1,0 +1,10 @@
+{
+  "cases": 73260,
+  "differences": 416,
+  "former": "serde 1.0.229 / serde_json 1.0.154, arbitrary_precision",
+  "native": "Pratique typed data/JSON values",
+  "scope": "Synthetic pinned-engine comparison; not universal conformance",
+  "reviewed_differences": 416,
+  "unexpected_differences": 0,
+  "exact_matches": 72844
+}

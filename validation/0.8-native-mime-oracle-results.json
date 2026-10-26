@@ -1,0 +1,8 @@
+{
+  "cases": 344,
+  "exact_matches": 312,
+  "reviewed_differences": 32,
+  "former": "mail-parser 0.11.9",
+  "native": "workglen-mime 0.1.0",
+  "scope": "Synthetic local corpus, not universal MIME conformance"
+}

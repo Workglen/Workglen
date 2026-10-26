@@ -1,0 +1,7 @@
+PASS selected Microsoft routes are grouped; unused and lookalike hosts are excluded
+PASS new connector is Partner, wildcard, TLS required and initially disabled
+PASS Enhanced Filtering trusts exact gateway IPs and retains Microsoft scanning
+PASS private, reserved, malformed and range inputs are rejected
+PASS no connector name can inject PowerShell or exceed bounds
+PASS valid boundaries outside private ranges remain usable
+{"passed":6,"scope":"Local generation only; no Microsoft tenant or SMTP calls"}

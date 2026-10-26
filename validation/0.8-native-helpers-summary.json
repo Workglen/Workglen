@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-25",
+  "removed": [
+    "anyhow 1.0.104",
+    "chrono 0.4.45"
+  ],
+  "added": [],
+  "retained_versions_and_checksums_unchanged": true,
+  "external_versions_before": 175,
+  "external_versions_after_anyhow": 174,
+  "external_versions_after_chrono": 173,
+  "direct_external_crates": 11,
+  "all_locked_packages_including_first_party": 176,
+  "first_party_crates": [
+    "workglen-mail",
+    "pratique",
+    "lazaret-pg"
+  ],
+  "anyhow_checkpoint": {
+    "rust_tests_passed": 168,
+    "optional_postgres_tests_skipped": 4,
+    "outbound_dkim_checks": 54,
+    "mail_imap_replication_checks": 119,
+    "differential_error_cases": 150
+  },
+  "chrono_checkpoint": {
+    "rust_tests_passed": 174,
+    "optional_postgres_tests_skipped": 4,
+    "outbound_dkim_checks": 54,
+    "mail_imap_replication_checks": 119,
+    "differential_date_cases": 433652
+  },
+  "clippy_warnings_denied_and_release_build_passed": true,
+  "rust_version": "1.99.1",
+  "platform": "Linux x86-64",
+  "cargo_mode": "offline locked",
+  "live_deployment_performed": false,
+  "cargo_lock_sha256": "8bc9435e5bb54c78404cb1c97f5a0aa3d3de423bbfdf403f373ca7e11dcb62f9",
+  "source_module_sha256": {
+    "error.rs": "6e5336fdca87dd00f56ce8d4e09c2bf4996a00d6bb9a923f1c3227918ea0e9a2",
+    "datetime.rs": "44235d6ddfb9190c8b256cb1f68362f718ae41cd1591883c3236d8064dfe6d90"
+  }
+}

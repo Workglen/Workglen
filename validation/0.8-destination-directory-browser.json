@@ -1,0 +1,11 @@
+{
+  "passed": 6,
+  "checks": [
+    "discovery requires explicit review before applying additions",
+    "applying discovery preserves existing recipients and preferences",
+    "failed discovery offers no apply action",
+    "Admin navigation and Microsoft 365 setup fit narrow screens",
+    "Webmail uses the configured Admin origin without forwarding credentials",
+    "no browser script errors"
+  ]
+}
