@@ -134,6 +134,15 @@ The real-process test now supports bounded connection reuse. A 5,000-message run
 
 Use these as test-host starting points, then rerun the matrix on the intended Ubuntu instance with representative MIME distributions.
 
+The target-host acceptance/upgrade campaign is now scripted in
+[MAIL-SECURITY-UBUNTU-CAMPAIGN.md](MAIL-SECURITY-UBUNTU-CAMPAIGN.md). Its default
+mode is a read-only systemd/host/capacity plan; its explicitly acknowledged
+execute mode measures 10k/25k/50k verified-STARTTLS acceptance while the scanner
+is replaced, records systemd memory properties and waits for the queue to drain.
+An optional reviewed executable makes the same run an actual package-upgrade
+campaign. The source runner is not Ubuntu evidence until its generated report is
+retained and reviewed from the intended disposable host.
+
 | Intended envelope | `security-serve` | `security-scan-worker` | Host RAM | Notes |
 |---|---|---|---|---|
 | Up to 10k small queued messages, scan concurrency 2 | 2 vCPU / 512 MiB | 2 vCPU / 512 MiB | 2 GiB | Suitable next Ubuntu validation tier. |

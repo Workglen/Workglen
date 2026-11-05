@@ -72,9 +72,11 @@ pub fn permission(action: &str) -> Option<&'static str> {
         "hold" => "security.retention",
         "digest-create" | "job-retry" | "job-cancel" => "security.jobs",
         "audit" => "security.audit",
-        "cluster-drain" | "cluster-handoff" | "cluster-rejoin" | "cluster-resync" => {
-            "security.cluster.operate"
-        }
+        "cluster-drain"
+        | "cluster-handoff"
+        | "cluster-handoff-cancel"
+        | "cluster-rejoin"
+        | "cluster-resync" => "security.cluster.operate",
         "cluster-takeover" => "security.cluster.takeover",
         "remediation-preview" | "remediation-review" => "security.remediation.preview",
         "remediation-start" => "security.remediation.execute",

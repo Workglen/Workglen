@@ -778,6 +778,64 @@ pub fn complete_handoff(
     Ok(json!({"ownership":next,"state_sequence":sequence}))
 }
 
+pub fn cancel_handoff(
+    t: &mut Table,
+    actor: &str,
+    partition: &str,
+    expected_owner: &str,
+    expected_term: u64,
+    expected_pending_owner: &str,
+    expected_pending_term: u64,
+) -> Result<Value> {
+    key(partition)?;
+    key(expected_owner)?;
+    key(expected_pending_owner)?;
+    let local = node_id(t)?;
+    let current = ownership(t, partition)?;
+    ensure!(
+        expected_owner == local
+            && current["owner"] == expected_owner
+            && current["term"] == expected_term
+            && current["state"] == "draining"
+            && current["pending_owner"] == expected_pending_owner
+            && current["pending_term"] == expected_pending_term,
+        "Planned handoff state changed; refresh cluster state"
+    );
+
+    let next = json!({
+        "partition":partition,
+        "owner":local,
+        "term":expected_term,
+        "state":"stable",
+        "updated":now()?,
+        "cancelled_pending_owner":expected_pending_owner,
+        "cancelled_pending_term":expected_pending_term
+    });
+    put(t, &format!("ownership/{partition}"), &next)?;
+    let sequence = record_ownership_state(t, partition)?;
+
+    let mut mode = must(t, NODE_MODE_KEY)?;
+    mode["mode"] = json!("active");
+    mode["acceptance_eligible"] = json!(true);
+    mode["updated"] = json!(now()?);
+    put(t, NODE_MODE_KEY, &mode)?;
+    audit(
+        t,
+        actor,
+        "cluster-handoff-cancel",
+        "",
+        json!({
+            "partition":partition,
+            "owner":local,
+            "term":expected_term,
+            "cancelled_pending_owner":expected_pending_owner,
+            "cancelled_pending_term":expected_pending_term,
+            "state_sequence":sequence
+        }),
+    )?;
+    Ok(json!({"ownership":next,"node_mode":mode,"state_sequence":sequence}))
+}
+
 pub fn operator_takeover(
     t: &mut Table,
     actor: &str,
@@ -1400,13 +1458,36 @@ pub fn status(t: &Table, accepting: bool) -> Result<Value> {
         .collect();
     let mode = must(t, NODE_MODE_KEY)?;
     let configured = !required_peers(t)?.is_empty();
+    let state_debt_operations = peers
+        .iter()
+        .map(|peer| peer["state_lag_operations"].as_u64().unwrap_or(0))
+        .sum::<u64>();
+    let state_debt_bytes = peers
+        .iter()
+        .map(|peer| peer["state_lag_bytes"].as_u64().unwrap_or(0))
+        .sum::<u64>();
+    let current = now()?;
+    let synchronized = configured
+        && debt_operations == 0
+        && state_debt_operations == 0
+        && peers.iter().all(|peer| {
+            ["outbound_health", "inbound_health"]
+                .iter()
+                .all(|direction| {
+                    let health = &peer[*direction];
+                    health["ok"] == true
+                        && health["at"]
+                            .as_i64()
+                            .is_some_and(|at| (0..=30).contains(&current.saturating_sub(at)))
+                })
+        });
     Ok(json!({
         "protocol_version":PROTOCOL_VERSION,
         "minimum_protocol_version":MIN_PROTOCOL_VERSION,
         "cluster_id":node["cluster_id"],
         "node_id":node_id,
         "topology":if configured { "authenticated-peer-log" } else { "standalone-foundation" },
-        "synchronized":false,
+        "synchronized":synchronized,
         "placement_generation":node["placement_generation"],
         "accepting":accepting && mode["acceptance_eligible"] == true,
         "node_mode":mode,
@@ -1417,7 +1498,7 @@ pub fn status(t: &Table, accepting: bool) -> Result<Value> {
         "peers":peers,
         "inbound":inbound,
         "replication_debt":{"operations":debt_operations,"bytes":debt_bytes,"oldest_seconds":oldest_seconds},
-        "state_replication_debt":{"operations":peers.iter().map(|peer| peer["state_lag_operations"].as_u64().unwrap_or(0)).sum::<u64>(),"bytes":peers.iter().map(|peer| peer["state_lag_bytes"].as_u64().unwrap_or(0)).sum::<u64>()},
+        "state_replication_debt":{"operations":state_debt_operations,"bytes":state_debt_bytes},
         "health":if configured { "peer-transport" } else { "foundation" }
     }))
 }

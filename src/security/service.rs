@@ -55,6 +55,149 @@ fn acquire_scan(active: &AtomicUsize, limit: usize) -> Result<ScanPermit<'_>> {
     Ok(ScanPermit(active))
 }
 
+fn operational_alerts(
+    scanner: &Value,
+    jobs: &Value,
+    storage_host: &Value,
+    cluster: &Value,
+    current: i64,
+) -> Value {
+    let mut alerts = Vec::new();
+    let receive_records = scanner["receive_records"].as_u64().unwrap_or(0);
+    let oldest_pending = scanner["oldest_pending_seconds"].as_u64().unwrap_or(0);
+    if receive_records > 0 && scanner["online"] != true {
+        alerts.push(json!({
+            "id":"scanner-unavailable",
+            "severity":"critical",
+            "category":"scanning",
+            "title":"Scanner unavailable with accepted mail waiting",
+            "detail":format!("{receive_records} receive record(s) are durably queued; SMTP acceptance can continue within configured capacity."),
+            "value":receive_records
+        }));
+    }
+    if oldest_pending >= 300 {
+        alerts.push(json!({
+            "id":"scan-backlog-age",
+            "severity":if oldest_pending >= 900 { "critical" } else { "warning" },
+            "category":"scanning",
+            "title":"Receive queue age exceeds the operating threshold",
+            "detail":format!("The oldest accepted record has waited {oldest_pending} seconds for analysis."),
+            "value":oldest_pending,
+            "unit":"seconds"
+        }));
+    }
+    for (state, severity, title) in [
+        (
+            "uncertain",
+            "critical",
+            "Delivery acknowledgements need review",
+        ),
+        ("failed", "warning", "Delivery jobs have failed"),
+    ] {
+        let count = jobs[state].as_u64().unwrap_or(0);
+        if count > 0 {
+            alerts.push(json!({
+                "id":format!("delivery-{state}"),
+                "severity":severity,
+                "category":"delivery",
+                "title":title,
+                "detail":format!("{count} delivery job(s) are {state}; review before retrying to avoid duplicate delivery."),
+                "value":count
+            }));
+        }
+    }
+    if matches!(storage_host["state"].as_str(), Some("warning" | "critical")) {
+        let severity = storage_host["state"].as_str().unwrap_or("warning");
+        alerts.push(json!({
+            "id":"host-storage-reserve",
+            "severity":severity,
+            "category":"storage",
+            "title":"Host storage reserve needs attention",
+            "detail":format!(
+                "{} bytes remain; SMTP admission fails closed below the {} byte reserve.",
+                storage_host["available_bytes"].as_u64().unwrap_or(0),
+                storage_host["minimum_free_bytes"].as_u64().unwrap_or(0)
+            ),
+            "value":storage_host["available_bytes"],
+            "unit":"bytes"
+        }));
+    }
+    let replication_debt = &cluster["replication_debt"];
+    let debt_operations = replication_debt["operations"].as_u64().unwrap_or(0);
+    let oldest_debt = replication_debt["oldest_seconds"].as_u64().unwrap_or(0);
+    if debt_operations > 0 {
+        alerts.push(json!({
+            "id":"acceptance-replication-debt",
+            "severity":if oldest_debt >= 60 { "critical" } else { "warning" },
+            "category":"replication",
+            "title":"Accepted mail is waiting for replica acknowledgement",
+            "detail":format!("{debt_operations} acceptance operation(s) are outstanding; oldest age is {oldest_debt} seconds."),
+            "value":debt_operations
+        }));
+    }
+    let state_operations = cluster["state_replication_debt"]["operations"]
+        .as_u64()
+        .unwrap_or(0);
+    if state_operations > 0 {
+        alerts.push(json!({
+            "id":"state-replication-debt",
+            "severity":"warning",
+            "category":"replication",
+            "title":"Processing state has not converged",
+            "detail":format!("{state_operations} processing-state operation(s) are waiting for replica acknowledgement."),
+            "value":state_operations
+        }));
+    }
+    if let Some(peers) = cluster["peers"].as_array() {
+        for peer in peers {
+            let peer_id = peer["node_id"].as_str().unwrap_or("unknown");
+            let health = [&peer["outbound_health"], &peer["inbound_health"]];
+            let missing = health.iter().any(|value| value.is_null());
+            let failed = health.iter().any(|value| value["ok"] == false);
+            let stale = health.iter().any(|value| {
+                value["at"]
+                    .as_i64()
+                    .is_none_or(|at| current.saturating_sub(at) > 30)
+            });
+            if missing || failed || stale {
+                let (severity, title, detail) = if failed {
+                    (
+                        "critical",
+                        "Authenticated peer exchange is failing",
+                        format!(
+                            "Gateway {peer_id} reported a failed inbound or outbound peer exchange."
+                        ),
+                    )
+                } else if missing {
+                    (
+                        "warning",
+                        "Peer synchronization is not established",
+                        format!(
+                            "Gateway {peer_id} has not recorded fresh authenticated contact in both directions."
+                        ),
+                    )
+                } else {
+                    (
+                        "warning",
+                        "Authenticated peer contact is stale",
+                        format!(
+                            "Gateway {peer_id} has not completed bidirectional authenticated contact within 30 seconds."
+                        ),
+                    )
+                };
+                alerts.push(json!({
+                    "id":format!("peer-contact-{peer_id}"),
+                    "severity":severity,
+                    "category":"replication",
+                    "title":title,
+                    "detail":detail
+                }));
+            }
+        }
+    }
+    json!({"version":1,"items":alerts})
+}
+
 pub fn event(
     t: &mut Table,
     a: &Actor,
@@ -927,9 +1070,10 @@ Ok(())}
                     Value::Null
                 };
                 let cluster = super::cluster::status(t, settings["enabled"] == true)?;
+                let alerts = operational_alerts(&scanner, &jobs, &storage_host, &cluster, current);
 
                 Ok(json!({
-                "instance":self.config.instance,"workspace":self.config.workspace,"version":1,"storage_schema":2,"tls":self.tls_status()?,"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"storage_host":storage_host,"at":current,"enabled":settings["enabled"],"active":must(t,"active")?,"messages":counts,"jobs":jobs,"bytes":bytes,"scanner":scanner,"delivery":{"configured_workers":settings["delivery_concurrency"],"running_workers":self.delivery_workers.load(Ordering::Acquire),"active":self.delivery_active.load(Ordering::Relaxed),"attempts_since_start":self.delivery_attempts.load(Ordering::Relaxed),"succeeded_since_start":self.delivery_succeeded.load(Ordering::Relaxed),"deferred_since_start":self.delivery_deferred.load(Ordering::Relaxed)},"cluster":cluster,"smtp":{"since":self.started_at,"accepted":self.smtp_accepted.load(Ordering::Relaxed),"deferred":self.smtp_deferred.load(Ordering::Relaxed),"acceptance_storage":self.acceptance.status()},"capacity":capacity,"capabilities":["native-inspection","smtp-gateway","rules","quarantine","digests","workglen","graph","ews","ai-instructions","authenticated-peer-replication","replicated-processing-state","fenced-ownership-operations","native-free-space-admission","cluster-replication-telemetry","bounded-acceptance-group-commit","indexed-concurrent-delivery","bounded-operational-lists","message-journey"],"engine":scan::ENGINE}
+                "instance":self.config.instance,"workspace":self.config.workspace,"version":1,"storage_schema":2,"tls":self.tls_status()?,"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"storage_host":storage_host,"at":current,"enabled":settings["enabled"],"active":must(t,"active")?,"messages":counts,"jobs":jobs,"bytes":bytes,"scanner":scanner,"delivery":{"configured_workers":settings["delivery_concurrency"],"running_workers":self.delivery_workers.load(Ordering::Acquire),"active":self.delivery_active.load(Ordering::Relaxed),"attempts_since_start":self.delivery_attempts.load(Ordering::Relaxed),"succeeded_since_start":self.delivery_succeeded.load(Ordering::Relaxed),"deferred_since_start":self.delivery_deferred.load(Ordering::Relaxed)},"cluster":cluster,"alerts":alerts,"smtp":{"since":self.started_at,"accepted":self.smtp_accepted.load(Ordering::Relaxed),"deferred":self.smtp_deferred.load(Ordering::Relaxed),"acceptance_storage":self.acceptance.status()},"capacity":capacity,"capabilities":["native-inspection","smtp-gateway","rules","quarantine","digests","workglen","graph","ews","ai-instructions","authenticated-peer-replication","replicated-processing-state","fenced-ownership-operations","native-free-space-admission","cluster-replication-telemetry","derived-operational-alerts","bounded-acceptance-group-commit","indexed-concurrent-delivery","bounded-operational-lists","message-journey"],"engine":scan::ENGINE}
                 ))
             }
 
@@ -954,6 +1098,20 @@ Ok(())}
                     s(d, "partition")?,
                     s(d, "new_owner")?,
                     n(d, "expected_term")?,
+                )
+            }
+
+            "cluster-handoff-cancel" => {
+                a.global(&settings)?;
+                ensure!(d["confirm"] == true, "Confirm planned handoff cancellation");
+                super::cluster::cancel_handoff(
+                    t,
+                    &a.id,
+                    s(d, "partition")?,
+                    s(d, "expected_owner")?,
+                    n(d, "expected_term")?,
+                    s(d, "expected_pending_owner")?,
+                    n(d, "expected_pending_term")?,
                 )
             }
 

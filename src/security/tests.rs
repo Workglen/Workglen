@@ -1217,6 +1217,14 @@ fn smtp_acceptance_durably_queues_before_scanning() {
     assert_eq!(status["delivery"]["running_workers"], 0);
     assert_eq!(status["delivery"]["active"], 0);
     assert_eq!(status["scanner"]["retries_since_start"], 0);
+    assert_eq!(status["alerts"]["version"], 1);
+    assert!(
+        status["alerts"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|alert| alert["id"] == "scanner-unavailable" && alert["severity"] == "critical")
+    );
     f.svc.mark_scanner_seen().unwrap();
     f.svc.record_smtp_result(true);
     f.svc.record_smtp_result(false);
@@ -2423,6 +2431,139 @@ fn planned_handoff_and_explicit_takeover_advance_fenced_terms() {
     let converged = b.svc.db.get("ownership/handoff-a").unwrap().unwrap();
     assert_eq!(converged["owner"], "handoff-a");
     assert_eq!(converged["term"], 3);
+}
+
+#[test]
+fn planned_handoff_can_be_cancelled_only_from_the_exact_draining_state() {
+    let a = Fixture::make_instance(false, true, "cancel-a");
+    let b = Fixture::make_instance(false, true, "cancel-b");
+    a.svc
+        .db
+        .write(|table| super::cluster::enable_replication(table, &["cancel-b".into()]))
+        .unwrap();
+    b.svc
+        .db
+        .write(|table| super::cluster::enable_replication(table, &["cancel-a".into()]))
+        .unwrap();
+
+    a.svc
+        .db
+        .write(|table| super::cluster::begin_drain(table, "admin", "cancel-a", "cancel-b", 1))
+        .unwrap();
+    assert!(
+        a.svc
+            .db
+            .write(|table| super::cluster::cancel_handoff(
+                table, "admin", "cancel-a", "cancel-a", 1, "cancel-b", 3,
+            ))
+            .is_err()
+    );
+    let cancelled = a
+        .svc
+        .db
+        .write(|table| {
+            super::cluster::cancel_handoff(table, "admin", "cancel-a", "cancel-a", 1, "cancel-b", 2)
+        })
+        .unwrap();
+    assert_eq!(cancelled["ownership"]["owner"], "cancel-a");
+    assert_eq!(cancelled["ownership"]["state"], "stable");
+    assert_eq!(cancelled["ownership"]["term"], 1);
+    assert_eq!(cancelled["node_mode"]["mode"], "active");
+    assert!(
+        a.svc
+            .db
+            .write(|table| super::cluster::acceptance_eligible(table))
+            .unwrap()
+    );
+    assert!(
+        a.svc
+            .db
+            .write(|table| super::cluster::cancel_handoff(
+                table, "admin", "cancel-a", "cancel-a", 1, "cancel-b", 2,
+            ))
+            .is_err()
+    );
+    assert!(
+        a.svc
+            .db
+            .write(|table| list(table, "audit/"))
+            .unwrap()
+            .iter()
+            .any(|event| event["action"] == "cluster-handoff-cancel")
+    );
+
+    let operations = a
+        .svc
+        .replication_export_state_batch(0, 8, 8 * 1024 * 1024)
+        .unwrap();
+    assert_eq!(operations.len(), 2);
+    assert_eq!(b.svc.replication_apply_state_batch(&operations).unwrap(), 2);
+    let converged = b.svc.db.get("ownership/cancel-a").unwrap().unwrap();
+    assert_eq!(converged["owner"], "cancel-a");
+    assert_eq!(converged["state"], "stable");
+    assert_eq!(converged["term"], 1);
+}
+
+#[test]
+fn synchronized_health_requires_fresh_bidirectional_peer_contact_and_zero_debt() {
+    let f = Fixture::make_instance(false, true, "sync-a");
+    f.svc
+        .db
+        .write(|table| super::cluster::enable_replication(table, &["sync-b".into()]))
+        .unwrap();
+    let before = f.cmd("status", json!({}));
+    assert_eq!(before["cluster"]["synchronized"], false);
+    assert!(
+        before["alerts"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|alert| alert["id"] == "peer-contact-sync-b")
+    );
+
+    f.svc
+        .db
+        .write(|table| {
+            let at = now()?;
+            for direction in ["outbound", "inbound"] {
+                put(
+                    table,
+                    &format!("replication_peer_health/sync-b/{direction}"),
+                    &json!({"peer":"sync-b","direction":direction,"at":at,"ok":true,"error":""}),
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let synchronized = f.cmd("status", json!({}));
+    assert_eq!(synchronized["cluster"]["synchronized"], true);
+    assert!(
+        !synchronized["alerts"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|alert| alert["id"] == "peer-contact-sync-b")
+    );
+
+    f.svc
+        .db
+        .write(|table| {
+            put(
+                table,
+                "replication_peer_health/sync-b/outbound",
+                &json!({"peer":"sync-b","direction":"outbound","at":now()?-31,"ok":true,"error":""}),
+            )
+        })
+        .unwrap();
+    let stale = f.cmd("status", json!({}));
+    assert_eq!(stale["cluster"]["synchronized"], false);
+    assert!(
+        stale["alerts"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|alert| alert["id"] == "peer-contact-sync-b" && alert["severity"] == "warning")
+    );
 }
 
 #[test]

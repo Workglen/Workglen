@@ -160,6 +160,16 @@ label small { display: block; margin-top: 5px; }
 .steps .current { background: var(--green-dark); color: #fff; }
 .warning { padding: 12px 14px; border-left: 3px solid #d29a36; border-radius: 7px; background: #fff7e5; color: #74531c !important; }
 .danger-callout { padding: 13px 15px; border: 1px solid #e8b4ae; border-left: 4px solid var(--red); border-radius: 8px; background: #fff0ee; color: #782820 !important; font-weight: 650; }
+.operations-alerts { display: grid; gap: 10px; margin-bottom: 18px; padding: 18px; border: 2px solid #b87513; border-radius: 12px; background: #fffbf5; box-shadow: 0 8px 24px rgba(92, 24, 18, .08); }
+.operations-alerts.critical { border-color: #9a332b; background: #fff8f6; }
+.operations-alert-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.operations-alert-heading h2 { margin: 2px 0 0; }
+.operations-alert { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 15px; border: 1px solid #e4c5a0; border-left: 6px solid #b87513; border-radius: 8px; background: #fff; }
+.operations-alert.critical { border-color: #e3aaa5; border-left-color: #a1261c; background: #fff0ee; }
+.operations-alert strong, .operations-alert p, .alert-kicker { display: block; }
+.operations-alert p { margin: 4px 0 0; }
+.alert-kicker { margin-bottom: 3px; color: #74420c; font-size: .72rem; font-weight: 800; letter-spacing: .08em; }
+.operations-alert.critical .alert-kicker { color: #8a1f17; }
 .queue-filter-grid { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); align-items: end; gap: 10px 14px; margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #f9fbf9; }
 .queue-filter-grid label { min-width: 0; margin: 0; }
 .queue-filter-grid input, .queue-filter-grid select { max-width: none; }
@@ -302,6 +312,7 @@ footer { max-width: 1440px; margin: 0 auto; padding: 24px; color: #7c8983; font-
   .security-metric strong { font-size: 20px; }
   .task-link { display: none; }
   .operations-grid, .queue-filter-grid, .journey-facts { grid-template-columns: 1fr; }
+  .operations-alert { align-items: flex-start; flex-direction: column; }
   .operations-foot { align-items: flex-start; flex-direction: column; }
   .journey-drawer { padding: 20px; }
 }

@@ -7,7 +7,7 @@ This backlog records future work. An item here is not a claim that the saved rel
 ## SEC-INGRESS-01 — Durable acceptance during scanner upgrades
 
 **Priority:** P0 availability and loss-prevention boundary.
-**Status:** Implemented in source; external Ubuntu/systemd and sustained fault/load validation remain required before production readiness.
+**Status:** Implemented in source. A guarded target-host campaign runner and runbook now cover Ubuntu/systemd preflight, 10k/25k/50k SMTP injection, scanner replacement, optional actual package-upgrade execution, evidence capture and backlog drain; external execution, soak, physical disk-full and power-loss validation remain required before production readiness.
 
 - SMTP now performs bounded protocol, enabled-recipient and configured-capacity checks, then commits exact original MIME, envelope, observed peer, active immutable rule version and a versioned analysis-settings snapshot as `pending-scan` before returning `250`.
 - `security-serve` remains the sole encrypted-store owner. The same native executable provides a separately restartable `security-scan-worker` role using an owner-only bounded Unix socket, version handshake and renewable token-bound claims. The worker renews active leases every 30 seconds; stale tokens are refused, cancellation is checked at bounded analysis phase boundaries, and a control-service restart immediately invalidates and requeues its orphaned leases. No external scanner/runtime/database was added.
@@ -26,8 +26,8 @@ Synthetic local evidence recorded 2026-11-04 (not production sizing):
 
 Remaining hardening/operations work:
 
-- Repeat sustained network-level SMTP injection while replacing the scanner service on the intended Ubuntu/systemd host and during an actual package upgrade; include systemd restart ordering, longer outage/soak periods, real filesystem-full behavior, host power-loss fault injection and backlog recovery measurements. The local macOS simulations cover actual scanner `SIGKILL`, state-machine lease replacement, logical quota exhaustion and encrypted-store interrupted-write recovery, not those host-specific behaviors.
-- Connect the exposed scanner freshness, oldest-pending age, receive depth/state, scan-retry/SMTP counters, logical capacity and native host free-space telemetry to deployment alerts. SMTP admission now reserves a configurable host-filesystem floor through a first-party native facility and fails closed; real disk-full and alert-delivery validation on Ubuntu remain required.
+- Execute [the guarded Ubuntu campaign](MAIL-SECURITY-UBUNTU-CAMPAIGN.md) on the intended disposable systemd host, including its optional reviewed package-upgrade driver, then add longer outage/soak periods, real filesystem-full behavior, host power-loss fault injection and startup rebuild/retention measurements. The runner is source capability, not completed external evidence. The local macOS simulations cover actual scanner `SIGKILL`, state-machine lease replacement, logical quota exhaustion and encrypted-store interrupted-write recovery, not those host-specific behaviors.
+- Versioned status now derives critical/warning alerts for scanner unavailability, old receive work, uncertain/failed delivery, replication debt, stale/failed bidirectional peer contact and host free-space reserve, and Central Admin renders them as a high-contrast cluster-wide action panel. External alert delivery, acknowledgement/deduplication policy and Ubuntu delivery validation remain required. SMTP admission reserves a configurable host-filesystem floor and fails closed.
 - Define and test an explicit N/N-1 worker-protocol compatibility window before the first protocol change. Version 1 currently refuses mismatches before work is claimed.
 - A restart of `security-serve` itself still relies on ordinary SMTP sender retry. Listener-FD handoff or independently spooling dual ingress nodes remains a later availability increment; no shared multi-gateway spool is claimed.
 
@@ -59,7 +59,7 @@ Remaining before production sizing:
 ## SEC-HA-02 — Synchronized dual-node acceptance with fenced delivery ownership
 
 **Priority:** P0 availability and accepted-mail durability.
-**Status:** Implemented in source as a pre-production two-node availability slice: authenticated verified-TLS/HMAC peer transport, durable peer acknowledgement before SMTP `250`, bounded explicit degraded acceptance, ordered acceptance and later-state logs, immutable replay receipts with gap/conflict checks, full-log bootstrap/resync, fenced planned handoff, guarded operator takeover and Admin controls. A strict-mode message returned with SMTP `451` stays non-runnable and is automatically tombstoned on every replica if a peer acknowledgement arrives late. A complete native two-node loopback fixture passes acceptance, state catch-up, delivery, scanner upgrade, central outage and encrypted restart. Production synchronized HA is still not claimed: Ubuntu multi-host fault/scale work, interrupted handoff/takeover campaigns, real disk-full/power-loss tests, N/N-1 rolling compatibility and bounded compact snapshots/log retention remain open.
+**Status:** Implemented in source as a pre-production two-node availability slice: authenticated verified-TLS/HMAC peer transport, durable peer acknowledgement before SMTP `250`, bounded explicit degraded acceptance, ordered acceptance and later-state logs, immutable replay receipts with gap/conflict checks, full-log bootstrap/resync, fenced planned handoff with exact-state cancellation, guarded operator takeover and Admin controls. A strict-mode message returned with SMTP `451` stays non-runnable and is automatically tombstoned on every replica if a peer acknowledgement arrives late. A complete native two-node loopback fixture passes acceptance, state catch-up, delivery, scanner upgrade, central outage and encrypted restart. Production synchronized HA is still not claimed: Ubuntu multi-host fault/scale work, interrupted handoff/takeover/cancellation campaigns, real disk-full/power-loss tests, N/N-1 rolling compatibility and bounded compact snapshots/log retention remain open.
 
 - Publish two MX receivers. Both durably accept, spool, scan and deliver the messages they own. Every message/ownership partition has exactly one fenced delivery owner, normally its accepting node; placement peers hold non-delivering replicas.
 - Healthy acceptance requires local plus peer durable commit before `250`. Explicit maintenance-only degraded acceptance may use one durable copy with bounded, visible replication debt.
@@ -69,6 +69,14 @@ Remaining before production sizing:
 
 The complete protocol, state, security, observability, handoff and fault-test requirements are in [MAIL-SECURITY-REPLICATION.md](MAIL-SECURITY-REPLICATION.md). The staged source slice is implemented; continue the remaining activation gates in the order defined there and do not describe the current same-host pre-production evidence as production synchronized HA.
 
+The guarded [two-host activation campaign](MAIL-SECURITY-HA-ACTIVATION.md) now
+defines the physical-host preflight, balanced/skew traffic, strict peer-loss,
+drain/cancel/handoff, fenced takeover, resync, rolling-upgrade and destructive
+fault order. The Ubuntu runner can authenticate to both nodes and refuses an
+execute run unless identities, protocol windows, reciprocal membership, fresh
+bidirectional contact and both debt counters are healthy. This is executable
+source and a runbook, not completed multi-host evidence.
+
 The protocol must remain extensible beyond two nodes: versioned rendezvous placement, bounded replication factors, per-origin ordered logs and placement generations instead of full-mesh replication. Delivery ownership is partitioned initially by accepting/origin node and may later use tenant/domain/route partitions; every partition retains exactly one fenced owner term.
 
 Central Admin must provide an authenticated cluster view with stable node identity, version compatibility, acceptance/scanner/delivery eligibility, ownership terms, replication lag/debt/gaps, queue age, capacity and degraded/fenced health. Separate audited permissions cover read-only health, normal drain/exclude/rejoin/resync/handoff operations, and high-risk operator takeover. See the Admin section of [MAIL-SECURITY-REPLICATION.md](MAIL-SECURITY-REPLICATION.md).
@@ -76,7 +84,7 @@ Central Admin must provide an authenticated cluster view with stable node identi
 ## SEC-OPS-04 — Cluster mail operations console
 
 **Priority:** P0 operator safety and queue visibility.
-**Status:** Implemented in source for cluster aggregation, per-message/job actions, native host-free-space state, planned drain/handoff, log resync/rejoin and separately permissioned forced takeover. Browser-source parsing and interactive browser-surface review pass; the dependency-free synthetic Playwright fixture remains for the established browser-test lane because Playwright is not installed locally.
+**Status:** Implemented in source for cluster aggregation, per-message/job actions, native host-free-space state, derived high-contrast operational alerts, planned drain/handoff/cancellation, log resync/rejoin and separately permissioned forced takeover. Browser-source parsing and interactive browser-surface review pass; the dependency-free synthetic Playwright fixture remains for the established browser-test lane because Playwright is not installed locally.
 
 - Operations aggregates reachable registered gateways and exposes receive depth/oldest age, scanner and delivery utilization, quarantine, delivery review, protected-storage utilization, node health and replication debt. Unavailable and stale nodes remain visible rather than disappearing from totals.
 - Receive Queue exposes bounded, cursor-based, mailbox/domain-scoped ingress summaries without message content. Quarantine defaults to only active quarantines, separates release-queued and history records, and filters by reason, release eligibility, hold, search and gateway. Delivery Jobs defaults to failed/uncertain work and separates active, queued/retrying and history records.
@@ -87,8 +95,8 @@ Central Admin must provide an authenticated cluster view with stable node identi
 
 Remaining operations work:
 
-- Add alert delivery for stale peers, replication debt, scanner age, queue age and host free-space warning/critical state.
-- Add exclude/cancel-handoff and content-hash reconciliation workflows; current resync replays the complete retained ordered logs and pauses acceptance until both debts reach zero.
+- Deliver the new versioned alert state to configured external destinations with bounded retries and deduplication/acknowledgement; peer-contact alerts and the Admin action panel are implemented, but they are not external paging.
+- Add exclude and content-hash reconciliation workflows. Cancel-handoff is now exact-state checked, replicated and audited; current resync replays the complete retained ordered logs and pauses acceptance until both debts reach zero.
 - Run the synthetic fixture in the supported Playwright/Chromium lane and perform automated accessibility plus keyboard review with representative 10k/25k queue data. Interactive accessibility-tree and narrow-screen checks pass locally.
 
 ## SEC-RELAY-03 — Ubuntu test deployment sign-off
