@@ -1,4 +1,7 @@
 /target/
+/tmp/
+/validation/f4-f5-f8-local/
+.DS_Store
 *.redb
 *.pem
 *.key
