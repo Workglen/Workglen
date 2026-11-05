@@ -46,6 +46,31 @@ fn mac(key: &[u8], pieces: &[&[u8]]) -> io::Result<[u8; 32]> {
     signer.finalize().try_into().map_err(crypto)
 }
 
+fn private_regular_file(
+    path: &Path,
+    file: &File,
+    message: &'static str,
+) -> io::Result<std::fs::Metadata> {
+    // O_NOFOLLOW is the primary atomic defense. Verify the pathname as well so
+    // unusual filesystems or platforms cannot silently weaken the boundary,
+    // and so a rename between lookup and open fails closed.
+    let path_meta = std::fs::symlink_metadata(path)?;
+    let file_meta = file.metadata()?;
+    if path_meta.file_type().is_symlink()
+        || !path_meta.is_file()
+        || !file_meta.is_file()
+        || path_meta.mode() & 0o077 != 0
+        || file_meta.mode() & 0o077 != 0
+        || path_meta.nlink() != 1
+        || file_meta.nlink() != 1
+        || path_meta.dev() != file_meta.dev()
+        || path_meta.ino() != file_meta.ino()
+    {
+        return Err(invalid(message));
+    }
+    Ok(file_meta)
+}
+
 /// A 256-bit random key, supplied by the operator or generated locally.
 /// Debug never includes the key; APIs never serialize it.
 pub struct Key([u8; 32]);
@@ -60,12 +85,11 @@ impl Key {
             .read(true)
             .custom_flags(NOFOLLOW)
             .open(path)?;
-        let meta = file.metadata()?;
-        if !meta.is_file() || meta.mode() & 0o077 != 0 || meta.nlink() != 1 {
-            return Err(invalid(
-                "Storage key must be a regular, owner-only file with one link",
-            ));
-        }
+        private_regular_file(
+            path,
+            &file,
+            "Storage key must be a regular, owner-only file with one link",
+        )?;
         let mut bytes = Vec::new();
         Read::by_ref(&mut file).take(67).read_to_end(&mut bytes)?;
         let mut key = [0; 32];
@@ -202,12 +226,11 @@ impl State {
             }
             Err(e) => return Err(e),
         };
-        let metadata = file.metadata()?;
-        if !metadata.is_file() || metadata.mode() & 0o077 != 0 || metadata.nlink() != 1 {
-            return Err(invalid(
-                "Encrypted database must be a regular owner-only file with one link",
-            ));
-        }
+        let metadata = private_regular_file(
+            path,
+            &file,
+            "Encrypted database must be a regular owner-only file with one link",
+        )?;
         let mut header = [0; HEADER];
         file.read_exact_at(&mut header, 0)?;
         if &header[..8] != MAGIC {

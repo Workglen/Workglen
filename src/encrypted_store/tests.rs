@@ -47,6 +47,21 @@ fn unsafe_key_files_are_rejected() {
 }
 
 #[test]
+fn unsafe_database_files_are_rejected() {
+    let (dir, path, key) = fixture();
+    drop(open(&path, &key));
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(EncryptedBackend::open(&path, Key::load(&key).unwrap()).is_err());
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let alias = dir.path().join("database-alias");
+    symlink(&path, &alias).unwrap();
+    assert!(EncryptedBackend::open(&alias, Key::load(&key).unwrap()).is_err());
+    std::fs::remove_file(&alias).unwrap();
+    std::fs::hard_link(&path, &alias).unwrap();
+    assert!(EncryptedBackend::open(&path, Key::load(&key).unwrap()).is_err());
+}
+
+#[test]
 fn encrypted_redb_roundtrip_hides_keys_values_and_headers() {
     use redb::TableDefinition;
     const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("sensitive-metadata");

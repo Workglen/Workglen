@@ -861,6 +861,7 @@ Ok(())}
                 "identities",
                 "remediation-review",
                 "learning",
+                "cluster-reconcile",
             ]
             .contains(&c.action.as_str())
             {
@@ -1073,8 +1074,22 @@ Ok(())}
                 let alerts = operational_alerts(&scanner, &jobs, &storage_host, &cluster, current);
 
                 Ok(json!({
-                "instance":self.config.instance,"workspace":self.config.workspace,"version":1,"storage_schema":2,"tls":self.tls_status()?,"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"storage_host":storage_host,"at":current,"enabled":settings["enabled"],"active":must(t,"active")?,"messages":counts,"jobs":jobs,"bytes":bytes,"scanner":scanner,"delivery":{"configured_workers":settings["delivery_concurrency"],"running_workers":self.delivery_workers.load(Ordering::Acquire),"active":self.delivery_active.load(Ordering::Relaxed),"attempts_since_start":self.delivery_attempts.load(Ordering::Relaxed),"succeeded_since_start":self.delivery_succeeded.load(Ordering::Relaxed),"deferred_since_start":self.delivery_deferred.load(Ordering::Relaxed)},"cluster":cluster,"alerts":alerts,"smtp":{"since":self.started_at,"accepted":self.smtp_accepted.load(Ordering::Relaxed),"deferred":self.smtp_deferred.load(Ordering::Relaxed),"acceptance_storage":self.acceptance.status()},"capacity":capacity,"capabilities":["native-inspection","smtp-gateway","rules","quarantine","digests","workglen","graph","ews","ai-instructions","authenticated-peer-replication","replicated-processing-state","fenced-ownership-operations","native-free-space-admission","cluster-replication-telemetry","derived-operational-alerts","bounded-acceptance-group-commit","indexed-concurrent-delivery","bounded-operational-lists","message-journey"],"engine":scan::ENGINE}
+                "instance":self.config.instance,"workspace":self.config.workspace,"version":1,"storage_schema":2,"tls":self.tls_status()?,"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"storage_host":storage_host,"at":current,"enabled":settings["enabled"],"active":must(t,"active")?,"messages":counts,"jobs":jobs,"bytes":bytes,"scanner":scanner,"delivery":{"configured_workers":settings["delivery_concurrency"],"running_workers":self.delivery_workers.load(Ordering::Acquire),"active":self.delivery_active.load(Ordering::Relaxed),"attempts_since_start":self.delivery_attempts.load(Ordering::Relaxed),"succeeded_since_start":self.delivery_succeeded.load(Ordering::Relaxed),"deferred_since_start":self.delivery_deferred.load(Ordering::Relaxed)},"cluster":cluster,"alerts":alerts,"smtp":{"since":self.started_at,"accepted":self.smtp_accepted.load(Ordering::Relaxed),"deferred":self.smtp_deferred.load(Ordering::Relaxed),"acceptance_storage":self.acceptance.status()},"capacity":capacity,"capabilities":["native-inspection","smtp-gateway","rules","quarantine","digests","workglen","graph","ews","ai-instructions","authenticated-peer-replication","replicated-processing-state","fenced-ownership-operations","native-free-space-admission","cluster-replication-telemetry","content-hash-reconciliation","safe-node-exclusion","derived-operational-alerts","bounded-acceptance-group-commit","indexed-concurrent-delivery","bounded-operational-lists","message-journey"],"engine":scan::ENGINE}
                 ))
+            }
+
+            "cluster-reconcile" => {
+                a.global(&settings)?;
+                super::cluster::reconciliation(t)
+            }
+
+            "cluster-compact" => {
+                a.global(&settings)?;
+                ensure!(
+                    d["confirm"] == true,
+                    "Confirm bounded replication compaction"
+                );
+                super::cluster::compact_logs(t, &a.id)
             }
 
             "cluster-drain" => {
@@ -1137,6 +1152,12 @@ Ok(())}
                 a.global(&settings)?;
                 ensure!(d["confirm"] == true, "Confirm cluster rejoin");
                 super::cluster::rejoin(t, &a.id)
+            }
+
+            "cluster-exclude" => {
+                a.global(&settings)?;
+                ensure!(d["confirm"] == true, "Confirm safe node exclusion");
+                super::cluster::exclude(t, &a.id)
             }
 
             "cluster-resync" => {

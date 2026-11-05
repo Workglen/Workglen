@@ -98,11 +98,79 @@ fn record_contact(service: &Service, peer: &str, direction: &str, error: Option<
     });
 }
 
+fn supported_range(value: &Value) -> Result<(u64, u64, u64)> {
+    let protocol = value["protocol"]
+        .as_u64()
+        .ok_or_else(|| crate::error!("Missing replication protocol"))?;
+    let wire_minimum = value["minimum_protocol"].as_u64().unwrap_or(protocol);
+    let wire_maximum = value["maximum_protocol"].as_u64().unwrap_or(protocol);
+    let minimum = value["supported_minimum_protocol"]
+        .as_u64()
+        .unwrap_or(wire_minimum);
+    let maximum = value["supported_maximum_protocol"]
+        .as_u64()
+        .unwrap_or(wire_maximum);
+    ensure!(
+        wire_minimum <= protocol
+            && protocol <= wire_maximum
+            && minimum <= protocol
+            && protocol <= maximum
+            && minimum <= maximum
+            && (super::cluster::MIN_PROTOCOL_VERSION..=super::cluster::PROTOCOL_VERSION)
+                .contains(&protocol)
+            && minimum <= super::cluster::PROTOCOL_VERSION
+            && maximum >= super::cluster::MIN_PROTOCOL_VERSION,
+        "Incompatible replication protocol window"
+    );
+    Ok((protocol, minimum, maximum))
+}
+
+fn selected_peer_protocol(service: &Service, peer: &str) -> Result<u64> {
+    service.db.write(|table| {
+        let maximum = get(table, &format!("replication_peer_protocol/{peer}"))?
+            .and_then(|value| value["maximum_protocol"].as_u64())
+            .unwrap_or(super::cluster::MIN_PROTOCOL_VERSION);
+        let selected = maximum.min(super::cluster::PROTOCOL_VERSION);
+        ensure!(
+            selected >= super::cluster::MIN_PROTOCOL_VERSION,
+            "Replication peer has no compatible protocol"
+        );
+        Ok(selected)
+    })
+}
+
+fn record_peer_protocol(
+    service: &Service,
+    peer: &str,
+    direction: &str,
+    selected: u64,
+    minimum: u64,
+    maximum: u64,
+) -> Result<()> {
+    service.db.write(|table| {
+        put(
+            table,
+            &format!("replication_peer_protocol/{peer}"),
+            &json!({
+                "peer":peer,
+                "direction":direction,
+                "selected_protocol":selected,
+                "minimum_protocol":minimum,
+                "maximum_protocol":maximum,
+                "compatible":minimum <= super::cluster::PROTOCOL_VERSION
+                    && maximum >= super::cluster::MIN_PROTOCOL_VERSION,
+                "at":now()?
+            }),
+        )
+    })
+}
+
 pub(super) fn sync_peer_once(
     service: &Service,
     peer_config: &ReplicationPeer,
     timeout: Duration,
 ) -> Result<u64> {
+    let protocol = selected_peer_protocol(service, &peer_config.node_id)?;
     let after = acknowledged(service, &peer_config.node_id)?;
     let batch = service.replication_export_batch(after, MAX_BATCH_OPERATIONS, MAX_BATCH_BYTES)?;
     let state_after = state_acknowledged(service, &peer_config.node_id)?;
@@ -125,9 +193,11 @@ pub(super) fn sync_peer_once(
         })
         .collect::<Vec<_>>();
     let envelope = json!({
-        "protocol":super::cluster::PROTOCOL_VERSION,
+        "protocol":protocol,
         "minimum_protocol":super::cluster::MIN_PROTOCOL_VERSION,
         "maximum_protocol":super::cluster::PROTOCOL_VERSION,
+        "supported_minimum_protocol":super::cluster::MIN_PROTOCOL_VERSION,
+        "supported_maximum_protocol":super::cluster::PROTOCOL_VERSION,
         "cluster_id":service.config.workspace,
         "source_node":service.config.instance,
         "target_node":peer_config.node_id,
@@ -160,15 +230,22 @@ pub(super) fn sync_peer_once(
             .as_str()
             .unwrap_or("Replication peer refused the batch")
     );
+    let (response_protocol, peer_minimum, peer_maximum) = supported_range(&value)?;
     ensure!(
-        value["protocol"] == super::cluster::PROTOCOL_VERSION
-            && value["minimum_protocol"] == super::cluster::MIN_PROTOCOL_VERSION
-            && value["maximum_protocol"] == super::cluster::PROTOCOL_VERSION
+        response_protocol == protocol
             && value["cluster_id"] == service.config.workspace
             && value["source_node"] == peer_config.node_id
             && value["target_node"] == service.config.instance,
         "Invalid replication acknowledgement identity"
     );
+    record_peer_protocol(
+        service,
+        &peer_config.node_id,
+        "outbound",
+        response_protocol,
+        peer_minimum,
+        peer_maximum,
+    )?;
     let sequence = n(&value, "acknowledged_sequence")?;
     if sequence > 0 {
         service.replication_acknowledge(&peer_config.node_id, sequence)?;
@@ -282,15 +359,9 @@ pub(super) fn wait_for_state(service: &Service, sequence: u64) -> Result<()> {
 pub(super) fn receive(service: &Service, raw: &[u8], supplied_signature: &str) -> Result<Value> {
     ensure!(raw.len() <= MAX_WIRE_BODY, "Replication request too large");
     let envelope: Value = pratique::json_value::from_slice(raw)?;
+    let (protocol, peer_minimum, peer_maximum) = supported_range(&envelope)?;
     ensure!(
-        envelope["protocol"] == super::cluster::PROTOCOL_VERSION
-            && envelope["minimum_protocol"]
-                .as_u64()
-                .is_some_and(|minimum| minimum <= super::cluster::PROTOCOL_VERSION)
-            && envelope["maximum_protocol"]
-                .as_u64()
-                .is_some_and(|maximum| maximum >= super::cluster::MIN_PROTOCOL_VERSION)
-            && envelope["cluster_id"] == service.config.workspace
+        envelope["cluster_id"] == service.config.workspace
             && envelope["target_node"] == service.config.instance,
         "Wrong replication protocol, cluster or target"
     );
@@ -332,6 +403,14 @@ pub(super) fn receive(service: &Service, raw: &[u8], supplied_signature: &str) -
         );
         put(table, &nonce_key, &json!(now()? + 120))
     })?;
+    record_peer_protocol(
+        service,
+        source,
+        "inbound",
+        protocol,
+        peer_minimum,
+        peer_maximum,
+    )?;
 
     let encoded = envelope["operations"]
         .as_array()
@@ -396,10 +475,17 @@ pub(super) fn receive(service: &Service, raw: &[u8], supplied_signature: &str) -
         service.replication_apply_state_batch(&state_operations)?
     };
     record_contact(service, source, "inbound", None);
+    let response_minimum = if protocol == super::cluster::MIN_PROTOCOL_VERSION {
+        protocol
+    } else {
+        super::cluster::MIN_PROTOCOL_VERSION
+    };
     Ok(json!({
-        "protocol":super::cluster::PROTOCOL_VERSION,
-        "minimum_protocol":super::cluster::MIN_PROTOCOL_VERSION,
-        "maximum_protocol":super::cluster::PROTOCOL_VERSION,
+        "protocol":protocol,
+        "minimum_protocol":response_minimum,
+        "maximum_protocol":protocol,
+        "supported_minimum_protocol":super::cluster::MIN_PROTOCOL_VERSION,
+        "supported_maximum_protocol":super::cluster::PROTOCOL_VERSION,
         "cluster_id":service.config.workspace,
         "source_node":service.config.instance,
         "target_node":source,
@@ -426,4 +512,131 @@ pub(super) fn start(service: &Arc<Service>) -> Result<Option<std::thread::JoinHa
                 }
             })?,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn replicated_service() -> (crate::test_support::TempDir, Arc<Service>, String) {
+        let directory = crate::test_support::tempdir().unwrap();
+        let control_key = directory.path().join("control.key");
+        let peer_key = directory.path().join("peer.key");
+        let storage_key = directory.path().join("storage.key");
+        std::fs::write(&control_key, "c".repeat(64)).unwrap();
+        std::fs::write(&peer_key, "p".repeat(64)).unwrap();
+        for path in [&control_key, &peer_key] {
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        crate::encrypted_store::generate_key(&storage_key).unwrap();
+        let config: super::super::model::Config = pratique::json_value::from_value(json!({
+            "data_dir":directory.path().join("data"),
+            "storage_key_file":storage_key,
+            "workspace":"compatibility-cluster",
+            "instance":"node-b",
+            "origin":"https://node-b.example.test:8445",
+            "hostname":"node-b.example.test",
+            "tls_cert":"unused",
+            "tls_key":"unused",
+            "control_key_file":control_key,
+            "smtp_listen":["127.0.0.1",2525],
+            "https_listen":["127.0.0.1",8445],
+            "routes":{},
+            "connectors":{},
+            "replication":{
+                "peers":[{
+                    "node_id":"node-a",
+                    "origin":"https://node-a.example.test:8445",
+                    "key_file":peer_key
+                }],
+                "durable_copies":2,
+                "acknowledgement_timeout_seconds":1,
+                "degraded_acceptance":false,
+                "max_degraded_operations":0,
+                "max_degraded_bytes":0
+            }
+        }))
+        .unwrap();
+        (directory, Service::open(config).unwrap(), "p".repeat(64))
+    }
+
+    #[test]
+    fn replication_protocol_window_accepts_n_minus_one_and_rejects_gaps() {
+        assert_eq!(
+            supported_range(&json!({
+                "protocol":1,
+                "minimum_protocol":1,
+                "maximum_protocol":1
+            }))
+            .unwrap(),
+            (1, 1, 1)
+        );
+        assert_eq!(
+            supported_range(&json!({
+                "protocol":1,
+                "minimum_protocol":1,
+                "maximum_protocol":1,
+                "supported_minimum_protocol":1,
+                "supported_maximum_protocol":2
+            }))
+            .unwrap(),
+            (1, 1, 2)
+        );
+        assert_eq!(
+            supported_range(&json!({
+                "protocol":2,
+                "minimum_protocol":1,
+                "maximum_protocol":2
+            }))
+            .unwrap(),
+            (2, 1, 2)
+        );
+        assert!(
+            supported_range(&json!({
+                "protocol":3,
+                "minimum_protocol":3,
+                "maximum_protocol":3
+            }))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn current_replication_receiver_serves_a_legacy_peer_and_then_negotiates_current() {
+        let (_directory, service, secret) = replicated_service();
+        let request = |protocol: u64, maximum: u64| {
+            json!({
+                "protocol":protocol,
+                "minimum_protocol":1,
+                "maximum_protocol":maximum,
+                "supported_minimum_protocol":1,
+                "supported_maximum_protocol":maximum,
+                "cluster_id":"compatibility-cluster",
+                "source_node":"node-a",
+                "target_node":"node-b",
+                "at":now().unwrap(),
+                "nonce":id(),
+                "operations":[],
+                "state_operations":[]
+            })
+        };
+        let legacy_raw = pratique::json_value::to_vec(&request(1, 1)).unwrap();
+        let legacy = receive(&service, &legacy_raw, &signature(&secret, &legacy_raw)).unwrap();
+        assert_eq!(legacy["protocol"], 1);
+        assert_eq!(legacy["minimum_protocol"], 1);
+        assert_eq!(legacy["maximum_protocol"], 1);
+        assert_eq!(
+            legacy["supported_maximum_protocol"],
+            super::super::cluster::PROTOCOL_VERSION
+        );
+        assert_eq!(selected_peer_protocol(&service, "node-a").unwrap(), 1);
+
+        let current_raw = pratique::json_value::to_vec(&request(2, 2)).unwrap();
+        let current = receive(&service, &current_raw, &signature(&secret, &current_raw)).unwrap();
+        assert_eq!(current["protocol"], 2);
+        assert_eq!(current["minimum_protocol"], 1);
+        assert_eq!(current["maximum_protocol"], 2);
+        assert_eq!(selected_peer_protocol(&service, "node-a").unwrap(), 2);
+    }
 }

@@ -23,7 +23,9 @@ use std::{
     time::Duration,
 };
 
-pub(super) const PROTOCOL_VERSION: u64 = 1;
+pub(super) const PROTOCOL_VERSION: u64 = 2;
+pub(super) const MIN_PROTOCOL_VERSION: u64 = 1;
+const COMPATIBILITY_HELLO_PROTOCOL: u64 = 1;
 const LEASE_SECONDS: i64 = 180;
 const HEARTBEAT_SECONDS: u64 = 30;
 const MAX_HELLO: usize = 4096;
@@ -92,18 +94,43 @@ fn read_json(stream: &mut UnixStream, limit: usize) -> Result<Value> {
     )?)?)
 }
 
-fn verify_versions(value: &Value) -> Result<()> {
+fn protocol_range(value: &Value) -> Result<(u64, u64, u64)> {
+    let protocol = value["protocol"]
+        .as_u64()
+        .ok_or_else(|| crate::error!("Missing scan protocol"))?;
+    let minimum = value["minimum_protocol"].as_u64().unwrap_or(protocol);
+    let maximum = value["maximum_protocol"].as_u64().unwrap_or(protocol);
     ensure!(
-        value["protocol"] == PROTOCOL_VERSION,
+        minimum <= protocol
+            && protocol <= maximum
+            && minimum <= maximum
+            && (MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION).contains(&protocol)
+            && minimum <= PROTOCOL_VERSION
+            && maximum >= MIN_PROTOCOL_VERSION,
         "Unsupported scan protocol"
     );
+    Ok((protocol, minimum, maximum))
+}
+
+fn verify_versions(value: &Value) -> Result<u64> {
+    let (protocol, _, _) = protocol_range(value)?;
     ensure!(
         value["api_version"] == scan::ANALYSIS_API_VERSION
             && value["profile_version"] == scan::ANALYSIS_PROFILE_VERSION
             && value["coverage_version"] == scan::COVERAGE_VERSION,
         "Unsupported analysis profile"
     );
-    Ok(())
+    Ok(protocol)
+}
+
+fn negotiate_versions(value: &Value) -> Result<u64> {
+    let (_, remote_minimum, remote_maximum) = protocol_range(value)?;
+    let selected = PROTOCOL_VERSION.min(remote_maximum);
+    ensure!(
+        selected >= MIN_PROTOCOL_VERSION.max(remote_minimum),
+        "No compatible scan protocol"
+    );
+    Ok(selected)
 }
 
 fn scan_record(t: &Table, id: &str, token: &str) -> Result<Value> {
@@ -141,7 +168,12 @@ fn cancellation_requested(value: &Value) -> Result<bool> {
 }
 
 impl Service {
+    #[cfg(test)]
     pub(super) fn claim_scan(&self) -> Result<Option<(Value, Vec<u8>)>> {
+        self.claim_scan_for_protocol(PROTOCOL_VERSION)
+    }
+
+    fn claim_scan_for_protocol(&self, protocol: u64) -> Result<Option<(Value, Vec<u8>)>> {
         self.db.write(|t| {
             use redb::ReadableTable;
 
@@ -209,12 +241,15 @@ impl Service {
             };
             let raw = body(t, &record)?;
             let job = json!({
-                "protocol":PROTOCOL_VERSION,
+                "protocol":protocol,
+                "minimum_protocol":MIN_PROTOCOL_VERSION,
+                "maximum_protocol":PROTOCOL_VERSION,
                 "api_version":record["api_version"],
                 "profile_version":record["profile_version"],
                 "coverage_version":record["coverage_version"],
                 "id":record["id"],
                 "token":record["lease_token"],
+                "scan_generation":record["scan_generation"],
                 "hash":record["hash"],
                 "sender":record["envelope_from"],
                 "source_ip":record["source_ip"],
@@ -231,7 +266,12 @@ impl Service {
         })
     }
 
+    #[cfg(test)]
     pub(super) fn renew_scan(&self, id: &str, token: &str) -> Result<Value> {
+        self.renew_scan_for_protocol(id, token, PROTOCOL_VERSION)
+    }
+
+    fn renew_scan_for_protocol(&self, id: &str, token: &str, protocol: u64) -> Result<Value> {
         self.db.write(|t| {
             let mut record = scan_record(t, id, token)?;
             let requested = record["cancel_requested"].as_bool().unwrap_or(false);
@@ -241,7 +281,9 @@ impl Service {
                 put(t, &format!("ingress/{id}"), &record)?;
             }
             Ok(json!({
-                "protocol":PROTOCOL_VERSION,
+                "protocol":protocol,
+                "minimum_protocol":MIN_PROTOCOL_VERSION,
+                "maximum_protocol":PROTOCOL_VERSION,
                 "api_version":scan::ANALYSIS_API_VERSION,
                 "profile_version":scan::ANALYSIS_PROFILE_VERSION,
                 "coverage_version":scan::COVERAGE_VERSION,
@@ -377,7 +419,7 @@ impl Service {
     }
 
     pub(super) fn finalize_scan(&self, id: &str, token: &str, result: &Value) -> Result<()> {
-        verify_versions(result)?;
+        let protocol = verify_versions(result)?;
         ensure!(
             result["status"] == "complete" && result["id"] == id && result["token"] == token,
             "Invalid scan result"
@@ -436,6 +478,11 @@ impl Service {
 
         self.db.write(|t| {
             let record = scan_record(t, id, token)?;
+            ensure!(
+                (protocol == MIN_PROTOCOL_VERSION && result["scan_generation"].is_null())
+                    || result["scan_generation"] == record["scan_generation"],
+                "Stale scan generation"
+            );
             ensure!(record["hash"] == result["hash"], "Scan input hash mismatch");
             let input_bytes = u64::try_from(body(t, &record)?.len())?;
             ensure!(
@@ -573,6 +620,7 @@ impl Service {
             "status":"complete",
             "id":id,
             "token":token,
+            "scan_generation":record["scan_generation"],
             "hash":record["hash"],
             "rule_version":record["rule_version"],
             "verdict":{
@@ -600,6 +648,7 @@ pub(super) fn handle(service: &Service, mut stream: UnixStream) -> Result<()> {
     stream.set_write_timeout(Some(Duration::from_secs(30)))?;
     let hello = read_json(&mut stream, MAX_HELLO)?;
     verify_versions(&hello)?;
+    let protocol = negotiate_versions(&hello)?;
     let role = s(&hello, "role")?;
     ensure!(
         ["capacity", "heartbeat", "scanner"].contains(&role),
@@ -611,7 +660,9 @@ pub(super) fn handle(service: &Service, mut stream: UnixStream) -> Result<()> {
         write_json(
             &mut stream,
             &json!({
-                "protocol":PROTOCOL_VERSION,
+                "protocol":protocol,
+                "minimum_protocol":MIN_PROTOCOL_VERSION,
+                "maximum_protocol":PROTOCOL_VERSION,
                 "api_version":scan::ANALYSIS_API_VERSION,
                 "profile_version":scan::ANALYSIS_PROFILE_VERSION,
                 "coverage_version":scan::COVERAGE_VERSION,
@@ -622,23 +673,40 @@ pub(super) fn handle(service: &Service, mut stream: UnixStream) -> Result<()> {
         return Ok(());
     }
     if role == "heartbeat" {
-        let response = service.renew_scan(s(&hello, "id")?, s(&hello, "token")?)?;
+        let response =
+            service.renew_scan_for_protocol(s(&hello, "id")?, s(&hello, "token")?, protocol)?;
         write_json(&mut stream, &response, MAX_HELLO)?;
         return Ok(());
     }
-    let Some((job, raw)) = service.claim_scan()? else {
-        write_json(&mut stream, &json!({"empty":true}), MAX_HELLO)?;
+    let Some((job, raw)) = service.claim_scan_for_protocol(protocol)? else {
+        write_json(
+            &mut stream,
+            &json!({
+                "empty":true,
+                "protocol":protocol,
+                "minimum_protocol":MIN_PROTOCOL_VERSION,
+                "maximum_protocol":PROTOCOL_VERSION
+            }),
+            MAX_HELLO,
+        )?;
         return Ok(());
     };
     write_json(&mut stream, &job, MAX_JOB)?;
     write_frame(&mut stream, &raw, MAX_MESSAGE)?;
 
     let inspected = read_json(&mut stream, MAX_INSPECTION)?;
-    verify_versions(&inspected)?;
+    ensure!(
+        verify_versions(&inspected)? == protocol,
+        "Scan connection protocol changed"
+    );
     let id = s(&job, "id")?;
     let token = s(&job, "token")?;
     ensure!(
-        inspected["id"] == id && inspected["token"] == token && inspected["hash"] == job["hash"],
+        inspected["id"] == id
+            && inspected["token"] == token
+            && inspected["hash"] == job["hash"]
+            && ((protocol == MIN_PROTOCOL_VERSION && inspected["scan_generation"].is_null())
+                || inspected["scan_generation"] == job["scan_generation"]),
         "Scan reply identity mismatch"
     );
     match s(&inspected, "status")? {
@@ -657,9 +725,17 @@ pub(super) fn handle(service: &Service, mut stream: UnixStream) -> Result<()> {
             write_json(&mut stream, &json!({"learned_spam_score":score}), MAX_HELLO)?;
             let result = read_json(&mut stream, MAX_RESULT)?;
             if result["status"] == "incomplete" {
-                verify_versions(&result)?;
                 ensure!(
-                    result["id"] == id && result["token"] == token && result["hash"] == job["hash"],
+                    verify_versions(&result)? == protocol,
+                    "Scan connection protocol changed"
+                );
+                ensure!(
+                    result["id"] == id
+                        && result["token"] == token
+                        && result["hash"] == job["hash"]
+                        && ((protocol == MIN_PROTOCOL_VERSION
+                            && result["scan_generation"].is_null())
+                            || result["scan_generation"] == job["scan_generation"]),
                     "Incomplete scan reply identity mismatch"
                 );
                 service.finalize_incomplete(id, token, s(&result, "reason")?)?;
@@ -705,12 +781,15 @@ fn send_state(stream: &mut UnixStream, job: &Value, status: &str, reason: &str) 
     write_json(
         stream,
         &json!({
-            "protocol":PROTOCOL_VERSION,
+            "protocol":job["protocol"],
+            "minimum_protocol":MIN_PROTOCOL_VERSION,
+            "maximum_protocol":PROTOCOL_VERSION,
             "api_version":scan::ANALYSIS_API_VERSION,
             "profile_version":scan::ANALYSIS_PROFILE_VERSION,
             "coverage_version":scan::COVERAGE_VERSION,
             "id":job["id"],
             "token":job["token"],
+            "scan_generation":job["scan_generation"],
             "hash":job["hash"],
             "status":status,
             "reason":reason
@@ -732,7 +811,9 @@ fn heartbeat_once(path: &Path, id: &str, token: &str) -> Result<bool> {
     write_json(
         &mut stream,
         &json!({
-            "protocol":PROTOCOL_VERSION,
+            "protocol":COMPATIBILITY_HELLO_PROTOCOL,
+            "minimum_protocol":MIN_PROTOCOL_VERSION,
+            "maximum_protocol":PROTOCOL_VERSION,
             "api_version":scan::ANALYSIS_API_VERSION,
             "profile_version":scan::ANALYSIS_PROFILE_VERSION,
             "coverage_version":scan::COVERAGE_VERSION,
@@ -845,7 +926,9 @@ fn scan_stream_inner(
     write_json(
         &mut stream,
         &json!({
-            "protocol":PROTOCOL_VERSION,
+            "protocol":COMPATIBILITY_HELLO_PROTOCOL,
+            "minimum_protocol":MIN_PROTOCOL_VERSION,
+            "maximum_protocol":PROTOCOL_VERSION,
             "api_version":scan::ANALYSIS_API_VERSION,
             "profile_version":scan::ANALYSIS_PROFILE_VERSION,
             "coverage_version":scan::COVERAGE_VERSION,
@@ -857,7 +940,7 @@ fn scan_stream_inner(
     if job["empty"] == true {
         return Ok(false);
     }
-    verify_versions(&job)?;
+    let protocol = verify_versions(&job)?;
     ensure!(
         !cancellation_requested(&job["cancellation"])?,
         "Scan was cancelled before it started"
@@ -922,12 +1005,15 @@ fn scan_stream_inner(
     write_json(
         &mut stream,
         &json!({
-            "protocol":PROTOCOL_VERSION,
+            "protocol":protocol,
+            "minimum_protocol":MIN_PROTOCOL_VERSION,
+            "maximum_protocol":PROTOCOL_VERSION,
             "api_version":scan::ANALYSIS_API_VERSION,
             "profile_version":scan::ANALYSIS_PROFILE_VERSION,
             "coverage_version":scan::COVERAGE_VERSION,
             "id":job["id"],
             "token":job["token"],
+            "scan_generation":job["scan_generation"],
             "hash":job["hash"],
             "status":"inspected",
             "inspection":inspection
@@ -970,13 +1056,16 @@ fn scan_stream_inner(
     write_json(
         &mut stream,
         &json!({
-            "protocol":PROTOCOL_VERSION,
+            "protocol":protocol,
+            "minimum_protocol":MIN_PROTOCOL_VERSION,
+            "maximum_protocol":PROTOCOL_VERSION,
             "api_version":scan::ANALYSIS_API_VERSION,
             "profile_version":scan::ANALYSIS_PROFILE_VERSION,
             "coverage_version":scan::COVERAGE_VERSION,
             "status":"complete",
             "id":job["id"],
             "token":job["token"],
+            "scan_generation":job["scan_generation"],
             "hash":job["hash"],
             "rule_version":job["rule_version"],
             "verdict":verdict,
@@ -1002,7 +1091,9 @@ pub fn run(config: Config) -> Result<()> {
             write_json(
                 &mut stream,
                 &json!({
-                    "protocol":PROTOCOL_VERSION,
+                    "protocol":COMPATIBILITY_HELLO_PROTOCOL,
+                    "minimum_protocol":MIN_PROTOCOL_VERSION,
+                    "maximum_protocol":PROTOCOL_VERSION,
                     "api_version":scan::ANALYSIS_API_VERSION,
                     "profile_version":scan::ANALYSIS_PROFILE_VERSION,
                     "coverage_version":scan::COVERAGE_VERSION,
@@ -1046,6 +1137,55 @@ pub fn run(config: Config) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn version(protocol: u64, minimum: Option<u64>, maximum: Option<u64>) -> Value {
+        let mut value = json!({
+            "protocol":protocol,
+            "api_version":scan::ANALYSIS_API_VERSION,
+            "profile_version":scan::ANALYSIS_PROFILE_VERSION,
+            "coverage_version":scan::COVERAGE_VERSION
+        });
+        if let Some(minimum) = minimum {
+            value["minimum_protocol"] = json!(minimum);
+        }
+        if let Some(maximum) = maximum {
+            value["maximum_protocol"] = json!(maximum);
+        }
+        value
+    }
+
+    #[test]
+    fn current_worker_negotiates_current_and_legacy_protocols() {
+        assert_eq!(
+            negotiate_versions(&version(1, Some(1), Some(PROTOCOL_VERSION))).unwrap(),
+            PROTOCOL_VERSION
+        );
+        assert_eq!(negotiate_versions(&version(1, None, None)).unwrap(), 1);
+        assert!(verify_versions(&version(PROTOCOL_VERSION + 1, None, None)).is_err());
+        assert!(
+            negotiate_versions(&version(
+                PROTOCOL_VERSION + 1,
+                Some(PROTOCOL_VERSION + 1),
+                Some(PROTOCOL_VERSION + 1)
+            ))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn current_worker_starts_with_a_legacy_compatible_hello() {
+        let checker = crate::auth::Checker::new(None).unwrap();
+        let (worker, mut legacy_server) = UnixStream::pair().unwrap();
+        let server = std::thread::spawn(move || {
+            let hello = read_json(&mut legacy_server, MAX_HELLO).unwrap();
+            assert_eq!(hello["protocol"], 1);
+            assert_eq!(hello["minimum_protocol"], 1);
+            assert_eq!(hello["maximum_protocol"], PROTOCOL_VERSION);
+            write_json(&mut legacy_server, &json!({"empty":true}), MAX_HELLO).unwrap();
+        });
+        assert!(!scan_stream(&checker, worker).unwrap());
+        server.join().unwrap();
+    }
 
     #[test]
     fn local_frames_are_bounded_and_round_trip() {

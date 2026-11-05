@@ -1634,6 +1634,40 @@ fn leased_scan_atomically_becomes_delivery_work() {
 }
 
 #[test]
+fn current_scan_service_accepts_a_legacy_worker_protocol() {
+    use std::io::{Read, Write};
+
+    let f = Fixture::new();
+    f.activate();
+    let (server_stream, mut legacy_worker) = std::os::unix::net::UnixStream::pair().unwrap();
+    let service = f.svc.clone();
+    let server =
+        std::thread::spawn(move || super::scan_worker::handle(&service, server_stream).unwrap());
+    let hello = pratique::json_value::to_vec(&json!({
+        "protocol":1,
+        "api_version":scan::ANALYSIS_API_VERSION,
+        "profile_version":scan::ANALYSIS_PROFILE_VERSION,
+        "coverage_version":scan::COVERAGE_VERSION,
+        "role":"capacity"
+    }))
+    .unwrap();
+    legacy_worker
+        .write_all(&(hello.len() as u32).to_be_bytes())
+        .unwrap();
+    legacy_worker.write_all(&hello).unwrap();
+    let mut header = [0; 4];
+    legacy_worker.read_exact(&mut header).unwrap();
+    let mut response = vec![0; u32::from_be_bytes(header) as usize];
+    legacy_worker.read_exact(&mut response).unwrap();
+    let response: Value = pratique::json_value::from_slice(&response).unwrap();
+    assert_eq!(response["protocol"], 1);
+    assert_eq!(response["minimum_protocol"], 1);
+    assert_eq!(response["maximum_protocol"], 2);
+    assert!(response["threads"].as_u64().is_some());
+    server.join().unwrap();
+}
+
+#[test]
 fn local_scanner_protocol_drains_mail_while_ingress_stays_owned_by_service() {
     use std::net::UdpSocket;
     use std::sync::{
@@ -1786,6 +1820,7 @@ fn cancellation_after_inspection_is_stored_as_incomplete_quarantine() {
             "coverage_version":scan::COVERAGE_VERSION,
             "id":job["id"],
             "token":job["token"],
+            "scan_generation":job["scan_generation"],
             "hash":job["hash"],
             "status":"inspected",
             "inspection":inspection
@@ -1805,6 +1840,7 @@ fn cancellation_after_inspection_is_stored_as_incomplete_quarantine() {
             "coverage_version":scan::COVERAGE_VERSION,
             "id":job["id"],
             "token":job["token"],
+            "scan_generation":job["scan_generation"],
             "hash":job["hash"],
             "status":"incomplete",
             "reason":"worker-cancelled"
@@ -1856,13 +1892,16 @@ fn synthetic_worker_result(service: &Service, job: &Value, raw: &[u8]) -> Value 
     let verdict =
         scan::evaluate_inspected(&inspected, &job["rules"], &job["settings"], &evidence).unwrap();
     json!({
-        "protocol":1,
+        "protocol":job["protocol"],
+        "minimum_protocol":super::scan_worker::MIN_PROTOCOL_VERSION,
+        "maximum_protocol":super::scan_worker::PROTOCOL_VERSION,
         "api_version":scan::ANALYSIS_API_VERSION,
         "profile_version":scan::ANALYSIS_PROFILE_VERSION,
         "coverage_version":scan::COVERAGE_VERSION,
         "status":"complete",
         "id":job["id"],
         "token":job["token"],
+        "scan_generation":job["scan_generation"],
         "hash":job["hash"],
         "rule_version":job["rule_version"],
         "verdict":verdict,
@@ -2434,6 +2473,372 @@ fn planned_handoff_and_explicit_takeover_advance_fenced_terms() {
 }
 
 #[test]
+fn ownership_handoff_automatically_reassigns_scan_generation_and_rejects_stale_results() {
+    let a = Fixture::make_instance(false, true, "scan-handoff-a");
+    let b = Fixture::make_instance(false, true, "scan-handoff-b");
+    a.activate();
+    a.svc
+        .db
+        .write(|table| {
+            let mut settings = must(table, "settings")?;
+            settings["enabled"] = json!(true);
+            put(table, "settings", &settings)
+        })
+        .unwrap();
+    for (fixture, peer) in [(&a, "scan-handoff-b"), (&b, "scan-handoff-a")] {
+        fixture
+            .svc
+            .db
+            .write(|table| super::cluster::enable_replication(table, &[peer.into()]))
+            .unwrap();
+    }
+
+    let ingress_id = a
+        .svc
+        .accept(
+            &mail("automatic scan reassignment"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.70".parse().unwrap(),
+            "handoff.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    let (acceptance, raw) = a.svc.replication_export(1).unwrap().unwrap();
+    b.svc.replication_apply(&acceptance, &raw).unwrap();
+    a.svc.replication_acknowledge("scan-handoff-b", 1).unwrap();
+    a.svc
+        .db
+        .write(|table| {
+            super::cluster::complete_acceptance(table, std::slice::from_ref(&ingress_id), false)
+        })
+        .unwrap();
+    let ready = a
+        .svc
+        .replication_export_state_batch(0, 8, 8 * 1024 * 1024)
+        .unwrap();
+    assert_eq!(b.svc.replication_apply_state_batch(&ready).unwrap(), 1);
+    a.svc
+        .replication_acknowledge_state("scan-handoff-b", 1)
+        .unwrap();
+
+    let (old_job, claimed) = a.svc.claim_scan().unwrap().unwrap();
+    let stale_result = synthetic_worker_result(&a.svc, &old_job, &claimed);
+    let draining = a
+        .svc
+        .db
+        .write(|table| {
+            super::cluster::begin_drain(table, "admin", "scan-handoff-a", "scan-handoff-b", 1)
+        })
+        .unwrap();
+    assert_eq!(draining["drain_state_sequence"], 2);
+    let drain = a
+        .svc
+        .replication_export_state_batch(1, 8, 8 * 1024 * 1024)
+        .unwrap();
+    assert_eq!(b.svc.replication_apply_state_batch(&drain).unwrap(), 2);
+    a.svc
+        .replication_acknowledge_state("scan-handoff-b", 2)
+        .unwrap();
+
+    let handoff = a
+        .svc
+        .db
+        .write(|table| {
+            super::cluster::complete_handoff(table, "admin", "scan-handoff-a", "scan-handoff-b", 2)
+        })
+        .unwrap();
+    assert_eq!(handoff["reassigned_scans"], 1);
+    let completion = a
+        .svc
+        .replication_export_state_batch(2, 8, 8 * 1024 * 1024)
+        .unwrap();
+    assert_eq!(completion.len(), 2);
+    assert_eq!(completion[0]["kind"], "ingress-state");
+    assert_eq!(completion[1]["kind"], "ownership-state");
+    assert_eq!(b.svc.replication_apply_state_batch(&completion).unwrap(), 4);
+
+    for fixture in [&a, &b] {
+        let ingress = fixture
+            .svc
+            .db
+            .get(&format!("ingress/{ingress_id}"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(ingress["scan_owner"], "scan-handoff-b");
+        assert_eq!(ingress["scan_generation"], 2);
+        assert_eq!(ingress["state"], "retrying");
+        assert!(ingress["lease_token"].is_null());
+    }
+    assert!(
+        a.svc
+            .finalize_scan(
+                old_job["id"].as_str().unwrap(),
+                old_job["token"].as_str().unwrap(),
+                &stale_result,
+            )
+            .is_err()
+    );
+    let (replacement, _) = b.svc.claim_scan().unwrap().unwrap();
+    assert_eq!(replacement["scan_generation"], 2);
+    assert_eq!(
+        replacement["protocol"],
+        super::scan_worker::PROTOCOL_VERSION
+    );
+}
+
+#[test]
+fn content_reconciliation_matches_replicas_and_reports_corruption_without_content() {
+    let a = Fixture::make_instance(false, true, "reconcile-a");
+    let b = Fixture::make_instance(false, true, "reconcile-b");
+    a.activate();
+    a.svc
+        .db
+        .write(|table| {
+            super::cluster::enable_replication(table, &["reconcile-b".into()])?;
+            let mut settings = must(table, "settings")?;
+            settings["enabled"] = json!(true);
+            put(table, "settings", &settings)
+        })
+        .unwrap();
+    let ingress_id = a
+        .svc
+        .accept(
+            &mail("content reconciliation marker"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.71".parse().unwrap(),
+            "reconcile.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    let (operation, raw) = a.svc.replication_export(1).unwrap().unwrap();
+    b.svc.replication_apply(&operation, &raw).unwrap();
+
+    let left = a.cmd("cluster-reconcile", json!({}));
+    let right = b.cmd("cluster-reconcile", json!({}));
+    assert_eq!(left["healthy"], true);
+    assert_eq!(left["content_root"], right["content_root"]);
+    assert_eq!(left["reference_root"], right["reference_root"]);
+    assert_eq!(left["blob_count"], 1);
+    assert!(left.get("content").is_none());
+
+    let content_hash = a
+        .svc
+        .db
+        .get(&format!("ingress/{ingress_id}"))
+        .unwrap()
+        .unwrap()["hash"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    a.svc
+        .db
+        .write(|table| {
+            table.insert(
+                format!("blob/{content_hash}").as_str(),
+                b"tampered".as_slice(),
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let corrupted = a.cmd("cluster-reconcile", json!({}));
+    assert_eq!(corrupted["healthy"], false);
+    assert_eq!(corrupted["invalid_blobs"], 1);
+    assert_eq!(corrupted["errors"][0]["kind"], "content-hash-mismatch");
+    assert!(corrupted["errors"][0].get("content").is_none());
+}
+
+#[test]
+fn node_exclusion_requires_synchronized_empty_handoff_then_fences_all_work() {
+    let a = Fixture::make_instance(false, true, "exclude-a");
+    let b = Fixture::make_instance(false, true, "exclude-b");
+    for (fixture, peer) in [(&a, "exclude-b"), (&b, "exclude-a")] {
+        fixture
+            .svc
+            .db
+            .write(|table| super::cluster::enable_replication(table, &[peer.into()]))
+            .unwrap();
+    }
+    assert!(
+        a.svc
+            .db
+            .write(|table| super::cluster::exclude(table, "admin"))
+            .is_err()
+    );
+    a.svc
+        .db
+        .write(|table| super::cluster::begin_drain(table, "admin", "exclude-a", "exclude-b", 1))
+        .unwrap();
+    let drain = a
+        .svc
+        .replication_export_state_batch(0, 8, 8 * 1024 * 1024)
+        .unwrap();
+    b.svc.replication_apply_state_batch(&drain).unwrap();
+    a.svc.replication_acknowledge_state("exclude-b", 1).unwrap();
+    a.svc
+        .db
+        .write(|table| {
+            super::cluster::complete_handoff(table, "admin", "exclude-a", "exclude-b", 2)
+        })
+        .unwrap();
+    let completion = a
+        .svc
+        .replication_export_state_batch(1, 8, 8 * 1024 * 1024)
+        .unwrap();
+    b.svc.replication_apply_state_batch(&completion).unwrap();
+    a.svc.replication_acknowledge_state("exclude-b", 2).unwrap();
+    a.svc
+        .db
+        .write(|table| {
+            let at = now()?;
+            put(
+                table,
+                "replication_peer_protocol/exclude-b",
+                &json!({"peer":"exclude-b","direction":"outbound","selected_protocol":2,"minimum_protocol":1,"maximum_protocol":2,"compatible":true,"at":at}),
+            )?;
+            for direction in ["outbound", "inbound"] {
+                put(
+                    table,
+                    &format!("replication_peer_health/exclude-b/{direction}"),
+                    &json!({"peer":"exclude-b","direction":direction,"at":at,"ok":true,"error":""}),
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let mode = a
+        .svc
+        .db
+        .write(|table| super::cluster::exclude(table, "admin"))
+        .unwrap();
+    assert_eq!(mode["mode"], "excluded");
+    assert_eq!(mode["acceptance_eligible"], false);
+    assert_eq!(mode["scanner_eligible"], false);
+    assert_eq!(mode["delivery_eligible"], false);
+    assert!(
+        a.svc
+            .db
+            .write(|table| list(table, "audit/"))
+            .unwrap()
+            .iter()
+            .any(|event| event["action"] == "cluster-exclude")
+    );
+}
+
+#[test]
+fn acknowledged_logs_compact_to_a_checksummed_bounded_replay_frontier() {
+    let a = Fixture::make_instance(false, true, "compact-a");
+    let b = Fixture::make_instance(false, true, "compact-b");
+    a.activate();
+    for (fixture, peer) in [(&a, "compact-b"), (&b, "compact-a")] {
+        fixture
+            .svc
+            .db
+            .write(|table| super::cluster::enable_replication(table, &[peer.into()]))
+            .unwrap();
+    }
+    a.svc
+        .db
+        .write(|table| {
+            let mut settings = must(table, "settings")?;
+            settings["enabled"] = json!(true);
+            put(table, "settings", &settings)
+        })
+        .unwrap();
+    let ingress_id = a
+        .svc
+        .accept(
+            &mail("compaction frontier"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.72".parse().unwrap(),
+            "compact.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    let (acceptance, raw) = a.svc.replication_export(1).unwrap().unwrap();
+    b.svc.replication_apply(&acceptance, &raw).unwrap();
+    a.svc.replication_acknowledge("compact-b", 1).unwrap();
+    a.svc
+        .db
+        .write(|table| {
+            super::cluster::complete_acceptance(table, std::slice::from_ref(&ingress_id), false)
+        })
+        .unwrap();
+    let state = a
+        .svc
+        .replication_export_state_batch(0, 8, 8 * 1024 * 1024)
+        .unwrap();
+    b.svc.replication_apply_state_batch(&state).unwrap();
+    a.svc.replication_acknowledge_state("compact-b", 1).unwrap();
+    a.svc
+        .db
+        .write(|table| {
+            let at = now()?;
+            put(
+                table,
+                "replication_peer_protocol/compact-b",
+                &json!({"peer":"compact-b","direction":"outbound","selected_protocol":2,"minimum_protocol":1,"maximum_protocol":2,"compatible":true,"at":at}),
+            )?;
+            for direction in ["outbound", "inbound"] {
+                put(
+                    table,
+                    &format!("replication_peer_health/compact-b/{direction}"),
+                    &json!({"peer":"compact-b","direction":direction,"at":at,"ok":true,"error":""}),
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+
+    let report = a
+        .svc
+        .db
+        .write(|table| super::cluster::compact_logs(table, "admin"))
+        .unwrap();
+    assert_eq!(report["acceptance_pruned"], 1);
+    assert_eq!(report["state_pruned"], 1);
+    assert_eq!(report["checkpoint"]["acceptance_sequence"], 1);
+    assert_eq!(report["checkpoint"]["state_sequence"], 1);
+    assert_eq!(report["checkpoint"]["checksum"].as_str().unwrap().len(), 64);
+    assert!(
+        a.svc
+            .db
+            .get("replication_out/compact-a/00000000000000000001")
+            .unwrap()
+            .is_none()
+    );
+    a.svc
+        .db
+        .write(super::cluster::rebuild_replication_state)
+        .unwrap();
+    let status = a.cmd("status", json!({}));
+    assert_eq!(status["cluster"]["compaction"]["acceptance_sequence"], 1);
+    assert_eq!(status["cluster"]["replication_debt"]["operations"], 0);
+
+    a.svc
+        .db
+        .write(|table| super::cluster::begin_resync(table, "admin", "compact-b"))
+        .unwrap();
+    let ack = a
+        .svc
+        .db
+        .get("replication_ack/compact-b/compact-a")
+        .unwrap()
+        .unwrap();
+    assert_eq!(ack["sequence"], 1);
+    assert_eq!(
+        a.svc
+            .db
+            .get("replication_state_ack/compact-b/compact-a")
+            .unwrap()
+            .unwrap()["sequence"],
+        1
+    );
+}
+
+#[test]
 fn planned_handoff_can_be_cancelled_only_from_the_exact_draining_state() {
     let a = Fixture::make_instance(false, true, "cancel-a");
     let b = Fixture::make_instance(false, true, "cancel-b");
@@ -2525,6 +2930,11 @@ fn synchronized_health_requires_fresh_bidirectional_peer_contact_and_zero_debt()
         .db
         .write(|table| {
             let at = now()?;
+            put(
+                table,
+                "replication_peer_protocol/sync-b",
+                &json!({"peer":"sync-b","direction":"outbound","selected_protocol":2,"minimum_protocol":1,"maximum_protocol":2,"compatible":true,"at":at}),
+            )?;
             for direction in ["outbound", "inbound"] {
                 put(
                     table,
@@ -2760,7 +3170,7 @@ fn ingress_scanner_upgrade_stress_simulation() {
     let service = f.svc.clone();
     let server = std::thread::spawn(move || super::scan_worker::handle(&service, server_stream));
     let hello = pratique::json_value::to_vec(&json!({
-        "protocol":2,
+        "protocol":super::scan_worker::PROTOCOL_VERSION + 1,
         "api_version":scan::ANALYSIS_API_VERSION,
         "profile_version":scan::ANALYSIS_PROFILE_VERSION,
         "coverage_version":scan::COVERAGE_VERSION,

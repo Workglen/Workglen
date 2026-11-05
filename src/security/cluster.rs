@@ -1,21 +1,26 @@
 //! Durable node identity, ordered replication state and ownership fencing.
 use super::{db::*, model::*};
 use crate::error::{Result, ensure};
+use pratique::crypto::sha2::{Hash, Sha256};
 use pratique::json_value::{Value, json};
 use redb::ReadableTable;
+use std::collections::BTreeSet;
 
-pub const PROTOCOL_VERSION: u64 = 1;
+pub const PROTOCOL_VERSION: u64 = 2;
 pub const MIN_PROTOCOL_VERSION: u64 = 1;
+const OPERATION_PROTOCOL_VERSION: u64 = 1;
 const NODE_KEY: &str = "system/cluster_node";
 const REPLICATION_CONFIG_KEY: &str = "system/replication_config";
 const MAX_BATCH_OPERATIONS: usize = 64;
 const MAX_BATCH_BYTES: usize = 32 * 1024 * 1024;
 const MAX_STATE_OPERATION_BYTES: usize = 8 * 1024 * 1024;
 const NODE_MODE_KEY: &str = "system/cluster_node_mode";
+const COMPACTION_KEY: &str = "system/replication_compaction";
+const MAX_COMPACTION_OPERATIONS: u64 = 10_000;
 
 pub fn initialize(t: &mut Table, config: &Config) -> Result<()> {
     let identity = json!({
-        "protocol":PROTOCOL_VERSION,
+        "protocol":OPERATION_PROTOCOL_VERSION,
         "cluster_id":config.workspace,
         "node_id":config.instance,
         "placement_generation":1
@@ -188,7 +193,7 @@ pub fn record_acceptance(t: &mut Table, record: &Value) -> Result<()> {
         t,
         &format!("replication_out/{origin}/{sequence:020}"),
         &json!({
-            "protocol":PROTOCOL_VERSION,
+            "protocol":OPERATION_PROTOCOL_VERSION,
             "cluster_id":identity(t)?["cluster_id"],
             "origin":origin,
             "sequence":sequence,
@@ -556,7 +561,7 @@ fn append_state_operation(
     );
     let operation_hash = hash(&pratique::json_value::to_vec(&payload)?);
     let mut operation = json!({
-        "protocol":PROTOCOL_VERSION,
+        "protocol":OPERATION_PROTOCOL_VERSION,
         "cluster_id":identity(t)?["cluster_id"],
         "origin":origin,
         "sequence":sequence,
@@ -651,12 +656,44 @@ pub fn record_ownership_state(t: &mut Table, partition: &str) -> Result<u64> {
     )
 }
 
-fn rewrite_partition_owner(t: &mut Table, partition: &str, owner: &str, term: u64) -> Result<()> {
+fn rewrite_partition_owner(
+    t: &mut Table,
+    partition: &str,
+    owner: &str,
+    term: u64,
+    replicate_scan_reassignments: bool,
+) -> Result<u64> {
+    let mut reassigned_scans = 0u64;
     for mut ingress in list(t, "ingress/")? {
         if ingress["delivery_partition"] == partition {
             ingress["delivery_owner"] = json!(owner);
             ingress["delivery_term"] = json!(term);
-            put(t, &format!("ingress/{}", s(&ingress, "id")?), &ingress)?;
+            let mut scan_reassigned = false;
+            if ingress["scan_owner"] != owner {
+                ingress["scan_owner"] = json!(owner);
+                ingress["scan_generation"] = json!(
+                    n(&ingress, "scan_generation")?
+                        .checked_add(1)
+                        .ok_or_else(|| crate::error!("Scan generation overflow"))?
+                );
+                if ingress["state"] == "leased" {
+                    ingress["state"] = json!("retrying");
+                    ingress["due"] = json!(now()?);
+                    ingress["error"] = json!("scan-owner-reassigned");
+                }
+                ingress["lease_token"] = Value::Null;
+                ingress["lease_until"] = json!(0);
+                ingress["cancel_requested"] = json!(false);
+                reassigned_scans = reassigned_scans
+                    .checked_add(1)
+                    .ok_or_else(|| crate::error!("Scan reassignment counter overflow"))?;
+                scan_reassigned = true;
+            }
+            let ingress_id = s(&ingress, "id")?.to_string();
+            put(t, &format!("ingress/{ingress_id}"), &ingress)?;
+            if replicate_scan_reassignments && scan_reassigned {
+                record_ingress_state(t, &ingress_id)?;
+            }
         }
     }
     for mut message in list(t, "message/")? {
@@ -675,7 +712,7 @@ fn rewrite_partition_owner(t: &mut Table, partition: &str, owner: &str, term: u6
             put(t, &format!("job/{}", s(&job, "id")?), &job)?;
         }
     }
-    Ok(())
+    Ok(reassigned_scans)
 }
 
 pub fn begin_drain(
@@ -757,7 +794,7 @@ pub fn complete_handoff(
             .any(|job| { job["delivery_partition"] == partition && job["state"] == "running" }),
         "A downstream delivery is still running"
     );
-    rewrite_partition_owner(t, partition, new_owner, expected_term)?;
+    let reassigned_scans = rewrite_partition_owner(t, partition, new_owner, expected_term, true)?;
     let next = json!({
         "partition":partition,
         "owner":new_owner,
@@ -773,9 +810,9 @@ pub fn complete_handoff(
         actor,
         "cluster-handoff",
         "",
-        json!({"partition":partition,"previous_owner":local,"owner":new_owner,"term":expected_term,"state_sequence":sequence}),
+        json!({"partition":partition,"previous_owner":local,"owner":new_owner,"term":expected_term,"state_sequence":sequence,"reassigned_scans":reassigned_scans}),
     )?;
-    Ok(json!({"ownership":next,"state_sequence":sequence}))
+    Ok(json!({"ownership":next,"state_sequence":sequence,"reassigned_scans":reassigned_scans}))
 }
 
 pub fn cancel_handoff(
@@ -852,7 +889,7 @@ pub fn operator_takeover(
     let next_term = expected_term
         .checked_add(1)
         .ok_or_else(|| crate::error!("Ownership term overflow"))?;
-    rewrite_partition_owner(t, partition, &local, next_term)?;
+    let reassigned_scans = rewrite_partition_owner(t, partition, &local, next_term, true)?;
     let next = json!({
         "partition":partition,
         "owner":local,
@@ -869,9 +906,9 @@ pub fn operator_takeover(
         actor,
         "cluster-takeover",
         "",
-        json!({"partition":partition,"fenced_owner":current["owner"],"owner":local,"term":next_term,"state_sequence":sequence,"risk_acknowledged":true}),
+        json!({"partition":partition,"fenced_owner":current["owner"],"owner":local,"term":next_term,"state_sequence":sequence,"risk_acknowledged":true,"reassigned_scans":reassigned_scans}),
     )?;
-    Ok(json!({"ownership":next,"state_sequence":sequence}))
+    Ok(json!({"ownership":next,"state_sequence":sequence,"reassigned_scans":reassigned_scans}))
 }
 
 pub fn rejoin(t: &mut Table, actor: &str) -> Result<Value> {
@@ -882,6 +919,10 @@ pub fn rejoin(t: &mut Table, actor: &str) -> Result<Value> {
         "Acceptance and state replication debt must be zero before rejoin"
     );
     let mut mode = must(t, NODE_MODE_KEY)?;
+    ensure!(
+        ["excluded", "resynchronizing"].contains(&mode["mode"].as_str().unwrap_or("")),
+        "Only an excluded or resynchronizing node can be rejoined"
+    );
     mode["mode"] = json!("active");
     mode["acceptance_eligible"] = json!(true);
     mode["scanner_eligible"] = json!(true);
@@ -890,6 +931,284 @@ pub fn rejoin(t: &mut Table, actor: &str) -> Result<Value> {
     put(t, NODE_MODE_KEY, &mode)?;
     audit(t, actor, "cluster-rejoin", "", json!({"node":node_id(t)?}))?;
     Ok(mode)
+}
+
+pub fn exclude(t: &mut Table, actor: &str) -> Result<Value> {
+    ensure!(enabled(t)?, "A standalone node cannot be safely excluded");
+    let local = node_id(t)?;
+    let cluster = status(t, false)?;
+    ensure!(
+        cluster["synchronized"] == true,
+        "Both replication logs and authenticated peer health must be synchronized before exclusion"
+    );
+    ensure!(
+        !list(t, "ownership/")?.iter().any(|ownership| {
+            ownership["owner"] == local || ownership["pending_owner"] == local
+        }),
+        "Drain and hand off every locally owned or pending partition before exclusion"
+    );
+    ensure!(
+        !list(t, "ingress/")?.iter().any(|ingress| {
+            ingress["scan_owner"] == local
+                && ["queued", "retrying", "leased"]
+                    .contains(&ingress["state"].as_str().unwrap_or(""))
+        }),
+        "Complete or hand off locally assigned scans before exclusion"
+    );
+    ensure!(
+        !list(t, "job/")?.iter().any(|job| {
+            job["delivery_owner"] == local
+                && !["succeeded", "cancelled"].contains(&job["state"].as_str().unwrap_or(""))
+        }),
+        "Complete or hand off locally assigned delivery work before exclusion"
+    );
+    let mut mode = must(t, NODE_MODE_KEY)?;
+    ensure!(mode["mode"] != "excluded", "Node is already excluded");
+    mode["mode"] = json!("excluded");
+    mode["acceptance_eligible"] = json!(false);
+    mode["scanner_eligible"] = json!(false);
+    mode["delivery_eligible"] = json!(false);
+    mode["updated"] = json!(now()?);
+    put(t, NODE_MODE_KEY, &mode)?;
+    audit(
+        t,
+        actor,
+        "cluster-exclude",
+        "",
+        json!({"node":local,"replication_synchronized":true,"workload_empty":true}),
+    )?;
+    Ok(mode)
+}
+
+/// Produces a bounded, content-derived inventory that can be compared across nodes.
+/// No message content or metadata is returned.
+pub fn reconciliation(t: &Table) -> Result<Value> {
+    const MAX_ERRORS: usize = 20;
+    let mut blob_digest = Sha256::new();
+    let mut blob_count = 0u64;
+    let mut blob_bytes = 0u64;
+    let mut invalid_blobs = 0u64;
+    let mut errors = Vec::new();
+    let mut available = BTreeSet::new();
+    for entry in t.range("blob/".."blob0")? {
+        let (key, value) = entry?;
+        let key = key.value();
+        let expected = key.strip_prefix("blob/").unwrap_or("");
+        let raw = value.value();
+        let actual = hash(raw);
+        let size = u64::try_from(raw.len())?;
+        blob_count = blob_count
+            .checked_add(1)
+            .ok_or_else(|| crate::error!("Reconciliation blob counter overflow"))?;
+        blob_bytes = blob_bytes
+            .checked_add(size)
+            .ok_or_else(|| crate::error!("Reconciliation byte counter overflow"))?;
+        available.insert(expected.to_string());
+        blob_digest.update(actual.as_bytes());
+        blob_digest.update(&[0]);
+        blob_digest.update(&size.to_be_bytes());
+        if expected != actual {
+            invalid_blobs = invalid_blobs
+                .checked_add(1)
+                .ok_or_else(|| crate::error!("Reconciliation error counter overflow"))?;
+            if errors.len() < MAX_ERRORS {
+                errors.push(
+                    json!({"kind":"content-hash-mismatch","expected":expected,"actual":actual}),
+                );
+            }
+        }
+    }
+
+    let mut referenced = BTreeSet::new();
+    for prefix in ["ingress/", "message/"] {
+        for record in list(t, prefix)? {
+            if let Some(content_hash) = record["hash"].as_str() {
+                referenced.insert(content_hash.to_string());
+            }
+        }
+    }
+    let mut reference_digest = Sha256::new();
+    let mut missing_references = 0u64;
+    for content_hash in &referenced {
+        reference_digest.update(content_hash.as_bytes());
+        reference_digest.update(&[0]);
+        if !available.contains(content_hash) {
+            missing_references = missing_references
+                .checked_add(1)
+                .ok_or_else(|| crate::error!("Reconciliation error counter overflow"))?;
+            if errors.len() < MAX_ERRORS {
+                errors.push(json!({"kind":"missing-content","hash":content_hash}));
+            }
+        }
+    }
+    let encode = |bytes: &[u8]| {
+        bytes
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    };
+    Ok(json!({
+        "version":1,
+        "node_id":node_id(t)?,
+        "at":now()?,
+        "healthy":invalid_blobs == 0 && missing_references == 0,
+        "content_root":encode(&blob_digest.finalize()),
+        "reference_root":encode(&reference_digest.finalize()),
+        "blob_count":blob_count,
+        "blob_bytes":blob_bytes,
+        "referenced_count":u64::try_from(referenced.len())?,
+        "invalid_blobs":invalid_blobs,
+        "missing_references":missing_references,
+        "errors":errors,
+        "errors_truncated":invalid_blobs.saturating_add(missing_references) > u64::try_from(MAX_ERRORS)?
+    }))
+}
+
+fn compacted_position(t: &Table, field: &str) -> Result<(u64, u64)> {
+    let snapshot = get(t, COMPACTION_KEY)?.unwrap_or_else(|| {
+        json!({
+            "acceptance_sequence":0,
+            "acceptance_cumulative_bytes":0,
+            "state_sequence":0,
+            "state_cumulative_bytes":0
+        })
+    });
+    if snapshot["checksum"].as_str().is_some() {
+        let supplied = s(&snapshot, "checksum")?;
+        let mut core = snapshot.clone();
+        core.as_object_mut()
+            .ok_or_else(|| crate::error!("Invalid replication compaction checkpoint"))?
+            .remove("checksum");
+        ensure!(
+            supplied == hash(&pratique::json_value::to_vec(&core)?),
+            "Replication compaction checkpoint checksum mismatch"
+        );
+    }
+    Ok((
+        n(&snapshot, &format!("{field}_sequence"))?,
+        n(&snapshot, &format!("{field}_cumulative_bytes"))?,
+    ))
+}
+
+/// Advances a checksummed replay checkpoint and removes only operations that
+/// every configured replica already acknowledged. Each call is deliberately
+/// bounded so maintenance cannot monopolize the encrypted store transaction.
+pub fn compact_logs(t: &mut Table, actor: &str) -> Result<Value> {
+    ensure!(enabled(t)?, "Replication is not configured");
+    let cluster = status(t, false)?;
+    ensure!(
+        cluster["synchronized"] == true,
+        "Replication and fresh bilateral peer health are required before compaction"
+    );
+    let integrity = reconciliation(t)?;
+    ensure!(
+        integrity["healthy"] == true,
+        "Content reconciliation must be healthy before compaction"
+    );
+    let origin = node_id(t)?;
+    let acceptance_tail = get(t, &format!("replication_out_state/{origin}"))?
+        .and_then(|value| value["last_sequence"].as_u64())
+        .unwrap_or(0);
+    let state_tail = get(t, &format!("replication_state_out_state/{origin}"))?
+        .and_then(|value| value["last_sequence"].as_u64())
+        .unwrap_or(0);
+    let (acceptance_floor, acceptance_floor_bytes) = compacted_position(t, "acceptance")?;
+    let (state_floor, state_floor_bytes) = compacted_position(t, "state")?;
+    ensure!(
+        acceptance_floor <= acceptance_tail && state_floor <= state_tail,
+        "Invalid replication compaction frontier"
+    );
+    let acceptance_sequence = acceptance_tail.min(
+        acceptance_floor
+            .checked_add(MAX_COMPACTION_OPERATIONS)
+            .ok_or_else(|| crate::error!("Replication compaction frontier overflow"))?,
+    );
+    let state_sequence = state_tail.min(
+        state_floor
+            .checked_add(MAX_COMPACTION_OPERATIONS)
+            .ok_or_else(|| crate::error!("Replication compaction frontier overflow"))?,
+    );
+    let acceptance_cumulative_bytes = if acceptance_sequence == acceptance_floor {
+        acceptance_floor_bytes
+    } else {
+        n(
+            &must(
+                t,
+                &format!("replication_out/{origin}/{acceptance_sequence:020}"),
+            )?,
+            "cumulative_bytes",
+        )?
+    };
+    let state_cumulative_bytes = if state_sequence == state_floor {
+        state_floor_bytes
+    } else {
+        n(
+            &must(
+                t,
+                &format!("replication_state_out/{origin}/{state_sequence:020}"),
+            )?,
+            "cumulative_bytes",
+        )?
+    };
+    for peer in required_peers(t)? {
+        let acceptance_ack = get(t, &format!("replication_ack/{peer}/{origin}"))?
+            .and_then(|value| value["sequence"].as_u64())
+            .unwrap_or(0);
+        let state_ack = get(t, &format!("replication_state_ack/{peer}/{origin}"))?
+            .and_then(|value| value["sequence"].as_u64())
+            .unwrap_or(0);
+        ensure!(
+            acceptance_ack >= acceptance_sequence && state_ack >= state_sequence,
+            "Every configured peer must acknowledge the compaction frontier"
+        );
+    }
+    let created_at = now()?;
+    let mut checkpoint = json!({
+        "version":1,
+        "cluster_id":identity(t)?["cluster_id"],
+        "origin":origin,
+        "created_at":created_at,
+        "acceptance_sequence":acceptance_sequence,
+        "acceptance_cumulative_bytes":acceptance_cumulative_bytes,
+        "state_sequence":state_sequence,
+        "state_cumulative_bytes":state_cumulative_bytes,
+        "content_root":integrity["content_root"],
+        "reference_root":integrity["reference_root"],
+        "blob_count":integrity["blob_count"],
+        "referenced_count":integrity["referenced_count"]
+    });
+    checkpoint["checksum"] = json!(hash(&pratique::json_value::to_vec(&checkpoint)?));
+    put(t, COMPACTION_KEY, &checkpoint)?;
+
+    let mut acceptance_pruned = 0u64;
+    for sequence in acceptance_floor.saturating_add(1)..=acceptance_sequence {
+        remove(t, &format!("replication_out/{origin}/{sequence:020}"))?;
+        acceptance_pruned += 1;
+    }
+    let mut state_pruned = 0u64;
+    for sequence in state_floor.saturating_add(1)..=state_sequence {
+        remove(t, &format!("replication_state_out/{origin}/{sequence:020}"))?;
+        state_pruned += 1;
+    }
+    audit(
+        t,
+        actor,
+        "cluster-compact",
+        "",
+        json!({
+            "acceptance_sequence":acceptance_sequence,
+            "state_sequence":state_sequence,
+            "acceptance_pruned":acceptance_pruned,
+            "state_pruned":state_pruned,
+            "checksum":checkpoint["checksum"]
+        }),
+    )?;
+    Ok(json!({
+        "checkpoint":checkpoint,
+        "acceptance_pruned":acceptance_pruned,
+        "state_pruned":state_pruned,
+        "more":acceptance_sequence < acceptance_tail || state_sequence < state_tail
+    }))
 }
 
 pub fn begin_resync(t: &mut Table, actor: &str, peer: &str) -> Result<Value> {
@@ -901,8 +1220,26 @@ pub fn begin_resync(t: &mut Table, actor: &str, peer: &str) -> Result<Value> {
         "Resync target is not a configured peer"
     );
     let origin = node_id(t)?;
-    remove(t, &format!("replication_ack/{peer}/{origin}"))?;
-    remove(t, &format!("replication_state_ack/{peer}/{origin}"))?;
+    let (acceptance_sequence, acceptance_cumulative_bytes) = compacted_position(t, "acceptance")?;
+    let (state_sequence, state_cumulative_bytes) = compacted_position(t, "state")?;
+    if acceptance_sequence == 0 {
+        remove(t, &format!("replication_ack/{peer}/{origin}"))?;
+    } else {
+        put(
+            t,
+            &format!("replication_ack/{peer}/{origin}"),
+            &json!({"peer":peer,"origin":origin,"sequence":acceptance_sequence,"cumulative_bytes":acceptance_cumulative_bytes,"at":now()?}),
+        )?;
+    }
+    if state_sequence == 0 {
+        remove(t, &format!("replication_state_ack/{peer}/{origin}"))?;
+    } else {
+        put(
+            t,
+            &format!("replication_state_ack/{peer}/{origin}"),
+            &json!({"peer":peer,"origin":origin,"sequence":state_sequence,"cumulative_bytes":state_cumulative_bytes,"at":now()?}),
+        )?;
+    }
     let mut mode = must(t, NODE_MODE_KEY)?;
     mode["mode"] = json!("resynchronizing");
     mode["acceptance_eligible"] = json!(false);
@@ -914,7 +1251,7 @@ pub fn begin_resync(t: &mut Table, actor: &str, peer: &str) -> Result<Value> {
         actor,
         "cluster-resync",
         "",
-        json!({"node":origin,"peer":peer,"acceptance_paused":true,"bootstrap":"ordered-log-replay"}),
+        json!({"node":origin,"peer":peer,"acceptance_paused":true,"bootstrap":if acceptance_sequence > 0 || state_sequence > 0 { "compaction-checkpoint-and-log-tail" } else { "ordered-log-replay" },"acceptance_sequence":acceptance_sequence,"state_sequence":state_sequence}),
     )?;
     Ok(mode)
 }
@@ -1021,7 +1358,9 @@ pub fn state_acknowledged(t: &Table, sequence: u64) -> Result<bool> {
 
 pub fn apply_state(t: &mut Table, operation: &Value) -> Result<u64> {
     ensure!(
-        operation["protocol"] == PROTOCOL_VERSION,
+        operation["protocol"].as_u64().is_some_and(|protocol| {
+            (MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION).contains(&protocol)
+        }),
         "Replication state protocol mismatch"
     );
     let local = identity(t)?;
@@ -1144,7 +1483,7 @@ pub fn apply_state(t: &mut Table, operation: &Value) -> Result<u64> {
                     );
                 }
             }
-            rewrite_partition_owner(t, object_id, s(incoming, "owner")?, incoming_term)?;
+            rewrite_partition_owner(t, object_id, s(incoming, "owner")?, incoming_term, false)?;
             put(t, &format!("ownership/{object_id}"), incoming)?;
         }
         _ => crate::bail!("Unsupported replication state operation"),
@@ -1168,8 +1507,8 @@ pub fn apply_state(t: &mut Table, operation: &Value) -> Result<u64> {
 pub fn rebuild_replication_state(t: &mut Table) -> Result<()> {
     let origin = node_id(t)?;
     let operations = list(t, &format!("replication_out/{origin}/"))?;
-    let mut last_sequence = 0u64;
-    let mut cumulative_bytes = 0u64;
+    let (mut last_sequence, mut cumulative_bytes) = compacted_position(t, "acceptance")?;
+    let floor = last_sequence;
     let mut oldest_at = Value::Null;
     for operation in operations {
         let sequence = n(&operation, "sequence")?;
@@ -1188,7 +1527,7 @@ pub fn rebuild_replication_state(t: &mut Table) -> Result<()> {
             operation_cumulative == expected_cumulative,
             "Invalid replication outbox byte counter"
         );
-        if last_sequence == 0 {
+        if last_sequence == floor {
             oldest_at = operation["accepted_at"].clone();
         }
         last_sequence = sequence;
@@ -1213,7 +1552,9 @@ pub fn rebuild_replication_state(t: &mut Table) -> Result<()> {
 
 pub fn apply_acceptance(t: &mut Table, operation: &Value, raw: &[u8]) -> Result<u64> {
     ensure!(
-        operation["protocol"] == PROTOCOL_VERSION && operation["kind"] == "accept",
+        operation["protocol"].as_u64().is_some_and(|protocol| {
+            (MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION).contains(&protocol)
+        }) && operation["kind"] == "accept",
         "Replication protocol mismatch"
     );
     let local = identity(t)?;
@@ -1395,11 +1736,20 @@ pub fn status(t: &Table, accepting: bool) -> Result<Value> {
                 "Invalid replication acknowledgment byte position"
             );
         } else {
-            let operation = must(t, &format!("replication_out/{node_id}/{acknowledged:020}"))?;
-            ensure!(
-                operation["cumulative_bytes"].as_u64() == Some(acknowledged_bytes),
-                "Invalid replication acknowledgment byte position"
-            );
+            if let Some(operation) =
+                get(t, &format!("replication_out/{node_id}/{acknowledged:020}"))?
+            {
+                ensure!(
+                    operation["cumulative_bytes"].as_u64() == Some(acknowledged_bytes),
+                    "Invalid replication acknowledgment byte position"
+                );
+            } else {
+                let (sequence, cumulative_bytes) = compacted_position(t, "acceptance")?;
+                ensure!(
+                    acknowledged == sequence && acknowledged_bytes == cumulative_bytes,
+                    "Replication acknowledgment is outside the retained log and checkpoint"
+                );
+            }
         }
         let lag_operations = tail_sequence - acknowledged;
         let lag_bytes = tail_bytes - acknowledged_bytes;
@@ -1414,6 +1764,7 @@ pub fn status(t: &Table, accepting: bool) -> Result<Value> {
         );
         let outbound_health = get(t, &format!("replication_peer_health/{peer}/outbound"))?;
         let inbound_health = get(t, &format!("replication_peer_health/{peer}/inbound"))?;
+        let protocol = get(t, &format!("replication_peer_protocol/{peer}"))?;
         debt_operations = debt_operations
             .checked_add(lag_operations)
             .ok_or_else(|| crate::error!("Replication debt overflow"))?;
@@ -1443,6 +1794,7 @@ pub fn status(t: &Table, accepting: bool) -> Result<Value> {
             "state_lag_operations":state_tail_sequence-state_acknowledged,
             "state_lag_bytes":state_tail_bytes-state_acknowledged_bytes,
             "last_state_acknowledged_at":state_ack["at"],
+            "protocol":protocol,
             "outbound_health":outbound_health,
             "inbound_health":inbound_health
         }));
@@ -1471,16 +1823,18 @@ pub fn status(t: &Table, accepting: bool) -> Result<Value> {
         && debt_operations == 0
         && state_debt_operations == 0
         && peers.iter().all(|peer| {
-            ["outbound_health", "inbound_health"]
-                .iter()
-                .all(|direction| {
-                    let health = &peer[*direction];
-                    health["ok"] == true
-                        && health["at"]
-                            .as_i64()
-                            .is_some_and(|at| (0..=30).contains(&current.saturating_sub(at)))
-                })
+            peer["protocol"]["compatible"] == true
+                && ["outbound_health", "inbound_health"]
+                    .iter()
+                    .all(|direction| {
+                        let health = &peer[*direction];
+                        health["ok"] == true
+                            && health["at"]
+                                .as_i64()
+                                .is_some_and(|at| (0..=30).contains(&current.saturating_sub(at)))
+                    })
         });
+    let compaction = get(t, COMPACTION_KEY)?;
     Ok(json!({
         "protocol_version":PROTOCOL_VERSION,
         "minimum_protocol_version":MIN_PROTOCOL_VERSION,
@@ -1499,6 +1853,7 @@ pub fn status(t: &Table, accepting: bool) -> Result<Value> {
         "inbound":inbound,
         "replication_debt":{"operations":debt_operations,"bytes":debt_bytes,"oldest_seconds":oldest_seconds},
         "state_replication_debt":{"operations":state_debt_operations,"bytes":state_debt_bytes},
+        "compaction":compaction,
         "health":if configured { "peer-transport" } else { "foundation" }
     }))
 }
