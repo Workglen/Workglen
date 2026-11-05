@@ -1151,6 +1151,7 @@ fn receive_queue_hides_out_of_scope_recipients_and_reports_ownership() {
         json!(["owner@example.test"])
     );
     assert_eq!(receive["records"][0]["origin_node"], "gateway");
+    assert_eq!(receive["records"][0]["scan_lane"], "light");
     assert_eq!(receive["records"][0]["scan_owner"], "gateway");
     assert_eq!(receive["total_recipients"], 1);
 }
@@ -1189,6 +1190,7 @@ fn smtp_acceptance_durably_queues_before_scanning() {
     assert_eq!(pending["rule_version"], 1);
     assert_eq!(pending["profile_version"], scan::ANALYSIS_PROFILE_VERSION);
     assert_eq!(pending["recipients"], json!(["owner@example.test"]));
+    assert_eq!(pending["scan_lane"], "light");
     assert!(
         f.cmd("jobs", json!({}))["jobs"]
             .as_array()
@@ -1202,6 +1204,9 @@ fn smtp_acceptance_durably_queues_before_scanning() {
     assert_eq!(status["scanner"]["receive_records"], 1);
     assert_eq!(status["scanner"]["pending_recipients"], 1);
     assert_eq!(status["scanner"]["states"]["queued"], 1);
+    assert_eq!(status["scanner"]["lanes"]["light"], 1);
+    assert_eq!(status["scanner"]["lane_workers"]["light"], 1);
+    assert_eq!(status["scanner"]["lane_workers"]["heavy"], 1);
     assert!(
         status["scanner"]["oldest_pending_seconds"]
             .as_i64()
@@ -1244,6 +1249,85 @@ fn smtp_acceptance_durably_queues_before_scanning() {
             Ok(())
         })
         .unwrap();
+}
+
+#[test]
+fn light_scan_lane_bypasses_heavy_backlog_and_heavy_lane_can_assist() {
+    let f = Fixture::new();
+    f.activate();
+    f.svc
+        .db
+        .write(|t| {
+            let mut settings = must(t, "settings")?;
+            settings["enabled"] = json!(true);
+            put(t, "settings", &settings)
+        })
+        .unwrap();
+    let heavy = f
+        .svc
+        .accept(
+            &attachment("archive.zip", &zip("payload.txt", b"bounded")),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.11".parse().unwrap(),
+            "sender.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    let light = f
+        .svc
+        .accept(
+            &mail("latency-sensitive plain text"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.12".parse().unwrap(),
+            "sender.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+
+    let status = f.cmd("status", json!({}));
+    assert_eq!(status["scanner"]["lanes"]["light"], 1);
+    assert_eq!(status["scanner"]["lanes"]["heavy"], 1);
+    let (light_job, _) = f.svc.claim_scan_lane("light").unwrap().unwrap();
+    assert_eq!(light_job["id"], light);
+    assert_eq!(light_job["scan_lane"], "light");
+    let (heavy_job, _) = f.svc.claim_scan_lane("heavy").unwrap().unwrap();
+    assert_eq!(heavy_job["id"], heavy);
+    assert_eq!(heavy_job["scan_lane"], "heavy");
+    assert!(f.svc.claim_scan_lane("light").unwrap().is_none());
+
+    let assist = Fixture::new();
+    assist.activate();
+    assist
+        .svc
+        .db
+        .write(|t| {
+            let mut settings = must(t, "settings")?;
+            settings["enabled"] = json!(true);
+            put(t, "settings", &settings)
+        })
+        .unwrap();
+    let only_light = assist
+        .svc
+        .accept(
+            &mail("heavy worker may help when its lane is empty"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.13".parse().unwrap(),
+            "sender.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    assert_eq!(
+        assist
+            .svc
+            .claim_scan_lane("heavy")
+            .unwrap()
+            .unwrap()
+            .0["id"],
+        only_light
+    );
 }
 
 #[test]

@@ -33,6 +33,74 @@ const MAX_JOB: usize = 1024 * 1024;
 const MAX_INSPECTION: usize = 3 * 1024 * 1024;
 const MAX_RESULT: usize = 1024 * 1024;
 const MAX_EVIDENCE: usize = 64 * 1024;
+const LIGHT_INPUT_BYTES: usize = 256 * 1024;
+const LIGHT_HEADER_BYTES: usize = 64 * 1024;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ScanLane {
+    Any,
+    Light,
+    Heavy,
+}
+
+impl ScanLane {
+    fn parse(value: Option<&str>) -> Result<Self> {
+        match value.unwrap_or("any") {
+            "any" => Ok(Self::Any),
+            "light" => Ok(Self::Light),
+            "heavy" => Ok(Self::Heavy),
+            _ => crate::bail!("Invalid scan lane"),
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Any => "any",
+            Self::Light => "light",
+            Self::Heavy => "heavy",
+        }
+    }
+}
+
+fn contains_ascii_case_insensitive(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack
+        .windows(needle.len())
+        .any(|window| window.eq_ignore_ascii_case(needle))
+}
+
+/// Assign only clearly bounded, single-part messages to the latency lane. This
+/// is a scheduling hint; both lanes run the identical complete analysis profile.
+/// Ambiguous or legacy records always take the resource-capped heavy lane.
+pub(super) fn scheduling_lane(raw: &[u8]) -> &'static str {
+    if raw.len() > LIGHT_INPUT_BYTES || raw.contains(&0) {
+        return "heavy";
+    }
+    let probe = &raw[..raw.len().min(LIGHT_HEADER_BYTES)];
+    let Some(header_end) = probe
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .or_else(|| probe.windows(2).position(|window| window == b"\n\n"))
+    else {
+        return "heavy";
+    };
+    let headers = &probe[..header_end];
+    for marker in [
+        b"content-type: multipart/".as_slice(),
+        b"content-type: application/".as_slice(),
+        b"content-type: message/".as_slice(),
+        b"content-type: image/".as_slice(),
+        b"content-type: audio/".as_slice(),
+        b"content-type: video/".as_slice(),
+        b"content-disposition:".as_slice(),
+        b"content-transfer-encoding: base64".as_slice(),
+        b"content-transfer-encoding: quoted-printable".as_slice(),
+    ] {
+        if contains_ascii_case_insensitive(headers, marker) {
+            return "heavy";
+        }
+    }
+    "light"
+}
 
 pub fn socket_path(config: &Config) -> PathBuf {
     // Keep the component deliberately short: sockaddr_un has a small fixed path
@@ -170,10 +238,19 @@ fn cancellation_requested(value: &Value) -> Result<bool> {
 impl Service {
     #[cfg(test)]
     pub(super) fn claim_scan(&self) -> Result<Option<(Value, Vec<u8>)>> {
-        self.claim_scan_for_protocol(PROTOCOL_VERSION)
+        self.claim_scan_for_protocol(PROTOCOL_VERSION, ScanLane::Any)
     }
 
-    fn claim_scan_for_protocol(&self, protocol: u64) -> Result<Option<(Value, Vec<u8>)>> {
+    #[cfg(test)]
+    pub(super) fn claim_scan_lane(&self, lane: &str) -> Result<Option<(Value, Vec<u8>)>> {
+        self.claim_scan_for_protocol(PROTOCOL_VERSION, ScanLane::parse(Some(lane))?)
+    }
+
+    fn claim_scan_for_protocol(
+        &self,
+        protocol: u64,
+        requested_lane: ScanLane,
+    ) -> Result<Option<(Value, Vec<u8>)>> {
         self.db.write(|t| {
             use redb::ReadableTable;
 
@@ -196,33 +273,60 @@ impl Service {
             if leased >= limit {
                 return Ok(None);
             }
-            let marker = {
+            let marker_for = |lane: &str| -> Result<Option<Value>> {
                 let node = super::cluster::node_id(t)?;
-                let prefix = format!("ingress_due/{node}/");
+                let prefix = format!("ingress_due/{node}/{lane}/");
                 let end = format!("{prefix}\u{10ffff}");
                 let mut due = t.range(prefix.as_str()..end.as_str())?;
-                due.next()
+                Ok(due
+                    .next()
                     .transpose()?
                     .map(|(_, value)| pratique::json_value::from_slice::<Value>(value.value()))
-                    .transpose()?
+                    .transpose()?)
+            };
+            let eligible_record = |lane: &str| -> Result<Option<Value>> {
+                let Some(marker) = marker_for(lane)? else {
+                    return Ok(None);
+                };
+                let record = must(t, &format!("ingress/{}", s(&marker, "id")?))?;
+                let eligible = if record["state"] == "leased" {
+                    record["lease_until"].as_i64()
+                } else {
+                    record["due"].as_i64()
+                }
+                .ok_or_else(|| crate::error!("Invalid indexed scan time"))?;
+                Ok((eligible <= current).then_some(record))
+            };
+            let marker = match requested_lane {
+                ScanLane::Light => eligible_record("light")?,
+                ScanLane::Heavy => match eligible_record("heavy")? {
+                    Some(record) => Some(record),
+                    None => eligible_record("light")?,
+                },
+                ScanLane::Any => {
+                    let light = eligible_record("light")?;
+                    let heavy = eligible_record("heavy")?;
+                    [light, heavy].into_iter().flatten().min_by_key(|record| {
+                        (
+                            if record["state"] == "leased" {
+                                record["lease_until"].as_i64().unwrap_or(i64::MAX)
+                            } else {
+                                record["due"].as_i64().unwrap_or(i64::MAX)
+                            },
+                            record["arrived"].as_i64().unwrap_or(i64::MAX),
+                            record["id"].as_str().unwrap_or("").to_string(),
+                        )
+                    })
+                }
             };
             let Some(marker) = marker else {
                 return Ok(None);
             };
-            let mut record = must(t, &format!("ingress/{}", s(&marker, "id")?))?;
+            let mut record = marker;
             ensure!(
                 super::cluster::scan_owned(t, &record)?,
                 "Scan ownership changed"
             );
-            let eligible = if record["state"] == "leased" {
-                record["lease_until"].as_i64()
-            } else {
-                record["due"].as_i64()
-            }
-            .ok_or_else(|| crate::error!("Invalid indexed scan time"))?;
-            if eligible > current {
-                return Ok(None);
-            }
             let token = id();
             record["state"] = json!("leased");
             record["lease_token"] = json!(token);
@@ -250,6 +354,7 @@ impl Service {
                 "id":record["id"],
                 "token":record["lease_token"],
                 "scan_generation":record["scan_generation"],
+                "scan_lane":record["scan_lane"].as_str().unwrap_or("heavy"),
                 "hash":record["hash"],
                 "sender":record["envelope_from"],
                 "source_ip":record["source_ip"],
@@ -657,6 +762,7 @@ pub(super) fn handle(service: &Service, mut stream: UnixStream) -> Result<()> {
     service.mark_scanner_seen()?;
     if role == "capacity" {
         let settings = service.settings()?;
+        let threads = n(&settings, "scan_concurrency")?;
         write_json(
             &mut stream,
             &json!({
@@ -666,7 +772,10 @@ pub(super) fn handle(service: &Service, mut stream: UnixStream) -> Result<()> {
                 "api_version":scan::ANALYSIS_API_VERSION,
                 "profile_version":scan::ANALYSIS_PROFILE_VERSION,
                 "coverage_version":scan::COVERAGE_VERSION,
-                "threads":n(&settings,"scan_concurrency")?
+                "threads":threads,
+                "light_threads":threads.saturating_sub(1),
+                "heavy_threads":if threads > 1 { 1 } else { 0 },
+                "any_threads":if threads == 1 { 1 } else { 0 }
             }),
             MAX_HELLO,
         )?;
@@ -678,7 +787,12 @@ pub(super) fn handle(service: &Service, mut stream: UnixStream) -> Result<()> {
         write_json(&mut stream, &response, MAX_HELLO)?;
         return Ok(());
     }
-    let Some((job, raw)) = service.claim_scan_for_protocol(protocol)? else {
+    let lane = if protocol >= 2 {
+        ScanLane::parse(hello["lane"].as_str())?
+    } else {
+        ScanLane::Any
+    };
+    let Some((job, raw)) = service.claim_scan_for_protocol(protocol, lane)? else {
         write_json(
             &mut stream,
             &json!({
@@ -903,23 +1017,24 @@ impl Drop for Heartbeat {
     }
 }
 
-fn scan_once(config: &Config, checker: &crate::auth::Checker) -> Result<bool> {
+fn scan_once(config: &Config, checker: &crate::auth::Checker, lane: ScanLane) -> Result<bool> {
     let stream = match UnixStream::connect(socket_path(config)) {
         Ok(stream) => stream,
         Err(_) => return Ok(false),
     };
-    scan_stream_inner(checker, stream, Some(socket_path(config)))
+    scan_stream_inner(checker, stream, Some(socket_path(config)), lane)
 }
 
 #[cfg(test)]
 pub(super) fn scan_stream(checker: &crate::auth::Checker, stream: UnixStream) -> Result<bool> {
-    scan_stream_inner(checker, stream, None)
+    scan_stream_inner(checker, stream, None, ScanLane::Any)
 }
 
 fn scan_stream_inner(
     checker: &crate::auth::Checker,
     mut stream: UnixStream,
     heartbeat_path: Option<PathBuf>,
+    lane: ScanLane,
 ) -> Result<bool> {
     stream.set_read_timeout(Some(Duration::from_secs(240)))?;
     stream.set_write_timeout(Some(Duration::from_secs(30)))?;
@@ -932,7 +1047,8 @@ fn scan_stream_inner(
             "api_version":scan::ANALYSIS_API_VERSION,
             "profile_version":scan::ANALYSIS_PROFILE_VERSION,
             "coverage_version":scan::COVERAGE_VERSION,
-            "role":"scanner"
+            "role":"scanner",
+            "lane":lane.name()
         }),
         MAX_HELLO,
     )?;
@@ -941,6 +1057,12 @@ fn scan_stream_inner(
         return Ok(false);
     }
     let protocol = verify_versions(&job)?;
+    ensure!(
+        protocol == MIN_PROTOCOL_VERSION
+            || lane == ScanLane::Any
+            || job["scan_lane"] == lane.name(),
+        "Scan lane mismatch"
+    );
     ensure!(
         !cancellation_requested(&job["cancellation"])?,
         "Scan was cancelled before it started"
@@ -1111,15 +1233,23 @@ pub fn run(config: Config) -> Result<()> {
         }
         std::thread::sleep(Duration::from_secs(1));
     };
-    let checkers = (0..threads)
-        .map(|_| crate::auth::Checker::new(config.dns_server))
+    let lanes = if threads == 1 {
+        vec![ScanLane::Any]
+    } else {
+        std::iter::once(ScanLane::Heavy)
+            .chain(std::iter::repeat_n(ScanLane::Light, threads - 1))
+            .collect()
+    };
+    let checkers = lanes
+        .into_iter()
+        .map(|lane| Ok((crate::auth::Checker::new(config.dns_server)?, lane)))
         .collect::<Result<Vec<_>>>()?;
-    for checker in checkers {
+    for (checker, lane) in checkers {
         let config = config.clone();
         std::thread::spawn(move || {
             loop {
                 let worked = crate::resilience::boundary("security scanner worker", || {
-                    scan_once(&config, &checker)
+                    scan_once(&config, &checker, lane)
                 });
                 match worked {
                     Ok(true) => {}
@@ -1185,6 +1315,26 @@ mod tests {
         });
         assert!(!scan_stream(&checker, worker).unwrap());
         server.join().unwrap();
+    }
+
+    #[test]
+    fn only_clearly_simple_messages_enter_the_light_lane() {
+        assert_eq!(
+            scheduling_lane(b"From: sender@example.invalid\r\nSubject: simple\r\n\r\nhello"),
+            "light"
+        );
+        for raw in [
+            b"MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=x\r\n\r\n--x--"
+                .as_slice(),
+            b"Content-Type: application/octet-stream\r\n\r\ndata".as_slice(),
+            b"Content-Transfer-Encoding: BASE64\r\n\r\nZGF0YQ==".as_slice(),
+            b"malformed headers without a separator".as_slice(),
+        ] {
+            assert_eq!(scheduling_lane(raw), "heavy");
+        }
+        let mut large = b"Subject: large\r\n\r\n".to_vec();
+        large.resize(LIGHT_INPUT_BYTES + 1, b'x');
+        assert_eq!(scheduling_lane(&large), "heavy");
     }
 
     #[test]

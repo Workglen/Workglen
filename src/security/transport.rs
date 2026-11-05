@@ -529,6 +529,7 @@ fn commit_acceptance(
         "routes":routes,
         "settings_revision":request.settings["revision"],
         "analysis_settings":super::scan_worker::analysis_settings(&request.settings)?,
+        "scan_lane":super::scan_worker::scheduling_lane(&request.raw),
         "rule_version":active["id"],
         "shadow_version":shadow_version,
         "api_version":super::scan::ANALYSIS_API_VERSION,

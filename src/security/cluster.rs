@@ -103,8 +103,13 @@ fn ownership(t: &Table, partition: &str) -> Result<Value> {
 }
 
 pub fn stamp_ingress(t: &Table, record: &mut Value) -> Result<bool> {
+    let mut changed = false;
+    if record["scan_lane"].as_str().is_none() {
+        record["scan_lane"] = json!("heavy");
+        changed = true;
+    }
     if record["origin_node"].as_str().is_some() {
-        return Ok(false);
+        return Ok(changed);
     }
     let node = node_id(t)?;
     let owner = ownership(t, &node)?;

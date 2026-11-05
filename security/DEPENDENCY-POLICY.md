@@ -324,3 +324,11 @@ frames and never puts decoded content in audit events. This native role may be
 restarted or replaced while ingress continues to spool within configured
 capacity. Lazaret remains in-process first-party library code inside that role;
 no Lazaret implementation change is made by this boundary.
+
+The native scan role also has durable light and heavy scheduling lanes without
+adding a process, runtime or dependency. Only small, clearly single-part mail is
+assigned to the latency lane; multipart, attachment, encoded, large, malformed
+or legacy work is conservatively heavy. With the default two scan threads one is
+reserved for each lane. Light workers never claim heavy work, while an idle heavy
+worker may assist the light queue. Both lanes run the identical pinned analysis
+profile, rules, coverage checks and mandatory incomplete-scan quarantine.

@@ -936,6 +936,7 @@ Ok(())}
                     pending_recipients,
                     oldest_arrival,
                     receive_states,
+                    receive_lanes,
                 ) = if global {
                     let receive_states = state_counts(t, "ingress")?;
                     let receive_records = receive_states
@@ -958,6 +959,7 @@ Ok(())}
                         ingress_recipient_count(t)?,
                         oldest_ingress_arrival(t)?,
                         receive_states,
+                        state_counts(t, "ingress_lane")?,
                     )
                 } else {
                     let mut counts = json!({});
@@ -974,6 +976,7 @@ Ok(())}
                     let mut pending_recipients = 0u64;
                     let mut oldest_arrival: Option<i64> = None;
                     let mut receive_states = json!({});
+                    let mut receive_lanes = json!({});
                     for pending in list(t, "ingress/")? {
                         let visible = arr(&pending, "recipients")?
                             .iter()
@@ -994,6 +997,10 @@ Ok(())}
                             let state = s(&pending, "state")?;
                             receive_states[state] =
                                 json!(receive_states[state].as_u64().unwrap_or(0) + 1);
+                            let lane = pending["scan_lane"].as_str().unwrap_or("heavy");
+                            ensure!(["light", "heavy"].contains(&lane), "Invalid scan lane");
+                            receive_lanes[lane] =
+                                json!(receive_lanes[lane].as_u64().unwrap_or(0) + 1);
                         }
                     }
                     for job in list(t, "job/")? {
@@ -1020,6 +1027,7 @@ Ok(())}
                         pending_recipients,
                         oldest_arrival,
                         receive_states,
+                        receive_lanes,
                     )
                 };
                 if pending_recipients > 0 {
@@ -1041,6 +1049,8 @@ Ok(())}
                     "pending_recipients":pending_recipients,
                     "oldest_pending_seconds":oldest_arrival.map(|arrival| current.saturating_sub(arrival).max(0)),
                     "states":receive_states,
+                    "lanes":receive_lanes,
+                    "lane_workers":{"light":n(&settings,"scan_concurrency")?.saturating_sub(1),"heavy":if n(&settings,"scan_concurrency")? > 1 { 1 } else { 0 },"any":if n(&settings,"scan_concurrency")? == 1 { 1 } else { 0 }},
                     "retries_since_start":self.scan_retries.load(Ordering::Relaxed),
                     "protocol_version":super::scan_worker::PROTOCOL_VERSION,
                     "api_version":scan::ANALYSIS_API_VERSION,
@@ -1074,7 +1084,7 @@ Ok(())}
                 let alerts = operational_alerts(&scanner, &jobs, &storage_host, &cluster, current);
 
                 Ok(json!({
-                "instance":self.config.instance,"workspace":self.config.workspace,"version":1,"storage_schema":2,"tls":self.tls_status()?,"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"storage_host":storage_host,"at":current,"enabled":settings["enabled"],"active":must(t,"active")?,"messages":counts,"jobs":jobs,"bytes":bytes,"scanner":scanner,"delivery":{"configured_workers":settings["delivery_concurrency"],"running_workers":self.delivery_workers.load(Ordering::Acquire),"active":self.delivery_active.load(Ordering::Relaxed),"attempts_since_start":self.delivery_attempts.load(Ordering::Relaxed),"succeeded_since_start":self.delivery_succeeded.load(Ordering::Relaxed),"deferred_since_start":self.delivery_deferred.load(Ordering::Relaxed)},"cluster":cluster,"alerts":alerts,"smtp":{"since":self.started_at,"accepted":self.smtp_accepted.load(Ordering::Relaxed),"deferred":self.smtp_deferred.load(Ordering::Relaxed),"acceptance_storage":self.acceptance.status()},"capacity":capacity,"capabilities":["native-inspection","smtp-gateway","rules","quarantine","digests","workglen","graph","ews","ai-instructions","authenticated-peer-replication","replicated-processing-state","fenced-ownership-operations","native-free-space-admission","cluster-replication-telemetry","content-hash-reconciliation","safe-node-exclusion","derived-operational-alerts","bounded-acceptance-group-commit","indexed-concurrent-delivery","bounded-operational-lists","message-journey"],"engine":scan::ENGINE}
+                "instance":self.config.instance,"workspace":self.config.workspace,"version":1,"storage_schema":2,"tls":self.tls_status()?,"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"storage_host":storage_host,"at":current,"enabled":settings["enabled"],"active":must(t,"active")?,"messages":counts,"jobs":jobs,"bytes":bytes,"scanner":scanner,"delivery":{"configured_workers":settings["delivery_concurrency"],"running_workers":self.delivery_workers.load(Ordering::Acquire),"active":self.delivery_active.load(Ordering::Relaxed),"attempts_since_start":self.delivery_attempts.load(Ordering::Relaxed),"succeeded_since_start":self.delivery_succeeded.load(Ordering::Relaxed),"deferred_since_start":self.delivery_deferred.load(Ordering::Relaxed)},"cluster":cluster,"alerts":alerts,"smtp":{"since":self.started_at,"accepted":self.smtp_accepted.load(Ordering::Relaxed),"deferred":self.smtp_deferred.load(Ordering::Relaxed),"acceptance_storage":self.acceptance.status()},"capacity":capacity,"capabilities":["native-inspection","smtp-gateway","rules","quarantine","digests","workglen","graph","ews","ai-instructions","authenticated-peer-replication","replicated-processing-state","fenced-ownership-operations","native-free-space-admission","cluster-replication-telemetry","content-hash-reconciliation","safe-node-exclusion","derived-operational-alerts","bounded-acceptance-group-commit","indexed-concurrent-delivery","bounded-operational-lists","message-journey","priority-scan-lanes"],"engine":scan::ENGINE}
                 ))
             }
 
@@ -1531,6 +1541,7 @@ Ok(())}
                             "profile_version":record["profile_version"],
                             "coverage_version":record["coverage_version"],
                             "origin_node":record["origin_node"],
+                            "scan_lane":record["scan_lane"].as_str().unwrap_or("heavy"),
                             "scan_owner":record["scan_owner"],
                             "scan_generation":record["scan_generation"],
                             "delivery_owner":record["delivery_owner"],

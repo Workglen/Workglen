@@ -131,6 +131,9 @@ fn adjust_status(t: &mut Table, key: &str, value: &Value, change: i128) -> Resul
             "status/ingress_recipients",
             change * arr(value, "recipients")?.len() as i128,
         )?;
+        let lane = value["scan_lane"].as_str().unwrap_or("heavy");
+        ensure!(["light", "heavy"].contains(&lane), "Invalid scan lane");
+        adjust_counter(t, &format!("status/ingress_lane/{lane}"), change)?;
     }
     Ok(())
 }
@@ -156,8 +159,10 @@ fn ingress_due_key(value: &Value) -> Result<Option<String>> {
         .ok_or_else(|| crate::error!("Invalid scan arrival time"))?;
     let scan_owner = s(value, "scan_owner")?;
     key(scan_owner)?;
+    let lane = value["scan_lane"].as_str().unwrap_or("heavy");
+    ensure!(["light", "heavy"].contains(&lane), "Invalid scan lane");
     Ok(Some(format!(
-        "ingress_due/{scan_owner}/{:020}/{:020}/{}",
+        "ingress_due/{scan_owner}/{lane}/{:020}/{:020}/{}",
         ordered_time(eligible),
         ordered_time(arrived),
         s(value, "id")?
