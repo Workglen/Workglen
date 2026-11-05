@@ -1,6 +1,6 @@
 # Mail Security scaling and initial sizing
 
-Updated: 2026-11-04. These are local development measurements, not production capacity claims.
+Updated: 2026-11-05. These are local development measurements, not production capacity claims.
 
 ## What changed
 
@@ -31,6 +31,8 @@ node security/tests/ingress-scale.cjs 1000,5000,10000 20 4096 0 1 1 0
 node security/tests/ingress-scale.cjs 1000,5000 20 4096 1 1 1 0
 node security/tests/ingress-scale.cjs 1000 20 65536 0 1 1 0
 node security/tests/scanner-scale.cjs 500 1,2,4,8 65536
+# Three alternating shared-versus-lane runs: 160 archive-heavy plus 40 light
+cargo test --release scanner_lane_mixed_workload_profile -- --ignored --nocapture
 node security/tests/ingress-scale.cjs 50000 40 4096 0 2 1,1 0
 # Deliberate 60/40 MX/distributor-skew simulation
 node security/tests/ingress-scale.cjs 25000 40 4096 0 2 3,2 0
@@ -89,6 +91,15 @@ The scanner concurrency matrix used 500 benign 64 KiB messages and included nati
 | 8 | 75.7/s | 75.9 ms | 8 | 47.0 MiB |
 
 Two scanner workers remain the default. Four added less than one percent throughput over two, while eight slightly regressed throughput and increased p95 3.6x. This profile is dominated by serialized durable finalization; archive-heavy target-host profiles may have a different CPU/RSS curve and must be measured before raising concurrency.
+
+The explicit mixed-lane benchmark used 160 archive-heavy messages (351,991 raw MIME bytes each, containing a 256 KiB tar/gzip payload) already queued ahead of 40 simple 4 KiB messages. It ran each configuration three times in alternating order and reports medians:
+
+| Two-worker scheduling | Total messages/s | Light first completion | Light p50 completion | Light p95 completion | Light service p95 |
+|---|---:|---:|---:|---:|---:|
+| Shared oldest-first workers | 69.4/s | 2.319 s | 2.599 s | 2.854 s | 23.1 ms |
+| One heavy + one light lane | 58.6/s | 19 ms | 488 ms | 915 ms | 18.9 ms |
+
+The lane split produced a clear 3.12x light-p95 improvement and moved the first simple message ahead by about 2.30 seconds. It also reduced total mixed-workload throughput by 15.5% and increased total completion time from a 2.881-second median to 3.411 seconds. That cost is expected from the strict reservation: after the 40 light messages drain, the light worker does not take the remaining heavy work. The current result supports a latency-reserve decision, not a claim of free throughput. The next optimization should measure configurable heavy/light splits and bounded weighted assistance while proving that a newly arriving light message cannot become trapped behind an unbounded archive inspection and that heavy work cannot starve.
 
 The following older backlog rows predate bounded group commit and remain useful as conservative backlog/RSS/storage evidence, not current peak-throughput results:
 
@@ -181,6 +192,7 @@ Initial alerts:
 
 ## Remaining gates
 
+- Recover more of the 15.5% heavy-dominated mixed-workload throughput cost while retaining the measured light p95 improvement; test configurable four-plus-worker lane splits and only bounded assistance that cannot weaken the latency reserve, durable leases or heavy-lane progress.
 - Repeat 10k/25k on the intended Ubuntu filesystem and service units, including restart during the backlog and derived-state rebuild timing.
 - Run representative 64 KiB, 1 MiB and near-limit MIME mixes with benign, nested, malformed and compression-heavy attachments.
 - Repeat the 5k persistent-session SMTP test across a real network on the target Ubuntu host and a disposable downstream service; current evidence is loopback only.

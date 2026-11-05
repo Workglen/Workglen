@@ -1,6 +1,6 @@
 # Mail Security backlog
 
-Updated: 2026-11-04 for the TBD 0.1.1 development/test release.
+Updated: 2026-11-05 for the TBD 0.1.1 development/test release.
 
 This backlog records future work. An item here is not a claim that the saved release implements it. There is no current installation.
 
@@ -43,6 +43,7 @@ Remaining hardening/operations work:
 - Delivery selection now uses a durable partition/term/owner/due index and a configurable bounded 1–16 worker pool (default four), replacing the single O(n) list-and-sort loop. Rebuild and eight-worker concurrent-claim tests prove 100 indexed jobs are claimed exactly once. The 5k loopback run exercised the pool through downstream delivery.
 - A scanner matrix over 500 benign 64 KiB messages measured 71.0/s at one worker, 75.6/s at two, 76.2/s at four and 75.7/s at eight. Two remains the default because higher concurrency added negligible throughput and sharply increased p95. Archive-heavy Ubuntu sizing remains required.
 - The default two-worker scanner now reserves one indexed latency lane for small, clearly single-part mail and one resource-capped heavy lane for multipart, attachments, encoded bodies, large or ambiguous input. Light workers never take heavy work; an idle heavy worker may assist the light queue. Classification changes scheduling only—both lanes run the same pinned analysis profile and fail-closed coverage rules. Status and the receive queue expose lane depth/placement. A mixed light/archive-heavy latency campaign remains required on Ubuntu.
+- A three-run alternating release benchmark used 160 archive-heavy 351,991-byte messages queued ahead of 40 simple 4 KiB messages. The dedicated light lane reduced light-message p95 completion from 2.854 s to 0.915 s (3.12x) and first completion from 2.319 s to 19 ms. The latency reserve is real, but it is not free: after the light queue drained, its worker stayed reserved, so median total throughput fell from 69.4/s to 58.6/s (15.5%) and total elapsed time rose from 2.881 s to 3.411 s. This is local synthetic evidence, not an Ubuntu SLO.
 - A same-host two-store baseline accepted 50,000 messages at an exact 25k/25k split with 40 writers: 229.0 aggregate accepts/s, 350 ms p95, 339 ms last-quarter p95, 8 ms combined status, 74.3 MiB peak RSS and 1,025.2 MiB aggregate disk growth. It intentionally excludes peer replication and is the ceiling against which SEC-HA-02 overhead will be measured.
 - The actual-process test queued 1,000 messages over separate verified-STARTTLS connections with 16 concurrent clients while the scanner was unavailable, killed/replaced the scanner four times, observed the deliberate capacity refusal and delivered all 1,076 accepted messages.
 - A persistent-session real-process campaign accepted 5,000 messages while the scanner was offline through 16 verified-STARTTLS clients and 48 total connections (up to 150 messages each). Acceptance sustained 1,877.6/s; four scanner `SIGKILL`/replacement cycles, one deliberate refusal and delivery of all 5,076 accepted messages completed in 145.864 seconds.
@@ -51,6 +52,7 @@ Detailed results, repeatable commands, conservative initial resource envelopes, 
 
 Remaining before production sizing:
 
+- Recover more heavy-backlog throughput without sacrificing the demonstrated light-lane latency reserve. Measure configurable lane splits at four and higher worker limits and evaluate bounded/weighted assistance that cannot strand a newly arrived light item behind an unbounded heavy inspection. Preserve durable leases, exact MIME ownership, fail-closed results, heavy-work progress and restart recovery; add host-calibrated light-p95 and total-throughput regression guards only after the policy is stable.
 - Repeat 10k/25k and a 50k campaign on the intended Ubuntu filesystem and systemd units; measure restart rebuild and retention collection time.
 - Run 1 MiB and near-limit benign/malformed/nested/compression-heavy distributions; repeat the scanner concurrency matrix for those profiles on Ubuntu.
 - Repeat the completed 5k persistent-session SMTP campaign across a real network on the target Ubuntu host and disposable downstream service.

@@ -766,6 +766,294 @@ fn scanner_concurrency_scaling_profile() {
 }
 
 #[test]
+#[ignore = "explicit mixed light/archive-heavy scanner lane benchmark"]
+fn scanner_lane_mixed_workload_profile() {
+    use std::{
+        sync::{Arc, Barrier, Mutex},
+        time::Instant,
+    };
+
+    fn configured_usize(
+        name: &str,
+        default: usize,
+        range: std::ops::RangeInclusive<usize>,
+    ) -> usize {
+        let value = std::env::var(name)
+            .ok()
+            .map(|value| value.parse::<usize>().expect("integer lane benchmark setting"))
+            .unwrap_or(default);
+        assert!(range.contains(&value), "{name} is outside the safe test range");
+        value
+    }
+
+    fn percentile(values: &mut [u64], percentile: usize) -> u64 {
+        values.sort_unstable();
+        values[(values.len() - 1) * percentile / 100]
+    }
+
+    fn median_u64(mut values: Vec<u64>) -> u64 {
+        values.sort_unstable();
+        values[values.len() / 2]
+    }
+
+    fn median_f64(mut values: Vec<f64>) -> f64 {
+        values.sort_by(|left, right| left.total_cmp(right));
+        values[values.len() / 2]
+    }
+
+    fn summarize(mode: &str, samples: Vec<Value>) -> Value {
+        let u64_metric = |name: &str| {
+            median_u64(
+                samples
+                    .iter()
+                    .map(|sample| sample[name].as_u64().unwrap())
+                    .collect(),
+            )
+        };
+        let f64_metric = |name: &str| {
+            median_f64(
+                samples
+                    .iter()
+                    .map(|sample| sample[name].as_f64().unwrap())
+                    .collect(),
+            )
+        };
+        json!({
+            "mode":mode,
+            "runs":samples.len(),
+            "samples":samples,
+            "elapsed_ms":u64_metric("elapsed_ms"),
+            "messages_per_second":f64_metric("messages_per_second"),
+            "light_completion_min_us":u64_metric("light_completion_min_us"),
+            "light_completion_p50_us":u64_metric("light_completion_p50_us"),
+            "light_completion_p95_us":u64_metric("light_completion_p95_us"),
+            "light_completion_p99_us":u64_metric("light_completion_p99_us"),
+            "light_completion_max_us":u64_metric("light_completion_max_us"),
+            "light_service_p95_us":u64_metric("light_service_p95_us"),
+            "heavy_service_p95_us":u64_metric("heavy_service_p95_us")
+        })
+    }
+
+    fn light_mail(target_bytes: usize) -> Vec<u8> {
+        let mut raw = b"From: sender@example.invalid\r\nTo: owner@example.test\r\nSubject: Fast track\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n".to_vec();
+        assert!(raw.len() + 2 <= target_bytes);
+        raw.resize(target_bytes - 2, b'x');
+        raw.extend_from_slice(b"\r\n");
+        raw
+    }
+
+    fn run(
+        priority_lanes: bool,
+        heavy_messages: usize,
+        light_messages: usize,
+        heavy_raw: &[u8],
+        light_raw: &[u8],
+    ) -> Value {
+        let total = heavy_messages + light_messages;
+        let f = Fixture::new();
+        f.activate();
+        f.svc
+            .db
+            .write(|t| {
+                let mut settings = must(t, "settings")?;
+                settings["enabled"] = json!(true);
+                settings["max_messages"] = json!(total.max(100));
+                settings["max_jobs"] = json!(total.max(100));
+                settings["max_bytes"] = json!(1024u64.pow(3));
+                settings["scan_concurrency"] = json!(2);
+                put(t, "settings", &settings)
+            })
+            .unwrap();
+        for _ in 0..heavy_messages {
+            f.svc
+                .accept(
+                    heavy_raw,
+                    "sender@example.invalid",
+                    &["owner@example.test".into()],
+                    "192.0.2.60".parse().unwrap(),
+                    "lane-benchmark.example.invalid",
+                )
+                .unwrap();
+        }
+        f.svc
+            .db
+            .write(|t| {
+                let older = now()? - 60;
+                for mut record in list(t, "ingress/")? {
+                    record["arrived"] = json!(older);
+                    record["due"] = json!(older);
+                    put(t, &format!("ingress/{}", s(&record, "id")?), &record)?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        for _ in 0..light_messages {
+            f.svc
+                .accept(
+                    light_raw,
+                    "sender@example.invalid",
+                    &["owner@example.test".into()],
+                    "192.0.2.61".parse().unwrap(),
+                    "lane-benchmark.example.invalid",
+                )
+                .unwrap();
+        }
+        let status = f.cmd("status", json!({}));
+        assert_eq!(status["scanner"]["lanes"]["heavy"], heavy_messages as u64);
+        assert_eq!(status["scanner"]["lanes"]["light"], light_messages as u64);
+
+        let mode = if priority_lanes {
+            "priority-lanes"
+        } else {
+            "shared-fifo"
+        };
+        let lanes: [&str; 2] = if priority_lanes {
+            ["heavy", "light"]
+        } else {
+            ["any", "any"]
+        };
+        let barrier = Arc::new(Barrier::new(lanes.len() + 1));
+        let completions = Arc::new(Mutex::new(Vec::with_capacity(total)));
+        let started = Instant::now();
+        let workers: Vec<_> = lanes
+            .into_iter()
+            .map(|lane| {
+                let service = f.svc.clone();
+                let barrier = barrier.clone();
+                let completions = completions.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    while let Some((job, raw)) = service.claim_scan_lane(lane).unwrap() {
+                        let item_started = Instant::now();
+                        let result = synthetic_worker_result(&service, &job, &raw);
+                        service
+                            .finalize_scan(
+                                job["id"].as_str().unwrap(),
+                                job["token"].as_str().unwrap(),
+                                &result,
+                            )
+                            .unwrap();
+                        completions.lock().unwrap().push((
+                            job["scan_lane"] == "light",
+                            u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX),
+                            u64::try_from(item_started.elapsed().as_micros()).unwrap_or(u64::MAX),
+                        ));
+                    }
+                })
+            })
+            .collect();
+        barrier.wait();
+        for worker in workers {
+            worker.join().unwrap();
+        }
+        let elapsed = started.elapsed();
+        let completions = Arc::try_unwrap(completions)
+            .unwrap()
+            .into_inner()
+            .unwrap();
+        assert_eq!(completions.len(), total);
+        assert_eq!(f.cmd("status", json!({}))["scanner"]["receive_records"], 0);
+        let mut light_completion: Vec<u64> = completions
+            .iter()
+            .filter(|(light, _, _)| *light)
+            .map(|(_, completed, _)| *completed)
+            .collect();
+        let mut light_service: Vec<u64> = completions
+            .iter()
+            .filter(|(light, _, _)| *light)
+            .map(|(_, _, service)| *service)
+            .collect();
+        let mut heavy_service: Vec<u64> = completions
+            .iter()
+            .filter(|(light, _, _)| !*light)
+            .map(|(_, _, service)| *service)
+            .collect();
+        json!({
+            "mode":mode,
+            "messages":total,
+            "elapsed_ms":elapsed.as_millis() as u64,
+            "messages_per_second":total as f64 / elapsed.as_secs_f64(),
+            "light_completion_min_us":*light_completion.iter().min().unwrap(),
+            "light_completion_p50_us":percentile(&mut light_completion,50),
+            "light_completion_p95_us":percentile(&mut light_completion,95),
+            "light_completion_p99_us":percentile(&mut light_completion,99),
+            "light_completion_max_us":*light_completion.last().unwrap(),
+            "light_service_p95_us":percentile(&mut light_service,95),
+            "heavy_service_p95_us":percentile(&mut heavy_service,95)
+        })
+    }
+
+    let runs = configured_usize("WORKGLEN_SCANNER_LANE_RUNS", 3, 1..=9);
+    let heavy_messages = configured_usize("WORKGLEN_SCANNER_LANE_HEAVY", 160, 10..=1_000);
+    let light_messages = configured_usize("WORKGLEN_SCANNER_LANE_LIGHT", 40, 10..=10_000);
+    let heavy_payload_bytes = configured_usize(
+        "WORKGLEN_SCANNER_LANE_HEAVY_BYTES",
+        256 * 1024,
+        64 * 1024..=2 * 1024 * 1024,
+    );
+    let light_bytes = configured_usize(
+        "WORKGLEN_SCANNER_LANE_LIGHT_BYTES",
+        4 * 1024,
+        256..=256 * 1024,
+    );
+    let heavy_raw = attachment(
+        "representative.tar.gz",
+        &tar_gzip("payload.txt", &vec![b'x'; heavy_payload_bytes]),
+    );
+    let light_raw = light_mail(light_bytes);
+    assert_eq!(super::scan_worker::scheduling_lane(&heavy_raw), "heavy");
+    assert_eq!(super::scan_worker::scheduling_lane(&light_raw), "light");
+
+    let mut shared_samples = Vec::with_capacity(runs);
+    let mut priority_samples = Vec::with_capacity(runs);
+    for round in 0..runs {
+        let shared = || {
+            run(
+                false,
+                heavy_messages,
+                light_messages,
+                &heavy_raw,
+                &light_raw,
+            )
+        };
+        let priority = || {
+            run(
+                true,
+                heavy_messages,
+                light_messages,
+                &heavy_raw,
+                &light_raw,
+            )
+        };
+        if round.is_multiple_of(2) {
+            shared_samples.push(shared());
+            priority_samples.push(priority());
+        } else {
+            priority_samples.push(priority());
+            shared_samples.push(shared());
+        }
+    }
+    let shared = summarize("shared-fifo", shared_samples);
+    let priority = summarize("priority-lanes", priority_samples);
+    println!(
+        "SCANNER_LANES {}",
+        pratique::json_value::to_string(&json!({
+            "heavy_messages":heavy_messages,
+            "light_messages":light_messages,
+            "runs":runs,
+            "heavy_payload_bytes":heavy_payload_bytes,
+            "heavy_message_bytes":heavy_raw.len(),
+            "light_message_bytes":light_raw.len(),
+            "shared":shared,
+            "priority":priority,
+            "light_p95_speedup":shared["light_completion_p95_us"].as_u64().unwrap() as f64 / priority["light_completion_p95_us"].as_u64().unwrap() as f64,
+            "total_throughput_ratio":priority["messages_per_second"].as_f64().unwrap() / shared["messages_per_second"].as_f64().unwrap()
+        }))
+        .unwrap()
+    );
+}
+
+#[test]
 fn pdf_active_and_ole_blocked() {
     blocked(&attachment(
         "invoice.pdf",
