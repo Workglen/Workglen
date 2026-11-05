@@ -17,6 +17,7 @@ unrelated upstream files alone; Workglen vendors only the library subset.
 | PRA-WG-01 | `0001-workglen-crypto.patch` | Earlier integration: strict Ed25519 verification, streaming legacy SHA-1, RSA exponent accessor, RSA-2048 generation, protected private-key PEM export, and fail-closed Linux entropy readiness. Seven files: `src/crypto/ed25519.rs`, `mod.rs`, `rand.rs`, `rsa.rs`, `rsa_generate.rs`, `sha1.rs`, and `src/sign.rs`. |
 | PRA-WG-02 | `0002-workglen-async-sockets.patch` | This Tokio-removal stage: cooperative `asyncio::yield_now`, bounded nonblocking UDP/TCP sockets, cancellable TCP connect/read/write, literal-address operation and standalone socket tests. Five files: `src/asyncio/exec.rs`, `mod.rs`, `socket.rs`, `socket/connect.rs`, and `tests/async_socket.rs`. |
 | PRA-WG-03 | `0003-workglen-typed-data-json.patch` | Explicit typed record contracts, bounded JSON values/parser/writer, reuse of the existing strict parser grammar and new reusable tests. Six files: `src/data/mod.rs`, `src/data/macros.rs`, `src/json_value.rs`, `src/json.rs`, `src/lib.rs`, `tests/data_json.rs`. |
+| PRA-WG-04 | `0004-workglen-fuzz-server-records.patch` | Development-only TLS server fuzz support: fragment arbitrary handshake bytes into records no larger than `MAX_PLAINTEXT`, and add an oversized handshake-stream regression seed. One file: `src/tls/server_fuzz.rs`. Production TLS code and its record-size assertion are unchanged. |
 
 The current Workglen vendor tree also contains a documented
 `PRA-WG-05-draft` change in `src/sys.rs`: a narrow Linux/macOS native
@@ -24,7 +25,7 @@ filesystem-available-byte probe used by Mail Security admission. It is recorded
 under `local_unstaged_changes` so `verify.py --vendor` remains exact, but it is
 not in `series`, has not received the reusable upstream test work described in
 `PRATIQUE-UPSTREAM.md`, and must not be represented as part of the verified
-patch handoff.
+four-patch handoff.
 
 Existing `block_on`, timer/timeout futures and async I/O traits are reused, not
 new additions. Workglen keeps DNS wire parsing, validation, retry/cache policy and
@@ -33,7 +34,7 @@ not in the Pratique patch series. Pratique still has zero external dependencies.
 
 `changes.json` records each stage's before/after SHA-256, patch hash, original
 commit/archive provenance and the complete final vendored-file inventory. This
-separates crypto, Tokio-removal and typed-data/JSON changes.
+separates crypto, Tokio-removal, typed-data/JSON and fuzz-harness changes.
 The earlier cryptography patch is included for tracking and carries its existing
 review limits; this networking work is not a new cryptographic audit.
 
@@ -47,7 +48,7 @@ python3 /path/to/this-folder/verify.py --checkout /path/to/pratique --stage all
 
 It checks exact preimages, runs `git apply --check`, applies the patches only in
 a temporary directory, and verifies exact postimages. The supplied checkout is
-never changed. The three patches have been verified against the pinned baseline.
+never changed. The four patches have been verified against the pinned baseline.
 
 If GitLab already contains the earlier crypto additions, verify only the new stage:
 
@@ -62,11 +63,12 @@ git switch -c workglen-pratique-additions
 git apply /path/to/this-folder/0001-workglen-crypto.patch
 git apply /path/to/this-folder/0002-workglen-async-sockets.patch
 git apply /path/to/this-folder/0003-workglen-typed-data-json.patch
+git apply /path/to/this-folder/0004-workglen-fuzz-server-records.patch
 cargo test --offline --locked --test async_socket --features net
 cargo test --offline --locked --test data_json --no-default-features
 ```
 
-If patches 0001/0002 are already present, run `verify.py --checkout /path/to/pratique --stage serde-json-removal` and apply only 0003. If only 0001 is present, verify/apply 0002 first, then verify/apply 0003. Omit patches already present. Review and commit the resulting diff
+If patches 0001/0002 are already present, run `verify.py --checkout /path/to/pratique --stage serde-json-removal` and apply only 0003. If only 0001 is present, verify/apply 0002 first, then verify/apply 0003. Apply 0004 after 0003 when it is not already present. Omit patches already present. Review and commit the resulting diff
 before opening the GitLab merge request. This folder intentionally contains no
 guessed GitLab URL or automatic push command. Retain LICENSE and NOTICE.
 

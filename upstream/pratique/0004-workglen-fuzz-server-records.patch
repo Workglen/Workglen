@@ -1,0 +1,31 @@
+diff --git a/src/tls/server_fuzz.rs b/src/tls/server_fuzz.rs
+index 23cd121..4ff7535 100644
+--- a/src/tls/server_fuzz.rs
++++ b/src/tls/server_fuzz.rs
+@@ -166,7 +166,10 @@ pub fn server_exchange(data: &[u8]) {
+     let mut client_flight = Vec::new();
+     if !messages.is_empty() {
+         transcript.extend_from_slice(&messages);
+-        hs_cipher.encrypt_into(RT_HANDSHAKE, &messages, &mut client_flight);
++        // Input is an arbitrary handshake byte stream, not one TLS record.
++        for chunk in messages.chunks(MAX_PLAINTEXT) {
++            hs_cipher.encrypt_into(RT_HANDSHAKE, chunk, &mut client_flight);
++        }
+     }
+     if flags & 4 != 0 {
+         let mut list = Vec::new();
+@@ -259,6 +262,7 @@ pub fn server_exchange_seeds() -> Vec<Vec<u8>> {
+         v.extend_from_slice(app);
+         v
+     };
++    let oversized_messages = vec![0; MAX_PLAINTEXT + 1];
+     vec![
+         seed(0x08, &empty_certificate, &app), // optional, no certificate, Finished, data
+         seed(0x0c, &[], &app),                // the harness's certificate and Finished
+@@ -266,5 +270,6 @@ pub fn server_exchange_seeds() -> Vec<Vec<u8>> {
+         seed(0x09, &empty_certificate, &app), // required, none: refused
+         seed(0x00, &[], &[]),                 // the ClientHello alone
+         seed(0x1e, &[], &app),                // strict store, certificate, pieces of one byte
++        seed(0x00, &oversized_messages, &[]), // handshake bytes require record fragmentation
+     ]
+ }

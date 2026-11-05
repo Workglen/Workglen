@@ -4,7 +4,7 @@ import argparse,hashlib,json,pathlib,subprocess,tempfile
 HERE=pathlib.Path(__file__).resolve().parent
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--checkout',type=pathlib.Path,help='Pratique checkout to check; never modified')
-p.add_argument('--stage',choices=['all','earlier-crypto','tokio-removal','serde-json-removal'],default='all')
+p.add_argument('--stage',choices=['all','earlier-crypto','tokio-removal','serde-json-removal','fuzz-server-records'],default='all')
 p.add_argument('--vendor',type=pathlib.Path,help='Also verify the complete Workglen vendored tree')
 a=p.parse_args();manifest=json.loads((HERE/'changes.json').read_text())
 digest=lambda b:hashlib.sha256(b).hexdigest()

@@ -1,3 +1,4 @@
 0001-workglen-crypto.patch
 0002-workglen-async-sockets.patch
 0003-workglen-typed-data-json.patch
+0004-workglen-fuzz-server-records.patch

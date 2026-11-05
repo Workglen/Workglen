@@ -146,6 +146,19 @@
           "change": "added"
         }
       ]
+    },
+    {
+      "stage": "fuzz-server-records",
+      "patch": "0004-workglen-fuzz-server-records.patch",
+      "patch_sha256": "e4de1b95db27a1e011f492b3391248ff90cd8eaeb1617aadc6f6ead7d1a77fef",
+      "files": [
+        {
+          "path": "src/tls/server_fuzz.rs",
+          "before_sha256": "57745bbfea3fcd65b17c1a59f6484cc6bb850efe7afd4aed38fd6cafc2bc7862",
+          "after_sha256": "19547a1d6e52ca6b73646bde2829adf71e725e2b6bcf8697f625946bca721a2a",
+          "change": "modified"
+        }
+      ]
     }
   ],
   "vendored_files": {
@@ -330,7 +343,7 @@
     "src/tls/rfc8448.rs": "8160358c25763dfd411f01934d9ac1ec4ad6ec6b4e704a7b9c22aa2e023c62d3",
     "src/tls/scripted.rs": "c97d0dec4495ce7e5b313b1adf64ab81235edfcf0b4cad46b34d4a895539f832",
     "src/tls/server.rs": "fa8000fe447132a5fdc933d69e781dad5456bc633542e6e33e582616220db9fc",
-    "src/tls/server_fuzz.rs": "57745bbfea3fcd65b17c1a59f6484cc6bb850efe7afd4aed38fd6cafc2bc7862",
+    "src/tls/server_fuzz.rs": "19547a1d6e52ca6b73646bde2829adf71e725e2b6bcf8697f625946bca721a2a",
     "src/tls/server_split.rs": "67db91ca0b2dee3565fc8ff9cbd7eb8dc9d8cde01d957ecbd89fd785b497849d",
     "src/tls/server_tests.rs": "1fd5e7c5999c9e54b2e3eceb99244247bccae2161e54ba34eddf2fe88a1c87eb",
     "src/tls/session.rs": "16a0f29acfec589543205696d7852741d30cc154fbb22150a7c331ba09288cbf",
