@@ -1,14 +1,19 @@
 'use strict';
 const $ = id => document.getElementById(id);
+const THEME_KEY='workglen-theme',THEMES=new Set(['forest','ocean','clay']),THEME_NAMES={forest:'Forest',ocean:'Ocean',clay:'Clay'};
+function storedTheme(){try{const value=localStorage.getItem(THEME_KEY);return THEMES.has(value)?value:'forest';}catch(_){return 'forest';}}
+function applyTheme(value,persist=true){const theme=THEMES.has(value)?value:'forest';document.documentElement.dataset.theme=theme;for(const choice of document.querySelectorAll('[data-theme-choice]'))choice.setAttribute('aria-pressed',String(choice.dataset.themeChoice===theme));const status=$('theme-status');if(status)status.textContent=THEME_NAMES[theme]+' theme selected';if(persist)try{localStorage.setItem(THEME_KEY,theme);}catch(_){}return theme;}
+applyTheme(storedTheme(),false);
 let session = null, page = 'overview', overview = null, accounts = [], queue = [], editing = false;
 let moduleState = null, accountingState = null;
 let refreshing = false, revision = 0, toastTimer;
 const pages = {
-  finance: ['ACCOUNTING', 'Books & ledger', 'Balances, accounts, customers and suppliers.'],
-  banking: ['ACCOUNTING', 'Banking', 'Connect, import, review and reconcile.'],
-  xero: ['ACCOUNTING', 'Xero migration', 'A checked cutover into your new ledger.'],
+  finance: ['ACCOUNTING', 'Accounting overview', 'See what needs attention and move today’s work forward.'],
+  banking: ['ACCOUNTING', 'Banking', 'Review transactions, balances, and bank connections.'],
+  xero: ['ACCOUNTING', 'Migration', 'Bring checked opening balances into your new ledger.'],
   overview: ['WORKSPACE HEALTH', 'Overview', 'Your workspace and infrastructure, at a glance.'],
   modules: ['WORKSPACE SETUP', 'Modules', 'Choose the capabilities your business needs.'],
+  settings: ['WORKSPACE SETTINGS', 'Settings', 'Personalize how Workglen looks on this browser.'],
   capacity: ['OPERATIONS', 'Capacity', 'Inspect current limits and plan for growth.'],
   foundation: ['SHARED SERVICES', 'Core services', 'The foundation for every Workglen module.'],
   accounts: ['MAILBOX MANAGEMENT', 'Mailboxes', 'Manage accounts within Workglen Mail.'],
@@ -154,6 +159,8 @@ $('login-form').addEventListener('submit', async e => {
 $('logout').addEventListener('click', async () => { try { await api('logout',{}); loggedOut(); text('login-error',''); } catch (e) { toast(e.message); } });
 document.querySelectorAll('[data-page]').forEach(b => b.addEventListener('click', () => navigate(b.dataset.page)));
 document.querySelectorAll('[data-open-page]').forEach(b => b.addEventListener('click', () => navigate(b.dataset.openPage)));
+document.querySelectorAll('[data-theme-choice]').forEach(b=>b.addEventListener('click',()=>{const theme=applyTheme(b.dataset.themeChoice);toast(THEME_NAMES[theme]+' theme applied.');}));
+window.addEventListener('storage',e=>{if(e.key===THEME_KEY)applyTheme(e.newValue,false);});
 $('refresh').addEventListener('click', () => void refresh());
 $('account-search').addEventListener('input',renderAccounts); $('queue-search').addEventListener('input',renderQueue); $('queue-status').addEventListener('change',renderQueue);
 function openAccount(email) {
