@@ -1,4 +1,6 @@
-# 0.8 native Mail Security review boundary
+# Workglen 0.1.1 (TBD) · security review boundary
+
+This is a development/test target with no current installations. Older version headings below identify historical review checkpoints.
 
 The runtime has moved into the Workglen Rust executable. Local validation covers native rule lifecycle, archive/attachment policy, scopes, digests, replay protection, TLS delivery, central control of two instances and held-content preservation before IMAPS/EWS removal. The test results are implementation checks, not an independent audit. Graph still needs live-provider validation. Native heuristic and policy scanning does not provide comprehensive malware detection. Existing first-party TLS code remains within its prior unaudited boundary. See security/README.md and VALIDATION.md.
 

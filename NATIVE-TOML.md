@@ -76,4 +76,4 @@ Recorded snapshots run without the retired dependency. Comparison results cover
 these fixtures, not every possible TOML document. See VALIDATION.md for executed
 results and `validation/0.8-native-toml-*` for logs and the exact graph difference.
 
-Additional IDNA security capabilities remain deferred under SEC-IDNA-04.
+F5's opt-in mixed-script heuristic is separate; full IDNA2008 and UTS #39 confusable policy remain deferred under SEC-IDNA-04.

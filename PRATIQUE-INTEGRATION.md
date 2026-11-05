@@ -57,7 +57,7 @@ Local certificates use fresh P-256 keys, a five-year private CA constrained to n
 
 See [VALIDATION.md](VALIDATION.md) for executed results. The suite covers published AES-GCM/HMAC vectors, authentication failures, encrypted-store recovery, native ACME, database operations, verified management requests, independent DKIM verification and installer execution with the OpenSSL command blocked. The executable's dynamic library list is checked separately for OpenSSL absence.
 
-Development fixtures may use independent OpenSSL/Python/Node TLS implementations as interoperability oracles. They are not application, build or installation requirements. Tests remain synthetic and local; no customer database, mailbox or public CA is used. Actual macOS compilation/Keychain trust, live Lightsail deployment, production load and independent cryptographic review remain unvalidated.
+Development fixtures may use independent OpenSSL/Python/Node TLS implementations as interoperability oracles. They are not application, build or installation requirements. Tests remain synthetic and local; no customer database, mailbox or public CA is used. The developer laptop is an Apple Silicon M5 Mac and server test machines run Ubuntu. The packaged Linux evidence does not establish M5 macOS compilation/Keychain trust, Ubuntu test deployment, production load or independent cryptographic review. There is no current installation.
 
 ## Tracked upstream handoff
 

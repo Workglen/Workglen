@@ -86,12 +86,13 @@ validation against a live third-party DKIM2 service.
 See [DEPENDENCY-CATALOG.md](DEPENDENCY-CATALOG.md) for every remaining crate's
 purpose and the companion JSON for its resolved parents/features.
 
-## Installation
+## Test installation
 
 Extract the desired full source checkpoint and run `bash install.sh build` as
-the normal build user. Follow the existing Mac/Lightsail stop, binary replacement
-and restart instructions; keep installed configuration, storage/DKIM keys and
-databases. Tests are synthetic/local; no live host or Microsoft 365 tenant is
+the normal build user. For a disposable test installation, follow the M5
+Mac/Ubuntu test-server stop, binary replacement and restart instructions; keep
+that test configuration, storage/DKIM keys and databases. Tests are
+synthetic/local; no current installation, live host or Microsoft 365 tenant is
 modified by these checkpoints.
 
 **Executed `hostname` checkpoint:** 152 offline locked Rust tests, release

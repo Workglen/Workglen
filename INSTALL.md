@@ -185,19 +185,19 @@ both passwords have been accepted.
 
 See `bash install.sh --help` for ports, manual certificates, staging, paths and noninteractive options. `--tls manual` requires a matching existing certificate/key; the configured public gateway DNS name must appear on the certificate. Native TLS hostname verification remains enabled when the Admin connects. For private CA deployments, supply a trust chain that contains the appropriate issuer; preserve that trust bundle across certificate renewals.
 
-The wizard performs no CA issuance and no mailbox operations. Native `check` parses configuration and credentials offline. Initialization of local redb also stays offline. A requested Accounting initialization contacts only the configured PostgreSQL endpoint. The Linux `--start` operation may initiate Let's Encrypt issuance because it starts the service.
+The wizard performs no CA issuance and no mailbox operations. Native `check` parses configuration and credentials offline. Initialization of local redb also stays offline. A requested Accounting initialization contacts only the configured PostgreSQL endpoint. In a separately and explicitly authorized ACME test, the Linux `--start` operation may initiate Let's Encrypt issuance because it starts an ACME-configured service. ACME is not part of the current private-test-CA procedure; use manual private test certificates for that procedure.
 
-## Linux gateway install
+## Ubuntu test gateway install
 
-Build the Linux executable and transfer the bundle first. Then:
+Build the Linux executable and transfer the bundle first. The following creates a disposable test installation on an Ubuntu server test machine; no current installation exists.
 
 ```sh
 sudo bash install.sh gateway --bundle /absolute/path/workglen-gateway-bundle --start
 ```
 
-The helper refuses pre-existing `/etc/workglen-security`, `/var/lib/workglen-security` or its systemd unit, and refuses to replace a different installed binary. It creates a dedicated unprivileged service account, private directories and credentials, generates the encryption key if BYOK was not supplied, validates the configuration, initializes the administrator, and installs the systemd unit. Without `--start` it initializes the files/database but leaves the service stopped. `--start` enables automatic startup after reboot and checks systemd process health; certificate readiness still needs the service log/status check.
+The helper refuses pre-existing `/etc/workglen-security`, `/var/lib/workglen-security` or either systemd unit, and refuses to replace a different installed binary. It creates a dedicated unprivileged service account, private directories and credentials, generates the encryption key if BYOK was not supplied, validates the configuration, initializes the administrator, and installs the ingress/control and scanner units. Both roles use the same native executable; only `security-serve` opens encrypted storage. Without `--start` it initializes the files/database but leaves both services stopped. `--start` enables automatic startup after reboot and checks both processes; certificate readiness still needs the service log/status check.
 
-No firewall rules or SSH configuration are changed. Port 80 is required for Let's Encrypt HTTP-01. Production certificates, DNS, SMTP routes and recipient/rule configuration must be ready before changing public MX. The gateway initially defers new messages until its guided setup and rules are explicitly enabled.
+No firewall rules or SSH configuration are changed. Port 80 is required only when ACME HTTP-01 is explicitly tested. The current development procedure uses private test certificates and synthetic recipients/routes; do not issue public certificates or change public MX. The gateway initially defers new messages until its guided setup and rules are explicitly enabled.
 
 Failures retain partial files for inspection and never delete or overwrite data to retry. Inspect a partial installation before removing only newly created files yourself. Keep a separate protected backup of the database encryption key and the pairing key.
 
@@ -205,7 +205,7 @@ Failures retain partial files for inspection and never delete or overwrite data 
 
 ## Validation boundary
 
-The bundled tests exercise the actual generated configurations, native initialization, loopback-only Admin startup, authenticated remote gateway control, local PostgreSQL transport, file separation/permissions and refusal paths using synthetic local fixtures. No production host, firewall, public certificate account or customer database is changed. macOS-specific compilation, Keychain trust and startup still require validation on a real Mac; this development environment is Linux. See [VALIDATION.md](VALIDATION.md).
+The bundled tests exercise the actual generated configurations, native initialization, loopback-only Admin startup, authenticated remote gateway control, local PostgreSQL transport, file separation/permissions and refusal paths using synthetic local fixtures. No production host, firewall, public certificate account or customer database is changed. The developer laptop is an Apple Silicon M5 Mac and server test machines run Ubuntu. The executed evidence packaged here is Linux x86-64 unless a record explicitly says otherwise; do not treat it as M5 macOS compilation, Keychain enrollment or startup validation. There are no current installations. See [VALIDATION.md](VALIDATION.md).
 
 ## Delivery destinations after installation
 

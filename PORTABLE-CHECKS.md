@@ -88,7 +88,34 @@ The cumulative MIME ZIP includes `tests/native_mime.rs`, all fixture inputs and
 old/new snapshots, generators, Unicode/WHATWG source data, notices and exact
 regeneration checks. The ordinary runner now checks the MIME data generator and
 MIME tests as well. The IDNA tests explicitly record that strict UTS #46 is not
-full IDNA2008 or Unicode impersonation detection; see NATIVE-IDNA.md.
+full IDNA2008 or UTS #39 confusable detection. Mixed-script coverage includes
+Unicode and A-label forms, legitimate single-script names and bounded inputs;
+see NATIVE-IDNA.md.
+
+For the current F4/F5/F8 source changes, run these offline scripts from the
+source root on a Rust-enabled macOS or Ubuntu development host:
+
+```sh
+bash tools/validate-f4-f5-f8.sh
+bash tools/measure-f4-memory.sh
+```
+
+The first checks formatting, targeted clock/budget/mixed-script regressions,
+the full workspace, warnings-denied Clippy and a locked release build. The
+second is an explicit ignored-test probe with two overlapping release-mode
+scans. Its peak-RSS figure is synthetic test-process evidence, not gateway
+service peak RSS, production capacity, leak detection or a swap recommendation.
+Logs go to `validation/f4-f5-f8-local/` by default; set `RESULT_DIR` to change
+that location. Neither script installs software, starts listeners, sends mail,
+uses real mailboxes or changes host configuration. Locked dependencies must
+already be cached.
+
+On October 26, 2026, the M5 Mac passed all focused regressions, workspace tests,
+both default/ARC warnings-denied Clippy runs and the release build. The memory
+probe passed with 41.0 MiB maximum RSS and zero swaps for its bounded synthetic
+workload. Ubuntu execution remains pending. The combined validator still returns
+nonzero for the separate vendored Pratique formatting check; see
+OFFENSIVE-REVIEW-REMEDIATION.md for exact scope and retained logs.
 
 To reproduce the former-parser comparison in a fresh development directory:
 
@@ -174,10 +201,12 @@ python3 upstream/pratique/verify.py --checkout /path/to/pinned-pratique
 The first command creates an empty disposable standalone harness, preserves all
 Pratique library bytes, checks the pure feature boundary and absence of registry
 dependencies, executes the ten socket tests, and lints the byte-identical new
-socket module and tests with warnings denied. Its disposable manifest omits
-upstream example/test entries whose sources are not in the vendor subset.
-Clippy explicitly selects this harness with `--no-deps`; it does not claim to
-resolve pre-existing lints across unrelated upstream Pratique modules.
+socket module and tests with warnings denied. Its disposable manifest removes
+all upstream example/test targets so the harness can inspect the library
+independently; this does not mean their sources are absent from the current
+vendor inventory. Clippy explicitly selects this harness with `--no-deps`; it
+does not claim to resolve pre-existing lints across unrelated upstream Pratique
+modules.
 
 The verifier checks both patch hashes and exact before/after source hashes. It
 applies patches only in a temporary directory. The supplied checkout is unchanged.
@@ -194,8 +223,11 @@ vendored tree. The cumulative source ZIP includes this tool and the handoff file
 
 ## First-party data, JSON and charsets
 
-The standard runner now enforces the no-external-dependency boundary for all six
-reusable libraries, including manifest entries for disabled optional features.
+The standard runner now enforces the no-external-dependency boundary for all
+eight reusable libraries, including manifest entries for disabled optional
+features. The six-library typed-data/charset checkpoint remains the baseline for
+the comparison corpora described below; Lazaret archive and its compatibility
+facade are the two later first-party additions.
 It runs the 73,260-case frozen JSON corpus, 1,148 contracts across 51 actual
 application record types, nine reusable Pratique data tests and the 2,883,056-case
 charset output/error fingerprint corpus. Charset source data is regenerated
@@ -221,7 +253,12 @@ explicitly reviewed parser corrections. Ordinary tests need no retired engine.
 The Pratique standalone check now also runs thirteen existing signed-JSON tests,
 nine new data tests, the ten socket tests and warnings-denied linting of the new
 modules. The original JSON fixture is bundled with its existing Pratique
-provenance. The exact three-patch series and 199 vendor hashes are verified.
+provenance. At the typed-data/charset checkpoint, the three-patch series and 199
+vendor hashes were verified. The subsequent offensive-review checkpoint restored
+23 development fixture/target files without changing runtime code; PRA-WG-04 then
+added the development-only server-fuzz correction. The current four-patch series
+and 222-file inventory are tracked in `upstream/pratique/`. See PRATIQUE-UPSTREAM.md and
+OFFENSIVE-REVIEW-REMEDIATION.md.
 
 To check the separately recorded Serde step against the same baseline, pass
 `--inventory validation/0.8-native-data-inventory.json --after-lock validation/0.8-native-data.Cargo.lock`
@@ -237,4 +274,9 @@ Microsoft 365 gateway checks. Add `--browser` for the documented preinstalled
 browser fixtures. It records results under `target/resilience-validation`.
 See OFFENSIVE-REVIEW-REMEDIATION.md for results, remaining items and scope.
 Optional `tools/check-security-fuzz.py` remains a sequential, separately prepared
-development runner; further fuzzer enhancements were deferred at user request.
+development runner. On macOS, pass `--no-leak-check` when process inspection is
+unsupported. A diagnostic campaign may additionally set
+`ASAN_OPTIONS=detect_leaks=0:quarantine_size_mb=64`; this reduces sanitizer
+use-after-free retention and must not be reported as equivalent default-quarantine
+or leak-checking evidence. See OFFENSIVE-REVIEW-REMEDIATION.md for the October 26
+RSS comparison, bounded target results and remaining extended-campaign work.

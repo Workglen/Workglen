@@ -49,7 +49,8 @@ operation lists with identical bytes and bidirectional decoding, the exact
 comparisons. Results are in `validation/0.8-native-bincode-*`. These are synthetic
 local checks; neither live host nor Microsoft 365 was exercised or changed.
 
-Rebuild with `bash install.sh build` as the normal build account. Follow the
-existing Mac/Lightsail stop, binary replacement and restart instructions. Keep
-installed configuration, keys and databases. This source checkpoint deploys
-nothing automatically.
+Rebuild with `bash install.sh build` as the normal build account. For a
+disposable test installation, follow the M5 Mac/Ubuntu test-server stop, binary
+replacement and restart instructions. Keep that test configuration, keys and
+databases. This source checkpoint deploys nothing automatically and does not
+update any current installation.

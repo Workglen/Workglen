@@ -1,4 +1,6 @@
-# Direct delivery and DKIM — Workglen 0.5
+# Direct delivery and DKIM
+
+Current documentation targets the TBD 0.1.1 development/test release.
 
 Workglen can deliver directly to each recipient domain's MX hosts. It remains the
 inbound MX gateway, mailbox server and authenticated submission server. Direct

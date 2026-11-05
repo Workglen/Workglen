@@ -67,7 +67,8 @@ compatible with the former Rust IDNA profile, not Python's full IDNA2008 profile
 | Bidi and contextual joiner validation | Implemented by default |
 | STD3 syntax, hyphen and DNS length rules | Available through `domain_to_ascii_strict`; DNS/URL callers also enforce their own rules |
 | IDNA2008 PVALID and ContextO | Not implemented |
-| Unicode confusables / impersonation detection | Not implemented |
+| Mixed-script label risk heuristic | `has_mixed_script_labels`; opt-in Mail Security impersonation signal, default off |
+| UTS #39 confusable skeletons / same-script impersonation detection | Not implemented |
 | Live malicious-domain reputation feed | Not implemented; configured domain blocking is separate |
 | Resource bounds before expensive processing | Implemented; regression inputs included |
 
@@ -75,21 +76,28 @@ For example, both native helpers accept `a·b.test` and emoji labels; Python's
 IDNA2008 validator rejects them. Both permit `l·l.test`. A Latin/Cyrillic lookalike
 such as `раypal.com` can pass either library: protocol validity is not trust.
 `strict` in our current function name denotes stricter UTS #46 options only.
+The optional mixed-script helper decodes validated A-labels and compares
+recognized script ranges within each Unicode label. ASCII, digits, punctuation,
+combining marks and unrecognized ranges do not form a script set. Legitimate
+multilingual names, including Japanese script combinations, can match;
+same-script lookalikes do not. Mail Security therefore adds this only as
+`mixed_script_domain` evidence to its impersonation rule when explicitly enabled.
+It is not UTS #39 confusable detection or a malicious-domain verdict.
 The optional `tools/check-idna-security.py` reproduces selected Python 3.19
 examples; its Unicode 17 data is not a whole-version oracle for Unicode 18.
-The test `security_boundary.rs` records these distinctions and oversized
-contextual-sequence rejection. It does not claim phishing detection efficacy.
+The test `security_boundary.rs` records these distinctions, mixed/single-script
+and A-label examples, bounded inputs and oversized contextual-sequence rejection.
+It does not claim phishing detection efficacy.
 
-Deferred policy backlog (SEC-IDNA-04 in MAIL-SECURITY-BACKLOG.md),
-not part of the next crate-reduction work:
+Remaining policy backlog (SEC-IDNA-04 in MAIL-SECURITY-BACKLOG.md):
 
 1. An explicit IDNA2008 eligibility/ContextO validation profile, using pinned
    Unicode data, for provisioned domain names. Keep browser-compatible URL
    normalization available for inspecting received content.
-2. A separate UTS #39 confusable skeleton and script-risk check against configured
-   protected domains. Report Unicode and canonical ASCII forms together; do not
-   treat all multilingual names as malicious or substitute skeletons for DNS
-   lookup, authentication alignment or authorization identity.
+2. A separate UTS #39 confusable skeleton and fuller script-risk analysis against
+   configured protected domains. Report Unicode and canonical ASCII forms
+   together; do not treat all multilingual names as malicious or substitute
+   skeletons for DNS lookup, authentication alignment or authorization identity.
 3. Keep reputation/blocking as separately audited policy. Any future feed needs
    provenance, freshness and failure behavior; no feed is enabled here.
 

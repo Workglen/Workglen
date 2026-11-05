@@ -1,10 +1,10 @@
-# Crate reduction order — updated October 26, 2026
+# Crate reduction order — updated November 3, 2026
 
 Current baseline: **15 external package versions**, three direct external crates,
-22 lockfile entries including seven first-party packages. All six reusable
+24 lockfile entries including nine first-party packages. All eight reusable
 first-party libraries have zero external dependencies, enforced by a portable
-manifest/graph check. Additional IDNA security capabilities remain deferred
-under SEC-IDNA-04.
+manifest/graph check. F5 adds an opt-in mixed-script risk heuristic; full
+IDNA2008 and UTS #39 confusable policy remain deferred under SEC-IDNA-04.
 
 | Completed replacement | Packages removed | Remaining external versions |
 | --- | ---: | ---: |
@@ -81,10 +81,11 @@ alloc/default; no additional feature-only reduction is claimed here.
   independent vectors and security review. Replacing it is not the next task.
 - redb: only one exclusive package, with substantial transactional durability,
   recovery, encrypted-storage and backup risk. Poor near-term reduction value.
-- Serde/JSON: broad use in persistence, APIs, accounting and DKIM2. Pratique has
-  a JSON reader, but it is not a drop-in Serde replacement. Removing derives
-  could release five macro packages only after replacing all generated mappings;
-  the amount of schema work makes it a later candidate.
+- subtle: retain the reviewed constant-time comparison boundary unless an
+  equivalent first-party implementation receives independent security review.
+
+Serde/JSON was an earlier retention recommendation and has since been replaced;
+see NATIVE-DATA.md. It is not part of the current dependency graph.
 
 ## Reproduce the counts
 
@@ -93,8 +94,9 @@ python3 tools/analyze-crate-reduction.py
 ```
 
 This standard-library script traverses the pinned dependency graph and preserves
-shared dependencies. The recorded result and baseline Cargo.lock hash are in
-validation/0.8-next-crate-reduction-projections.json (historical 51-package baseline)
-and validation/0.8-post-toml-reduction-projections.json (historical 41-package baseline).
-The current baseline is validation/0.8-post-tokio-reduction-projections.json. Confirm final counts with
-Cargo metadata/lockfile checks when an implementation actually lands.
+shared dependencies. Historical results and baseline Cargo.lock hashes are in
+validation/0.8-next-crate-reduction-projections.json (51 packages),
+validation/0.8-post-toml-reduction-projections.json (41 packages) and
+validation/0.8-post-tokio-reduction-projections.json (33 packages). The current
+15-package baseline is defined by Cargo.lock and DEPENDENCY-CATALOG.md. Confirm
+counts with Cargo metadata/lockfile checks when another implementation lands.

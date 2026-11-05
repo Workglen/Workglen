@@ -1,11 +1,12 @@
 # Pratique upstream tracking
 
 The reusable additions are tracked in [upstream/pratique/README.md](upstream/pratique/README.md).
-It includes a verified three-patch series against the pinned Pratique commit:
+It includes a verified four-patch series against the pinned Pratique commit:
 
 - PRA-WG-01: the seven earlier cryptography/entropy files.
 - PRA-WG-02: the five files added/changed for Tokio removal.
 - PRA-WG-03: six files for typed data, JSON values/writing, a private parser entry and reusable tests.
+- PRA-WG-04: the development-only TLS server fuzz harness now fragments arbitrary handshake bytes into legal TLS records and includes an oversized-record regression seed. Production TLS code and its plaintext-size assertion are unchanged.
 
 The manifest records before/after source hashes, complete vendor hashes and
 baseline provenance. `verify.py` checks application in a temporary directory,
@@ -19,7 +20,7 @@ feature/API boundaries, tests and platform limitations.
 ## Pending filesystem-capacity addition
 
 Workglen currently carries one additional first-party Pratique system API that is
-not yet included in the verified patch upstream series:
+not yet included in the verified four-patch upstream series:
 
 ```rust
 pratique::sys::filesystem_available(path) -> std::io::Result<u64>
@@ -37,7 +38,7 @@ and macOS ABI layouts on supported architectures, add upstream-native tests for
 an existing path and an invalid path, and decide whether the stable public API
 should expose available bytes or a richer filesystem-capacity record. Until
 then, this is a documented local delta and `upstream/pratique/verify.py` should
-not claim that the current patch series reproduces it.
+not claim that the four-patch series reproduces it.
 
 ## Offensive-review fuzz support
 

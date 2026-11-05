@@ -70,6 +70,7 @@ Neither stage tested a live Microsoft 365 tenant, deployed to either host, or
 claimed a Mac build. All mail/DNS peers used here were synthetic local fixtures.
 
 This cumulative source ZIP also contains the native replication codec. Rebuild
-with `bash install.sh build` as the normal build account, then use the existing
-Mac/Lightsail stop, binary replacement and restart instructions. Preserve current
-configuration, keys and databases; no conversion or automatic deployment occurs.
+with `bash install.sh build` as the normal build account. For a disposable test
+installation, use the M5 Mac/Ubuntu test-server stop, binary replacement and
+restart instructions. Preserve that test configuration, keys and databases; no
+conversion, automatic deployment or current-installation update occurs.

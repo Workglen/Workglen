@@ -1,6 +1,8 @@
 > Local Mac PostgreSQL is supported with explicit `transport = "local"` (literal loopback TCP or absolute Unix socket). The default `verified-tls` still applies to remote databases. See [MAC-ADMIN-LIGHTSAIL.md](MAC-ADMIN-LIGHTSAIL.md) for setup and the local transport boundary.
 
-# Workglen Accounting — 0.6 posting corrections
+# Workglen Accounting
+
+Current documentation targets the TBD 0.1.1 development/test release. Posting corrections, named roles and retained audit history are included. There are no current installations or live books.
 
 The optional Accounting module stores its entire ledger, books, contacts, documents,
 import previews, bank transactions, feed state and audit history in your PostgreSQL
@@ -99,8 +101,8 @@ Planned work:
 - Reusable CSV/JSON import/export for other accounting systems, with preview, balance reconciliation, source identifiers, duplicate detection, scoped access and audited commits/exports.
 
 These adapters are backlog requirements, not implemented integrations. They are
-separate from Workglen version upgrades, which are unnecessary before the first
-active installation.
+separate from Workglen version upgrades. There are no current installations or
+live books; all present accounting work is development and testing.
 
 ## Xero cutover
 

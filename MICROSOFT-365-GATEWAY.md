@@ -1,5 +1,7 @@
 # Microsoft 365: require inbound delivery through Workglen
 
+This is a product deployment runbook, not a current development test procedure. There are no current installations or live Microsoft tenant validations. Current testing must remain synthetic; do not change a tenant, connector or DNS record without separate explicit authorization.
+
 The setup wizard now includes **Microsoft 365 protection** immediately before
 Go live. It prepares a reviewable tenant configuration and explains how to prove
 it works. Workglen does not log into Microsoft, execute PowerShell, change DNS,

@@ -1,18 +1,69 @@
-# Validation — Workglen 0.8.0
+# Validation — Workglen 0.1.1 (TBD)
 
-Latest validation: October 26, 2026 (UTC), Linux x86-64, Rust 1.99.1.
+Current documentation targets the TBD 0.1.1 development/test release. There are no current installations, live or otherwise. The developer laptop is an Apple Silicon M5 Mac; server test machines run Ubuntu.
+
+Latest packaged baseline validation: October 26, 2026 (UTC), Linux x86-64, Rust 1.99.1.
+This Linux evidence does not establish M5 macOS or external Ubuntu test-host validation.
 Builds and tests used `--offline --locked` after preparing the pinned dependencies
-and updating the lockfile offline. Native DNS, HTTP(S) URLs, mail authentication, Unicode IDNA, email/MIME parsing, TOML configuration parsing Pratique DNS transport, first-party typed data/JSON and native charset decoding are active.
+and updating the lockfile offline. Native DNS, HTTP(S) URLs, mail authentication,
+Unicode IDNA, email/MIME parsing, TOML configuration parsing, Pratique DNS
+transport, first-party typed data/JSON and native charset decoding are active.
 No registry package was added/upgraded in the main workspace and retained checksums are unchanged. Optional isolated fuzz tooling has its own lockfile.
 This source validation did not deploy a live service or exercise real providers.
+
+Historical checkpoint numbers and artifact prefixes such as `0.8-`, `0.6-` and
+`0.5-` are retained below for evidence traceability. They are not current release
+numbers, and their files have not been renamed.
 
 ## Latest offensive-review checkpoint
 
 See [OFFENSIVE-REVIEW-REMEDIATION.md](OFFENSIVE-REVIEW-REMEDIATION.md) and
-`validation/0.8-resilience-review/` for the latest tests and retained failure logs.
+`validation/0.8-resilience-review/` for the earlier tests and retained failure logs.
 Panic isolation, state-specific poison handling, resolver health failover and
-Base64 differential regressions are implemented. MIME budget configuration and
-fallible clock conversion remain open; IDNA security additions remain deferred.
+Base64 differential regressions were previously exercised. On October 26, 2026,
+the Apple Silicon M5 Mac passed the focused F4/F5/F8 regressions, complete
+offline locked workspace tests, warnings-denied Clippy with default features and
+ARC, and the offline locked release build using Rust 1.99.1. These later checks
+were run in the working tree and their generated logs are not part of the
+packaged October 26 baseline. The synthetic
+release-mode probe of two overlapping scans, three iterations each with a 4 MiB
+attachment per message, passed with 43,024,384 bytes (41.0 MiB) maximum RSS and
+zero reported swaps. Local logs are in `validation/f4-f5-f8-local/`.
+
+This is bounded synthetic test-process evidence, not production gateway peak RSS,
+production capacity, leak detection, detection efficacy or a swap recommendation.
+Ubuntu test-host execution, representative production-load measurement and full
+IDNA2008 / UTS #39 confusable policy remain open. The validator's separate
+formatting check still fails on vendored Pratique examples; no source was
+reformatted. See OFFENSIVE-REVIEW-REMEDIATION.md for the detailed record.
+
+F2 macOS triage also completed on October 26. The earlier `tls_client` campaign
+aborted at 516 MiB against its 512 MiB RSS cap; its saved input replayed normally.
+A fresh 240-second run reached 415 MiB after 573,191 inputs. Repeating with only
+ASan quarantine reduced to 64 MiB completed 629,150 inputs at 178 MiB peak RSS.
+Sixty-second `tls_server`, HTTP/2 and X.509 diagnostic runs also completed without
+saved artifacts, at 199, 226 and 167 MiB peak RSS respectively.
+
+The subsequent reduced-quarantine extended campaign completed `tls_client` for
+its full hour: 7,566,582 inputs, 273 MiB peak RSS, exit 0 and no artifact.
+`tls_server` stopped after 800.33 seconds and 2,657,534 inputs at 256 MiB peak
+RSS when its harness passed an oversized arbitrary handshake byte stream to one
+record-encryption call. The 16,604-byte artifact reproduced the same
+`MAX_PLAINTEXT` assertion with the preserved binary. PRA-WG-04 now fragments
+that stream and adds an oversized seed without changing production TLS. Vendor
+hash and isolated patch-application checks passed. On the M5 Mac, the rebuilt
+release replay passed the exact 16,604-byte artifact and all four targets passed
+seed replay, including the new oversized server seed. A fresh `tls_server`
+campaign then completed its full hour: 7,506,825 inputs in 3,602.37 seconds,
+329 MiB peak RSS, exit 0 and no saved artifact. Seed replay and the fuzz build
+also passed in that runner. HTTP/2 and X.509 did not start the earlier extended
+campaign and remain pending.
+
+ASan remained enabled and leak inspection was disabled throughout these macOS
+runs. Reduced quarantine is not equivalent full-strength evidence; supported
+leak detection and the HTTP/2/X.509 extended campaigns stay open. Logs are under
+`target/fuzz-mac-*/`, including `target/fuzz-mac-extended-q64/` and
+`target/fuzz-mac-tls-server-fragmentation/`.
 
 ## Current and historical checks
 
@@ -32,6 +83,19 @@ fallible clock conversion remain open; IDNA security additions remain deferred.
   evidence; those gates remain open in
   [MAIL-SECURITY-REPLICATION.md](MAIL-SECURITY-REPLICATION.md).
 
+- **Lazaret archive integration (November 3, 2026, Apple Silicon macOS):**
+  the pinned first-party Lazaret archive snapshot passed all 104 upstream crate
+  tests, four Workglen format/recursion/quarantine integration tests, the
+  complete offline locked workspace suite, warnings-denied workspace Clippy and
+  the offline locked release build.
+  Dependency-boundary verification passed for all eight reusable first-party
+  libraries. Workglen's existing ZIP reader remains separate. The integrated
+  subset and mandatory-quarantine behavior are documented in
+  [LAZARET-ARCHIVE-INTEGRATION.md](LAZARET-ARCHIVE-INTEGRATION.md); changes that
+  belong to Lazaret are isolated in
+  [LAZARET-ARCHIVE-BACKLOG.md](LAZARET-ARCHIVE-BACKLOG.md). These are local
+  fixture-based checks, not detection-efficacy, live-provider or Ubuntu-host
+  evidence.
 
 - **Microsoft 365 gateway setup (October 26, 2026):** **308 workspace tests
   passed**, four optional PostgreSQL fixtures ignored. Warnings-denied workspace
@@ -384,11 +448,11 @@ fallible clock conversion remain open; IDNA security additions remain deferred.
 
 Pratique now supplies database TLS, AES-GCM storage/feed encryption, HMAC management authentication, DKIM RSA signing/key generation and native setup certificates/secrets. The application, build and installer require no OpenSSL. The dependency graph and dynamic executable linkage were checked; independent test peers still use OpenSSL/Python/Node. See [PRATIQUE-INTEGRATION.md](PRATIQUE-INTEGRATION.md).
 
-The CLI installer now targets local Admin/Accounting with existing local PostgreSQL and a separately hosted Linux gateway. Its native Admin profile does not start mail listeners/workers. PostgreSQL local mode is explicit and constrained to loopback IPs/Unix sockets; remote TLS verification remains the default.
+The CLI installer targets local Admin/Accounting with local PostgreSQL and a separately hosted Ubuntu test gateway. Its native Admin profile does not start mail listeners/workers. PostgreSQL local mode is explicit and constrained to loopback IPs/Unix sockets; remote TLS verification remains the default.
 
-Installer validation uses Linux and synthetic fixtures. **No macOS build, Keychain enrollment, live Lightsail systemd installation or public CA issuance was performed.** macOS Bash-compatible syntax and portable paths are implemented, and Darwin's no-follow file flag is selected separately from Linux, but an actual Mac build/startup remains an operator validation step. `install.sh gateway --destdir` verifies deployment layout without changing host accounts, services or firewalls.
+The recorded installer validation used Linux and synthetic fixtures. **That run did not perform an M5 macOS build, Keychain enrollment, external Ubuntu systemd test or public CA issuance.** macOS Bash-compatible syntax and portable paths are implemented, and Darwin's no-follow file flag is selected separately from Linux. Actual M5 Mac and Ubuntu server testing must be recorded separately rather than inferred from these fixtures. `install.sh gateway --destdir` verifies deployment layout without changing host accounts, services or firewalls.
 
-Development installations now exist on Mac and Lightsail. Preserve their configuration, keys and current-schema data; this release adds no Workglen version converter. Removed the Security importer/exporter and legacy password/audit paths, Accounting version-upgrade scripts, old outbound queue conversion, and persisted-record compatibility defaults. Accounting creates one complete current schema; external Xero/statement imports, backups and replication remain supported.
+There are no current installations, live or otherwise; all work is development and testing. This TBD release adds no Workglen version converter. Removed the Security importer/exporter and legacy password/audit paths, Accounting version-upgrade scripts, old outbound queue conversion, and persisted-record compatibility defaults. Accounting creates one complete current schema; external Xero/statement imports, backups and replication remain supported.
 
 - **100 Rust unit/core/cryptography tests passed**, including **41 native Security tests**. Coverage includes local detection, immutable rule lifecycle, activation confirmation, scopes, receipts/replay, digest snapshots, mandatory release guards, retained-content holds, audit integrity, explicit spam learning, in-flight restart handling and dependency-policy enforcement.
 - **4 TLS/ACME tests passed**: explicit configuration/SAN coverage, private and exclusively locked state, lifetime-based scheduling for 90/64/45/6-day certificates, and local HTTP-01 issuance with simulated CA outage/retry, ARI replacement, live TLS handshakes using the renewed leaf, challenge cleanup and cached restart on the same port. No public CA account or certificate was created. The vendored crate’s separate protocol test target could not compile because its upstream test fixture files are not included in this source distribution; no pass is claimed for that target.
@@ -396,7 +460,7 @@ Development installations now exist on Mac and Lightsail. Preserve their configu
 - Encrypted offline backup recovery passed with the original key and the same 41-event audit chain. Missing and incorrect keys were rejected without changing the backed-up database.
 - Archive tests include independently generated Deflate ZIP, GZIP and USTAR fixtures; nested executable inspection; corrupt checksums/headers; path traversal; encrypted/unsupported/truncated archives; nesting/expansion limits; links; and a deterministic ZIP byte-mutation corpus. This is not a long-running fuzz campaign.
 - **17 loopback network checks passed**: real native HTTPS and SMTP STARTTLS, verified TLS forwarding with exact original MIME, native quarantine, recipient refusal, mandatory release refusal, digest delivery/CSRF/recipient isolation, central signed control of two native instances, independent RBAC scopes, native Workglen IMAPS and synthetic EWS remediation, acceptance with central Admin offline, generated/supplied storage keys, ciphertext inspection and forced-termination recovery.
-- **11 browser checks passed**: standalone sign-in, seven-step setup/rationale, AI-rule defaults, draft/testing, evidence review, recipient-scoped bulk discard, central remote selection, encryption/key-custody guidance, TLS availability/expiry, guided TLS setup and no script errors. Screenshots were inspected locally and are not included in the source package.
+- **Historical pre-Microsoft-setup browser checkpoint: 11 checks passed**: standalone sign-in, the then-current seven-step setup/rationale, AI-rule defaults, draft/testing, evidence review, recipient-scoped bulk discard, central remote selection, encryption/key-custody guidance, TLS availability/expiry, guided TLS setup and no script errors. The current wizard has eight steps; this older result is not a check of the added Microsoft 365 step. Screenshots were inspected locally and are not included in the source package.
 - **54 direct-delivery/DKIM loopback checks passed** with native Pratique key generation and signing, independently verified signatures, exact retry bytes, TLS refusals and ordinary queue retries. The generated RSA key also passed independent private-key consistency/primality checks.
 - **3 Accounting database scenarios passed** against independent disposable PGlite fixtures (two over verified TLS and one explicit loopback connection): fresh schema creation, repeat initialization preserving balances/audit, Xero cutover, banking, posting corrections/locks/audit and local-transport schema initialization/reopening. Prior Accounting browser results below are historical, not represented as rerun here.
 - **11 installer checks passed**: protected generated bundles and local-secret separation; existing-install refusal; loopback/Admin-profile guards; explicit ACME agreement with offline preparation; BYOK; injection/linked-password refusal; Linux staging; native Admin HTTPS/CLI without binding occupied mail ports; verified signed gateway control; browser checks, gateway continuity after Admin shutdown, and completion with the OpenSSL command explicitly blocked. The grouped final browser/continuity scenarios are recorded in `validation/0.8-installer.json`.
@@ -404,71 +468,21 @@ Development installations now exist on Mac and Lightsail. Preserve their configu
 - Published AES-256-GCM/HMAC-SHA256 known-answer tests passed; modified ciphertext/tag/AAD is refused. Native local certificates passed independent chain and hostname validation.
 - Clippy with all targets and warnings denied passed. Changed Rust formatting and current Security JavaScript syntax checks passed. The earlier full functional suites used the debug executable; some fixtures used that executable with debug symbols stripped to limit disk use. The revised release build and its selected tests are recorded separately above; the full network/browser suites were not repeated for the profile change.
 
-Current logs use the `0.8-` prefix. Prior logs are historical. All tests used synthetic recipients and loopback services. No customer mail was sent or removed. Graph was ported but has not been tested against a live tenant in this release; EWS uses a synthetic TLS protocol fixture. Native policy/heuristic scanning is not a maintained malware-signature feed or a measured efficacy benchmark. Production load, provider consent/authentication, DNS/MX routing, sender reputation and independent security review remain outstanding. PGlite does not establish native PostgreSQL concurrency or production durability.
+Current-source evidence retains its historical `0.8-` log prefix; those files were not renamed for the TBD 0.1.1 documentation target. Older `0.6-` and `0.5-` logs are historical checkpoints. All tests used synthetic recipients and loopback services. No customer mail was sent or removed. Graph was ported but has not been tested against a live tenant in this release; EWS uses a synthetic TLS protocol fixture. Native policy/heuristic scanning is not a maintained malware-signature feed or a measured efficacy benchmark. Production load, provider consent/authentication, DNS/MX routing, sender reputation and independent security review remain outstanding. PGlite does not establish native PostgreSQL concurrency or production durability.
 
 The earlier development source snapshot was the baseline, not a prior deployed version. 189 of the 191 baseline Pratique files remain byte-identical, including root-certificate notices. Two files expose the new native RSA generator and the existing constant-time PEM encoder; one generator source file is added. Independent cryptographic review of these additions remains outstanding. The old security runtime and its service-specific tests were replaced by native code and fixtures. The archive-reader integration is first-party and uses the already-present first-party bounded inflater. See [security/README.md](security/README.md) and [the dependency rule](security/DEPENDENCY-POLICY.md).
 
 ---
 
-# Validation — Workglen 0.6.0
+# Historical validation checkpoint — Workglen 0.6.0
 
 Validated October 24, 2026 (America/Chicago), Linux x86-64, Rust 1.99.1
 (58cf8f9c3 2026-10-13). New code builds/tests use `--offline --locked`.
 The unchanged vendored Pratique files were compared with the authoritative 0.5
 source archive. No new Rust dependency was added.
 
-## Current checks
+## Checks recorded for this checkpoint
 
-- **Guided delivery destination setup (October 25 UTC):** 111 offline locked
-  Rust tests passed (97 library, 12 core, 2 crypto); the same three PostgreSQL
-  integration tests remained explicitly ignored. Release Clippy passed with
-  warnings denied, and the embedded UI/native release binary rebuilt successfully.
-  New security tests cover destination creation from an empty installation,
-  authorization, failed/expired/stale tests, idempotent saves, protected settings,
-  encrypted persistence and reopen, interrupted-check recovery, and public-address
-  enforcement at the actual transport boundary. Browser-created destinations use
-  checked public addresses on every subsequent connection and cannot supply
-  arbitrary ports, credential paths or custom trust paths.
-- **45 local integration/browser checks passed** for that update: 17 native
-  gateway checks, 14 native-browser checks, 8 destination-wizard checks and 6
-  recipient-discovery UI regressions. The exact empty-route failure is exercised:
-  the wizard blocks premature advance, finds a synthetic Microsoft MX hostname,
-  preserves fields after a failed test, saves/selects a tested destination, keeps
-  the recipient draft across Back, and advances successfully to Detection. Narrow
-  viewport checks and browser script-error checks passed. See
-  `validation/0.8-destination-*` and `security/tests/destinations-ui.cjs`.
-  New Microsoft MX and SMTP test outcomes were synthetic; existing SMTP/TLS,
-  IMAPS/EWS, signed control, encryption and restart checks ran on loopback. No
-  live Microsoft tenant, public DNS/SMTP destination, user host or public CA was
-  used. Build dependencies and lockfile are unchanged. This update requires
-  replacing the binary on both Admin and gateway, then refreshing the browser;
-  route creation itself subsequently needs no file edit or restart.
-- **Microsoft 365 discovery and module navigation:** 106 offline locked Rust
-  tests passed (92 library, 12 core, 2 crypto); three PostgreSQL integration
-  tests remained explicitly ignored because no disposable PostgreSQL endpoint
-  was provided for this change. Release Clippy passed with warnings denied and
-  the native release binary built successfully. Six directory-focused Rust
-  tests cover shared/disabled accounts, SMTP aliases, groups/contacts, domain
-  filtering, pagination refusal, partial failure, RBAC, additive/idempotent
-  apply, preserved disabled/manual recipients, stale/expired previews and live
-  acceptance refusal. Network fetches execute outside the database transaction.
-- **37 synthetic integration/browser checks passed:** 17 native loopback
-  gateway checks, 14 native-browser checks and 6 directory-UI checks. These
-  verify existing SMTP/quarantine/digest/connector behavior, encrypted forced
-  restart, signed central administration, visible Back to Admin navigation at
-  390px, return to the Admin module overview, mailbox-holder link exclusion,
-  directory review/apply and failed-fetch UI behavior. The Webmail UI uses its
-  configured Admin origin without forwarding credentials. JavaScript syntax
-  and installer Bash syntax checks passed.
-  Records: `validation/0.8-directory-*`; fixtures:
-  `security/tests/native-network.cjs`, `security/tests/browser.cjs`, and
-  `security/tests/directory-ui.cjs`. Microsoft responses and credentials were
-  synthetic; no live Microsoft tenant, admin consent, real mailbox discovery,
-  public CA issuance or user host was accessed. Microsoft OAuth/API behavior
-  still requires deployment validation against the intended tenant. Directory
-  discovery is on demand and additive; automatic synchronization/removal is
-  not implemented. **This update requires rebuilding and replacing the
-  installed binary on both Admin and gateway**, because the UI is embedded.
 - Rust unit/core tests: **37 passed**; database tests run separately.
 - Accounting SQL/application scenarios: **2 passed** over verified loopback TLS,
   including the original cutover/banking scenario and the new correction scenario.
@@ -491,25 +505,25 @@ PostgreSQL concurrency, managed-service failover, and production durability rema
 unvalidated**. PGlite, Playwright, certificates, passwords, and test mailbox content
 are test-only and are not included as runtime dependencies or package secrets.
 
-Current results are prefixed `0.6-` in `validation/`. Default Rust tests skip the two
+Results from this checkpoint are prefixed `0.6-` in `validation/`. Default Rust tests skip the two
 opt-in database scenarios; their separate passing run is included. The
 `tools/accounting-web-test.py` fixture runs Accounting and RBAC browser checks using
 a disposable database and the supplied TLS CA; existing instructions below apply.
 
-This source release was built in the dev/test profile. A new optimized release
+This historical source checkpoint was built in the dev/test profile. A new optimized release
 build and the complete Mail/Webmail/direct-delivery integration suites were not
 rerun for 0.6. Their prior evidence is retained below as historical baseline only.
 
-Remote module hosting, standalone Mail Security, spam engines, quarantine digests,
-rule lifecycle enforcement, and Exchange mailbox remediation are **requirements
-recorded in MODULE-HOSTING-AND-MAIL-SECURITY.md, not implemented/tested features**.
-No public SMTP traffic or real external mailbox operation was performed.
+At this historical checkpoint, remote module hosting, standalone Mail Security,
+spam engines, quarantine digests, rule lifecycle enforcement, and Exchange mailbox
+remediation were **requirements recorded in MODULE-HOSTING-AND-MAIL-SECURITY.md,
+not implemented/tested features**. Later checkpoints implemented and tested the
+native Mail Security capabilities described above. No public SMTP traffic or real
+external mailbox operation was performed.
 
 ---
 
-## Historical 0.5 validation (not a new 0.6 execution)
-
-# Validation — Workglen 0.5.0
+# Historical validation checkpoint — Workglen 0.5.0
 
 Validated October 24, 2026 (UTC) on Linux x86-64 with Rust 1.99.1
 (58cf8f9c3 2026-10-13). Pratique remains pinned to

@@ -1,9 +1,11 @@
 # Staged first-party crate replacements
 
 Each checkpoint is a full, cumulative Workglen source ZIP. Extract a checkpoint
-into a fresh source directory and rebuild; preserve deployed configuration,
-keys and databases. No binary is deployed automatically. The main version remains
-0.8.0; the descriptive ZIP suffix identifies the dependency checkpoint.
+into a fresh source directory and rebuild. When updating a disposable test
+installation, preserve its configuration, keys and databases. No binary is
+deployed automatically. These historical checkpoints used 0.8.0 package naming;
+current documentation targets TBD 0.1.1, and the descriptive ZIP suffix continues
+to identify the dependency checkpoint.
 
 ## 1. Native Base64
 

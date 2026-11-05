@@ -1,13 +1,15 @@
 # Current Workglen architecture
 
-Updated 2026-10-24. This describes implemented structure; [MODULES.md](MODULES.md), [SCALING.md](SCALING.md) and the historical remote-module design also contain future targets. Code and [VALIDATION.md](VALIDATION.md) define the tested behavior.
+Updated 2026-11-04 for the TBD 0.1.1 development/test release. There are no current installations, live or otherwise. This describes implemented structure; [MODULES.md](MODULES.md), [SCALING.md](SCALING.md) and the historical remote-module design also contain future targets. Code and [VALIDATION.md](VALIDATION.md) define the tested behavior.
+
+The test topology uses an Apple Silicon M5 developer laptop and Ubuntu server test machines. Lightsail is one optional Ubuntu test-hosting environment, not a claim of a current deployment.
 
 ```mermaid
 flowchart TD
-    Browser["Mac browser"] -->|"Loopback HTTPS"| Admin["Native local Admin"]
+    Browser["M5 Mac browser"] -->|"Loopback HTTPS"| Admin["Native local Admin"]
     Admin -->|"Local transport or verified TLS"| PG["Local PostgreSQL: Accounting"]
     Admin --> Local["Local redb: identities and administration"]
-    Admin -->|"Verified HTTPS and signed scoped commands"| Gateway["Lightsail Mail Security"]
+    Admin -->|"Verified HTTPS and signed scoped commands"| Gateway["Ubuntu test Mail Security"]
     Senders["SMTP senders"] --> Gateway
     Gateway --> Security["Encrypted redb: rules, queues, quarantine, audit"]
     Gateway -->|"Verified SMTP TLS"| Mailboxes["Existing mailbox service"]
@@ -17,7 +19,7 @@ flowchart TD
 
 - **Local Admin:** the `admin_only=true` profile in the existing Rust executable serves loopback HTTPS and the loopback authenticated CLI. It starts no Mail/SMTP/IMAP/Webmail/relay/replication/witness listeners or workers. Accounting may run in the same process with a separately configured database. No Electron, Node or Python runtime is required.
 - **Accounting:** PostgreSQL is authoritative for journals, accounts, invoices/bills, statements, reconciliation and correction/audit history. The Mac deployment uses an existing local server. `transport="local"` is an explicit exception for literal loopback TCP or absolute Unix sockets only; no DNS endpoint, hostaddr override, remote address or multi-host fallback is accepted. Remote databases default to verified TLS. PostgreSQL disk encryption and backups are independent of gateway redb encryption.
-- **Mail Security:** a separate `security-serve` process owns its encrypted redb database and SMTP/HTTPS interfaces. Native scanning, spam heuristics, rule lifecycle, quarantine, queues, digests and optional mailbox connectors continue independently of Admin availability. The gateway neither stores Accounting data nor connects to the Mac's PostgreSQL.
+- **Mail Security:** `security-serve` is the sole owner of encrypted redb plus SMTP/HTTPS and delivery. It durably records exact MIME as `pending-scan` before SMTP acknowledgment. A separately restartable `security-scan-worker` role from the same native executable performs authentication and bounded inspection over an owner-only, versioned Unix-socket protocol; it never opens the database. Scanner replacement therefore does not stop SMTP acceptance, and expired scan leases are reclaimed. Native spam heuristics, rule lifecycle, quarantine, queues, digests and optional mailbox connectors continue independently of Admin availability. The gateway neither stores Accounting data nor connects to the Mac's PostgreSQL.
 - **Mail/Core:** the ordinary Mail profile remains available for mailbox hosting, direct delivery/DKIM, Webmail and cluster replication. The split installer intentionally targets local Admin plus standalone Mail Security. Use the existing Mail configuration/deployment guides for mailbox hosting or dual-node setups.
 
 The local Admin redb is not encrypted by the Mail Security encrypted backend. It contains administration/RBAC state and audit metadata; protect the Mac user account and filesystem. Gateway whole-database encryption, BYOK/generated keys, crash recovery and key-loss behavior are specified in [security/ENCRYPTED-STORAGE.md](security/ENCRYPTED-STORAGE.md). Quarantine originals remain in the gateway store unless an authorized inspection/response explicitly retrieves them.
@@ -44,4 +46,4 @@ Pratique provides all TLS (including PostgreSQL through a first-party adapter), 
 
 Independent remote Mail Security management is implemented. Arbitrary remote hosting/administration of every module, a signed macOS application bundle, hosted central control, management-key rotation, a universal cross-OS binary, RAR/7z decoding, full antivirus/signature coverage and live Microsoft-provider certification are not claimed. See the indexed backlog, design targets and validation record for specifics.
 
-The source ZIP intentionally retains historical implementation/review notes with their version labels. Those are context and evidence, not upgrade/import code. Current initialization targets fresh installs and reopening the current schema; external accounting interchange remains supported separately.
+The source ZIP intentionally retains historical implementation/review notes with their checkpoint labels. Those are context and evidence, not upgrade/import code. Current initialization targets fresh disposable test installs and reopening the current schema; no current installation exists. External accounting interchange remains supported separately.

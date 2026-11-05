@@ -1,12 +1,14 @@
 # First-party code and dependency provenance
 
-## Apache 2.0 compatibility inventory — updated 2026-10-26
+## Apache 2.0 compatibility inventory — updated 2026-11-03
 
 Workglen's own code is already declared Apache-2.0 in Cargo.toml and LICENSE.
-The current package inventory has 22 entries: seven first-party packages and
+The current package inventory has 24 entries: nine first-party packages and
 15 registry packages. mail-auth and its source are removed. Retained registry
 versions, checksums and declared licenses are unchanged from the preceding
-review; see validation/0.8-license-inventory.json.
+review. The preceding 22-package inventory is retained in
+`validation/0.8-license-inventory.json`; the current first-party additions and
+their licenses are recorded in Cargo.lock, DEPENDENCY-CATALOG.md and this file.
 
 On this evidence, Workglen can remain Apache-2.0 overall, provided component
 licenses and notices are respected. This does not relicense every third-party
@@ -16,7 +18,8 @@ terms; OR permits the chosen alternative. In particular:
 - MIT, BSD, ISC and Zlib components retain their notices and applicable terms.
 - Unicode/ICU components retain their Unicode-3.0 notices. The generated
   lazaret-pg Unicode tables retain `vendor/lazaret-pg/LICENSE-UNICODE`. The
-  native IDNA tables/data retain `crates/native-idna/LICENSE-UNICODE`.
+  native IDNA tables/data retain `crates/native-idna/LICENSE-UNICODE`. Lazaret
+  archive path-folding data retains `vendor/lazaret-archive/LICENSE-UNICODE`.
 - Native MIME bundles Unicode charset mappings and official WHATWG encoding indexes, labels and HTML entities.
   Preserve `crates/native-mime/data/LICENSE-UNICODE`, `LICENSE-WHATWG` and `LICENSE-HTML`; the latter two
   offer BSD-3-Clause for portions incorporated into code. See the crate README.
@@ -29,9 +32,10 @@ terms; OR permits the chosen alternative. In particular:
   ZIP with its MPL notice. Preserve its MPL terms and any covered modifications;
   it does not require Workglen's separate source files to adopt MPL.
 
-The complete package/version/license-expression inventory and Cargo.lock hash
-are recorded in `validation/0.8-license-inventory.json`. This reviews declared
-package licenses and the bundled Pratique notices, not every source-file origin
+The preceding 22-entry package/version/license-expression inventory and its
+Cargo.lock hash are recorded in `validation/0.8-license-inventory.json`; it is
+historical evidence, not a current 24-package lock snapshot. This review covers
+declared package licenses and the bundled notices, not every source-file origin
 or contributor's rights. Recheck after dependency changes. Before distributing
 compiled binaries, assemble the complete notices for their included dependencies;
 this summary is not a substitute for those license texts. The source ZIP does
@@ -43,7 +47,13 @@ and [Unicode License v3](https://www.unicode.org/license.txt).
 
 ## Provenance and components
 
-Pratique and the incorporated Lazaret archive-reader technology are first-party code. Their use does not require additional product attribution. Preserve all actual third-party notices, including certificate-root notices.
+Pratique and the incorporated Lazaret archive-reader technology are first-party code. Their use does not require additional product attribution. Preserve all actual third-party notices, including certificate-root and Unicode notices.
+
+`vendor/lazaret-archive` is copied from Lazaret commit
+`a08bc1684abd29d13e726c014b9dee4d4eacfc20` (2026-11-03). Its Rust source,
+tests and fixtures are unchanged; only standalone Cargo metadata points its
+single inflater dependency at Workglen's narrow compatibility facade. See
+`vendor/lazaret-archive/WORKGLEN.md` and `LAZARET-ARCHIVE-INTEGRATION.md`.
 
 Pratique is vendored from https://github.com/lazaret-dev/pratique,
 commit `9efaab9c010a2ca7f5ffaaf46b3b82eb50e20be4` (retrieved 2026-10-23).
@@ -88,7 +98,7 @@ Webmail uses first-party workglen-mime for MIME parsing and HTML-to-text convers
 First-party decoders supply legacy charset conversion using attributed official mapping data.
 No new third-party runtime dependencies were added for direct delivery or Webmail.
 
-Native Mail Security reuses the existing first-party inflater and hardened archive-reader code. Its Cargo dependencies are the inherited Workglen set with OpenSSL-related dependencies and the reviewed redundant dependencies removed; direct and transitive policy checks run in the regression suite. See `DEPENDENCIES.md` for the measured reduction. No retained package version or declared license changed in that reduction.
+Native Mail Security reuses the existing first-party inflater, the existing ZIP reader and Lazaret's bounded archive crate. The two added path packages are first-party and add no registry package, extractor process or runtime service. Direct and transitive policy checks run in the regression suite. See `DEPENDENCIES.md` and `LAZARET-ARCHIVE-INTEGRATION.md`.
 
 Native DNS, URL parsing and mail authentication are first-party. Unicode IDNA
 logic is first-party; its official Unicode 18 data remains attributed under

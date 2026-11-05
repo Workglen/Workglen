@@ -81,8 +81,9 @@ in the preceding archives. MIME `full_encoding` and `base64_slice` are now expli
 direct mail-parser features, preserving the former unified feature selection.
 
 The executable, configuration, keys, data schema and deployment boundaries are
-unchanged. Rebuild from a fresh extraction and preserve installed configuration,
-keys and data. No service is deployed and no real mail is sent during validation.
+unchanged. Rebuild from a fresh extraction. When updating a disposable test
+installation, preserve its configuration, keys and data. No service is deployed,
+no current installation is updated and no real mail is sent during validation.
 
 References: RFCs [7208](https://www.rfc-editor.org/rfc/rfc7208),
 [6376](https://www.rfc-editor.org/rfc/rfc6376),

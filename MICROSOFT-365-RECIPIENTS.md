@@ -58,9 +58,9 @@ Workglen reads SMTP proxy addresses and `mail` from users (without excluding dis
 
 A snapshot is bounded to 200 pages, 100,000 directory objects, 10,000 distinct accepted addresses, 64 MiB decoded JSON overall and roughly five minutes of work plus the final bounded request. Exceeding a limit fails the whole discovery. Individual requests have time/body limits; continuation URLs must remain on the same Microsoft collection. No OAuth token, secret or raw provider error body is stored in the preview or audit log.
 
-## Updating already installed code
+## Updating a disposable test installation
 
-Build the new source on both machines as your normal user with `bash install.sh build`. Extract updated source into your existing source directory to keep `target/` and its reusable build cache. The application binary embeds the UI, so a source update alone does not update installed screens.
+Build the new source on both test machines as your normal user with `bash install.sh build`. Extract updated source into your existing source directory to keep `target/` and its reusable build cache. The application binary embeds the UI, so a source update alone does not update test installation screens. No current installation exists.
 
 On the Mac, stop the running Admin process with Ctrl-C, then:
 
@@ -71,7 +71,7 @@ mv "$WG_ADMIN/bin/workglen.new" "$WG_ADMIN/bin/workglen"
 bash "$WG_ADMIN/run-admin.sh"
 ```
 
-On Lightsail, stage the rebuilt binary, then replace it while the service is stopped:
+On the Ubuntu test server, stage the rebuilt binary, then replace it while the service is stopped:
 
 ```sh
 sudo install -o root -g root -m 755 target/release/workglen /usr/local/bin/workglen.new
@@ -81,7 +81,7 @@ sudo systemctl start workglen-security
 sudo systemctl status workglen-security --no-pager -l
 ```
 
-These steps retain your installed configuration, keys and databases. Do not run `security-init` or reinstall a fresh pairing bundle over this deployment. Configure the optional directory profile after updating the binary. Refresh the browser after restarting Admin.
+These steps retain the disposable test configuration, keys and databases. Do not run `security-init` or reinstall a fresh pairing bundle over the test deployment. Configure the optional directory profile after updating the binary. Refresh the browser after restarting Admin.
 
 ## Navigation
 

@@ -1,4 +1,6 @@
-# Implementation update — 0.5
+# Module implementation and architecture
+
+Current documentation targets the TBD 0.1.1 development/test release. There are no current installations.
 
 Webmail is now a separate optional module depending on Mail. It provides mailbox
 login, reading, composing, replies, attachments and Sent copies on the shared mail
@@ -19,7 +21,7 @@ PostgreSQL-backed Accounting; the remaining suite modules are planned.
 
 ## Navigation and ownership
 
-| Admin area | Contents | Available in 0.5 |
+| Admin area | Contents | Current development state |
 |---|---|---|
 | Workspace | Overview, module catalog and lifecycle controls | Yes |
 | Foundation | Core services, capacity, deployment and replication status, backups | Yes; future shared services are labeled planned |
@@ -72,8 +74,8 @@ Before adding other business applications, extend Core with these services:
 | Versioned module manifests and schema definitions | Declare required Core capabilities, schema versions, routes, jobs, permissions and lifecycle hooks. Reject unsupported or missing dependencies before activation. |
 
 These additional shared services are **design requirements**, not implemented
-features. In particular, 0.5 has no general user directory, record ACL system,
-message service, workflow engine or general audit log.
+features. In particular, the current implementation has no general user directory,
+record ACL system, message service, workflow engine or general audit log.
 
 ## Independence and optional integrations
 

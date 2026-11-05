@@ -1,14 +1,14 @@
 # Dependency minimization
 
 The current source has **15 external package versions**, down from 96; three
-direct external application crates and seven first-party packages remain.
+direct external application crates and nine first-party packages remain.
 Serde/serde_json removal accounts for 11 removals (33 to 22), and native MIME
 charsets account for seven more (22 to 15). No retained registry version or
 checksum changed. JSON, configuration, storage and wire formats remain in use
 through first-party implementations. See NATIVE-DATA.md, NATIVE-CHARSETS.md,
 DEPENDENCY-CATALOG.md and PORTABLE-CHECKS.md. Earlier tables are historical.
 
-The six reusable first-party libraries must have **no external dependencies**.
+The eight reusable first-party libraries must have **no external dependencies**.
 They may depend on std and approved first-party paths. This requirement covers
 normal, optional, development, build and platform dependencies; the portable
 runner checks both manifests and transitive closure. A local path does not
@@ -17,8 +17,14 @@ retains its actual provenance and notices. The root application's existing
 database/password dependencies remain separately reviewed and counted.
 
 Changes to the dependency allowlists require an explicit documented review.
-DEPS-18/19 record this user-authorized change in security/DEPENDENCY-POLICY.md.
-Additional IDNA security capabilities remain deferred under SEC-IDNA-04.
+DEPS-18/19/20 record these user-authorized changes in security/DEPENDENCY-POLICY.md.
+F5's opt-in mixed-script heuristic adds no dependency; full IDNA2008 and UTS #39 confusable policy remain deferred under SEC-IDNA-04.
+
+DEPS-20 adds the exact first-party Lazaret archive snapshot and a narrow
+Workglen compatibility facade that re-exports the already-vendored Pratique
+inflater. Cargo.lock grows from 22 to 24 entries, both first-party; the 15
+registry packages, their versions and checksums are unchanged. The archive
+crate's Unicode path-folding data retains its Unicode-3.0 notice.
 
 ## Implemented reductions — October 24–25, 2026
 
@@ -67,10 +73,11 @@ positively reports readiness. Failed opening/polling, timeout and error/hangup
 events fail closed. Linux normally uses the blocking `getrandom` system call;
 macOS uses `getentropy` in bounded chunks. That first cleanup added no new cryptographic algorithm. Existing constant-time comparison remains with `subtle`.
 
-No installed configuration, key, database schema, replication encoding or audit format changes.
-Existing installations rebuild and replace their binary using the instructions
-in [MICROSOFT-365-RECIPIENTS.md](MICROSOFT-365-RECIPIENTS.md). Do not recreate
-databases or keys. Cargo can reuse unaffected cached builds.
+No test configuration, key, database schema, replication encoding or audit format changes.
+When updating a disposable test installation, rebuild and replace its binary using
+the instructions in [MICROSOFT-365-RECIPIENTS.md](MICROSOFT-365-RECIPIENTS.md).
+Do not recreate test databases or keys. Cargo can reuse unaffected cached builds.
+No current installation exists.
 
 ## Remaining priorities
 
@@ -79,7 +86,7 @@ databases or keys. Cargo can reuse unaffected cached builds.
 All three authorized checkpoints are complete.
 The DEPS-09 checkpoint finished with **175 external package versions**. Each completed
 checkpoint has its own cumulative ZIP, compatibility evidence and reviewed graph.
-Live Lightsail relay sign-off remains separate; see GATEWAY-RELAY-SECURITY.md.
+External Ubuntu test relay sign-off remains separate; see GATEWAY-RELAY-SECURITY.md.
 
 | Order / ID | Change | Removal | Remaining | Status |
 |---|---|---:|---:|---|
@@ -108,7 +115,7 @@ Completed: 174 → **173 external package versions**. 174 Rust tests,
 release Clippy/build, 54 delivery/DKIM checks and 119 broader mail/IMAP checks
 passed. Four optional database tests skipped. See NATIVE-ERRORS-AND-DATES.md.
 
-### Later architectural work
+### Remaining architectural work
 
 1. **Separate build profiles for module hosts.** Mail Security still shares the
    full executable with Accounting. Make the native PostgreSQL client and CSV
@@ -116,16 +123,12 @@ passed. Four optional database tests skipped. See NATIVE-ERRORS-AND-DATES.md.
    default. The external PostgreSQL client has already been removed; its former
    transitive dependency savings must not be counted again for module profiles.
    Native/remote RBAC and existing host behavior need coverage.
-2. **Review the remaining direct helpers and shared formats.** Mail-builder and
-   similar are now replaced by first-party adapters. The native helper checkpoints are documented in
-   NATIVE-ERRORS-AND-DATES.md; preserve timestamp semantics and error context. Serde/JSON still provide shared formats and DKIM2 recipes.
-   See DEPENDENCY-CATALOG.md for all remaining crates and purposes; this list is
-   not an authorization to remove required protocol or storage behavior.
-3. **Review the remaining DNS/URL graph together.** Hickory supports bounded DNS
-   and authentication; URL/IDNA/Unicode code is shared by DNS and URL handling.
-   Removing a direct dependency alone often removes zero transitive packages.
-   Preserve DNS retries, truncation/TCP behavior and strict URL/origin checks.
-   A new parser or resolver requires a separate interoperability review.
+2. **Review the remaining root dependencies individually.** Argon2, redb and
+   subtle remain the three direct external crates. JSON, DKIM2 recipes, DNS,
+   URLs, IDNA, MIME, TOML and charsets now use first-party implementations.
+   See DEPENDENCY-CATALOG.md for every remaining crate and purpose; further
+   reduction requires a separate security/storage review and must not weaken
+   required protocol, password or transactional behavior.
 
 ### PostgreSQL and Lazaret: current boundary
 
@@ -133,7 +136,7 @@ The operator's PostgreSQL server remains unchanged. Workglen now uses the separa
 first-party `vendor/lazaret-pg` Rust port of Lazaret's Python wire driver with
 Pratique TLS, SHA-256, HMAC and OS entropy. There is no Python runtime and no
 external postgres/tokio-postgres/protocol/types crate. The optional JSON feature
-reuses existing serde_json; generated Unicode tables retain their Unicode notice.
+uses Pratique JSON values; generated Unicode tables retain their Unicode notice.
 
 The port retains parameterized SQL, NULLs and exact accounting values,
 transactions/savepoints, error recovery, bounded streaming, cancellation, SCRAM,
@@ -142,14 +145,14 @@ See [LAZARET-POSTGRESQL.md](LAZARET-POSTGRESQL.md) and the crate README for the
 explicitly unsupported Python/libpq conveniences and eventual upstream handoff.
 No database/schema conversion or Workglen importer is involved.
 
-Keep redb, Serde/JSON, Argon2 and the current MIME parser while they provide
-necessary transactional, serialization, password and message handling. Retain
-the native replication byte format and CSV accounting semantics, whose replacements
-are checked against their former implementations. Do not trade these guarantees for a lower count.
-Module-specific builds remain unimplemented. The PostgreSQL client port,
-Pratique mail-auth crypto/Base64 adapters, native replication codec, bounded
-DKIM2 diff and unused reporting/compression cleanup are implemented. The complete
-remaining-crate purpose catalog is in DEPENDENCY-CATALOG.md.
+Keep redb, Argon2 and subtle unless a separately reviewed replacement preserves
+their transactional, password and constant-time behavior. Retain the native JSON,
+MIME, replication byte format and CSV accounting semantics, whose replacements
+are checked against their former implementations. Do not trade these guarantees
+for a lower count. Module-specific builds remain unimplemented. The PostgreSQL
+client port, Pratique mail-auth crypto/Base64 adapters, native replication codec,
+bounded DKIM2 diff and unused reporting/compression cleanup are implemented. The
+complete remaining-crate purpose catalog is in DEPENDENCY-CATALOG.md.
 
 ## Enforcement and evidence
 

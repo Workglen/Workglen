@@ -1,10 +1,13 @@
 # Native MIME charsets and reusable-library dependency boundary
 
-All six reusable libraries—Pratique, Lazaret PostgreSQL, native DNS, IDNA, MIME
-and TOML—now require only std and reviewed first-party libraries. The automatic
+At the DEPS-19 checkpoint, all six then-present reusable libraries—Pratique,
+Lazaret PostgreSQL, native DNS, IDNA, MIME and TOML—required only std and reviewed
+first-party libraries. The automatic
 boundary check inspects their resolved dependency closure and every manifest
 section, including disabled optional, development, build and platform dependencies.
-The root Workglen application retains its database/password dependencies separately.
+The current source adds two first-party Lazaret archive packages and enforces the
+same boundary across all eight. The root Workglen application retains its
+database/password dependencies separately.
 
 First-party MIME decoders replace encoding_rs without reducing supported legacy
 charsets. The removed package versions are encoding_rs 0.8.42, cfg-if 1.0.5,

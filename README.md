@@ -1,30 +1,30 @@
-# Workglen 0.8 · native Mail Security
+# Workglen 0.1.1 (TBD) · development/test release
 
-**Start here:** [CLI installer](START-HERE.md), [Mac Admin + local PostgreSQL + Lightsail gateway](MAC-ADMIN-LIGHTSAIL.md), [current architecture](ARCHITECTURE.md), and [all included documentation](DOCUMENTATION.md).
+**Start here:** [CLI installer](START-HERE.md), [M5 Mac Admin + local PostgreSQL + Ubuntu test gateway](MAC-ADMIN-LIGHTSAIL.md), [current architecture](ARCHITECTURE.md), and [all included documentation](DOCUMENTATION.md).
 
 Mail Security now runs inside the Workglen Rust executable with encrypted embedded redb storage, supplied or generated storage keys, local attachment/archive inspection and spam detection. It retains independently hosted gateways, central administration, scoped access, rule testing/activation, quarantine, digests and mailbox remediation. Start with [security/README.md](security/README.md) for installation, native redb storage and coverage limits, and [the dependency rule](security/DEPENDENCY-POLICY.md) for the self-contained service contract.
 
-All modules target fresh installations: there are no active installs to upgrade. Workglen-to-Workglen conversion paths are omitted; backup/restore, replication and external accounting import/export remain in scope.
+There are no current installations, live or otherwise. All modules target fresh test installations and reopening the current schema. Workglen-to-Workglen conversion paths are omitted; backup/restore, replication and external accounting import/export remain in scope.
 
-No additional third-party Cargo dependency was added. This is a development release; native policy scanning is not a claim of comprehensive malware detection or live Microsoft-provider certification. RAR and 7z remain [backlog work](MAIL-SECURITY-BACKLOG.md).
+No additional third-party Cargo dependency was added. This TBD release is for development and testing only; native policy scanning is not a claim of comprehensive malware detection or live Microsoft-provider certification. The first-party Lazaret integration inspects the documented RAR/7-Zip and other archive subset; unsupported compression, encryption and container variants remain fail-closed. See [the coverage boundary](LAZARET-ARCHIVE-INTEGRATION.md) and [upstream backlog](LAZARET-ARCHIVE-BACKLOG.md).
 
-The earlier 0.6 posting-correction behavior remains included. The following application overview describes the included modules.
+The posting-correction behavior below remains included. The following application overview describes the included modules.
 
-# Workglen 0.6 — posting corrections
+## Included posting-correction behavior
 
-This update adds ordinary posting edits/voids/deletes, controlled period reopening,
+Accounting includes ordinary posting edits/voids/deletes, controlled period reopening,
 named administration roles, and retained correction history. See [ACCOUNTING.md](ACCOUNTING.md)
 for external-system imports and operation details. [MODULE-HOSTING-AND-MAIL-SECURITY.md](MODULE-HOSTING-AND-MAIL-SECURITY.md)
-records the next-phase remote hosting, standalone gateway, quarantine, rule lifecycle,
+records the original remote hosting, standalone gateway, quarantine, rule lifecycle,
 and mailbox remediation requirements; the Mail Security implementation now supports those remote capabilities.
 
 The remaining material below describes the existing Mail/Webmail baseline and its limitations.
 
-# Workglen 0.5.0 — Mail, Webmail and Accounting
+## Mail, Webmail and Accounting overview
 
 Current builds use Pratique for TLS and application cryptography; OpenSSL headers, libraries and CLI are not required. See [INSTALL.md](INSTALL.md).
 
-This release adds direct MX email delivery, local DKIM signing and an optional slim
+Mail includes direct MX email delivery, local DKIM signing and an optional slim
 Webmail module. Start with [DIRECT-MAIL.md](DIRECT-MAIL.md) for outbound DNS, keys
 and network setup, and [WEBMAIL.md](WEBMAIL.md) for mailbox access in a browser.
 Existing implicit-TLS relay configurations remain supported.

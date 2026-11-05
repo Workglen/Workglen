@@ -1,8 +1,8 @@
 # Full crate catalog — October 26, 2026
 
 The main application/workspace has **15 external package versions**, **3 direct external crates**
-and **22 total Cargo.lock entries**, including seven first-party packages.
-All six reusable first-party libraries have zero external dependencies, including
+and **24 total Cargo.lock entries**, including nine first-party packages.
+All eight reusable first-party libraries have zero external dependencies, including
 optional, development, build and platform edges. The root application retains
 its separately reviewed database/password dependencies.
 
@@ -20,7 +20,7 @@ This removes 81 package versions from the 96-package baseline. No registry
 package was added or upgraded in the application/workspace; retained checksums are unchanged. JSON remains
 the interchange/storage format; its implementation and explicit typed schemas
 are now first-party. Legacy charset support remains through native decoders.
-Additional IDNA security capabilities remain deferred under SEC-IDNA-04.
+F5's opt-in mixed-script heuristic is implemented without new dependencies; full IDNA2008 and UTS #39 confusable policy remain deferred under SEC-IDNA-04.
 See NATIVE-DATA.md, NATIVE-CHARSETS.md, PRATIQUE-UPSTREAM.md and PORTABLE-CHECKS.md.
 
 The former simdutf8 entry incorrectly described an Android-only purpose. It was
@@ -34,10 +34,12 @@ measurements or a vulnerability audit.
 
 | Crate | Version | Purpose |
 | --- | --- | --- |
+| `lazaret-archive` | 0.1.9 | Bounded first-party TAR/GZIP, RAR, 7z, BZIP2, XZ and LZMA archive extraction for Mail Security |
 | `lazaret-pg` | 0.1.0 | Native PostgreSQL wire client translated from Lazaret, using Pratique TLS |
 | `pratique` | 0.1.0 | A from-scratch HTTPS client for Rust with zero dependencies: TLS 1.3 (and 1.2), X.509 validation and HTTP/1.1, std only |
 | `workglen-dns` | 0.1.0 | Bounded first-party recursive DNS client |
 | `workglen-idna` | 0.1.0 | First-party UTS 46 domain processing using attributed Unicode 18 data |
+| `workglen-lazaret-verify` | 0.1.0 | Narrow compatibility facade exposing Workglen's existing Pratique inflater to the unmodified Lazaret archive source |
 | `workglen-mail` | 0.8.0 | Modular Linux mail and accounting server using Pratique, redb and BYO PostgreSQL |
 | `workglen-mime` | 0.1.0 | Bounded first-party email and MIME parsing for Workglen |
 | `workglen-toml` | 0.1.0 | Bounded first-party TOML configuration parser with first-party typed decoding |

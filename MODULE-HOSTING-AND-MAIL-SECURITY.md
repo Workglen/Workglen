@@ -2,9 +2,13 @@
 
 For delivered topology and the Mac/local-PostgreSQL deployment, use [ARCHITECTURE.md](ARCHITECTURE.md) and [MAC-ADMIN-LIGHTSAIL.md](MAC-ADMIN-LIGHTSAIL.md). The older design requirements below are retained for context, not a statement that every target is implemented.
 
-The current [Mail Security backlog](MAIL-SECURITY-BACKLOG.md) includes native RAR and other archive-format inspection using first-party code, with unsupported content quarantined until support is validated.
+The current source integrates a validated first-party Lazaret subset for RAR,
+7-Zip and other archive formats while retaining Workglen's separate ZIP reader.
+Unsupported content remains mandatory quarantine; remaining coverage and
+cooperative decoder-budget work are tracked in the [Mail Security backlog](MAIL-SECURITY-BACKLOG.md)
+and [Lazaret archive backlog](LAZARET-ARCHIVE-BACKLOG.md).
 
-Historical 0.6 architecture requirements, October 24, 2026. Mail Security is implemented as a separate native Rust process profile in 0.8 with central remote management. See [security/README.md](security/README.md) for the delivered capability map and specific operational limits. The descriptions below retain the original target; independent Accounting and Webmail hosting remain outside this Mail Security release.
+Historical 0.6 architecture requirements, October 24, 2026. Mail Security is implemented as a separate native Rust process profile with central remote management in the current development source targeted for TBD 0.1.1. See [security/README.md](security/README.md) for the delivered capability map and specific operational limits. The descriptions below retain the original target; independent Accounting and Webmail hosting remain outside this Mail Security release.
 
 ## Historical 0.6 boundary (superseded)
 

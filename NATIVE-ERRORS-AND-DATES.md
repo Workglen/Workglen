@@ -2,8 +2,9 @@
 
 These are two user-authorized, cumulative source checkpoints after DEPS-09.
 No configuration, key, database schema, audit timestamp or queue format is
-changed. Existing installations rebuild and replace the binary using the
-Mac/Lightsail instructions; preserve installed configuration, keys and data.
+changed. When applying a checkpoint to a disposable test installation, rebuild
+and replace the binary using the M5 Mac/Ubuntu test-server instructions;
+preserve that test configuration, keys and data. No current installation exists.
 
 ## DEPS-10 — application errors replace anyhow
 

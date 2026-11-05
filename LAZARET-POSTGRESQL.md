@@ -5,11 +5,12 @@ Rust port of Lazaret's Python SQL driver. It uses Pratique directly for verified
 TLS and SCRAM cryptography. The external `postgres`, `tokio-postgres`,
 `postgres-protocol` and `postgres-types` crates are removed.
 
-This replaces the connection driver. Your existing PostgreSQL server, database,
-accounting schema, journal history, credentials and storage keys remain in place.
-Rebuild and replace the executable using the existing deployment instructions;
-do not reinitialize the database or regenerate keys. Nothing in this source
-release installs or updates your running Mac or Lightsail hosts automatically.
+This replaces the connection driver. In a disposable test installation, the
+PostgreSQL server, database, accounting schema, journal history, credentials and
+storage keys remain in place. Rebuild and replace the executable using the test
+deployment instructions; do not reinitialize the database or regenerate keys.
+Nothing in this source release installs or updates an M5 Mac or Ubuntu test
+server automatically. No current installation exists.
 
 The source is organized for a later Lazaret handoff. Its public API, authentication,
 wire protocol, types, transport and regression tests live in the crate rather
@@ -44,7 +45,8 @@ This port removes 28 more registry package versions, taking the lockfile from
 258 to 230. Together with the preceding dependency cleanup, the total falls
 from 271 to 230 and direct third-party application dependencies from 20 to 16.
 No registry package was added or upgraded. The default driver runtime depends
-only on first-party Pratique; its optional JSON support uses existing serde_json.
+only on first-party Pratique. At this historical port checkpoint its optional
+JSON support used serde_json; the current source uses Pratique JSON values.
 Generated Unicode data retains its actual license notice.
 
 Tests cover the published SCRAM vector, Lazaret's 20 PostgreSQL password
@@ -52,4 +54,5 @@ verifiers, all Unicode scalar values against the Python reference, malformed
 protocol responses, transaction failures, cancellation, TLS channel binding and
 certificate refusals. Disposable database and Workglen accounting results are
 recorded in [VALIDATION.md](VALIDATION.md). This is not a claim of production
-load testing, live Mac/Lightsail deployment or independent security certification.
+load testing, an M5 Mac or Ubuntu test deployment, or independent security
+certification. No current installation exists.

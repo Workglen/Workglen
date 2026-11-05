@@ -1,4 +1,6 @@
-# Implementation update — 0.5
+# Workglen scaling architecture
+
+Current documentation targets the TBD 0.1.1 development/test release. The capacity designs below are not production deployment claims.
 
 Accounting now uses a shared BYO PostgreSQL endpoint. Each node has a bounded
 connection pool (default 2, maximum 8). Its state is not replicated through redb.
@@ -14,7 +16,7 @@ ownership, transactional storage boundaries, and durable work queues. Separate
 **feature activation**, **runtime placement**, and **capacity**. An organization
 should not have to enable a second copy of Sales just to run more Sales workers.
 
-Workglen 0.5 implements compact Mail with one/two-node availability, an optional
+The current development source implements compact Mail with one/two-node availability, an optional
 slim Webmail client, and Accounting using shared BYO PostgreSQL. Larger deployments
 below are a design, not a claim that the
 current binary is a distributed business suite. The two-node mode has one active

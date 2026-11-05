@@ -1,5 +1,7 @@
 # Documentation included in this source ZIP
 
+Current documentation targets **Workglen 0.1.1 (TBD)**, a development/test release. There are no current installations, live or otherwise. The developer laptop is an Apple Silicon M5 Mac and server test machines run Ubuntu. Historical checkpoint numbers and validation artifact prefixes remain only where needed for evidence and reproduction.
+
 All the documents listed below, the implementation, examples, SQL schema, tests and validation records are packaged under `workglen/`. They do not require a repository checkout or earlier conversation. The CLI installer also copies these guides and validation records into the installed local documentation directory.
 
 | Topic | Included document | How to use it |
@@ -8,23 +10,31 @@ All the documents listed below, the implementation, examples, SQL schema, tests 
 | Native errors and dates | [NATIVE-ERRORS-AND-DATES.md](NATIVE-ERRORS-AND-DATES.md) | Anyhow/Chrono replacement scope, compatibility and validation |
 | Remaining crate catalog | [DEPENDENCY-CATALOG.md](DEPENDENCY-CATALOG.md) | Every remaining external crate, its purpose and resolved parent dependencies |
 | Mail-auth native utilities | [MAIL-AUTH-UTILITIES.md](MAIL-AUTH-UTILITIES.md) | Ordered hostname, Base64 and bounded diff checkpoints and validation |
-| Gateway relay protection | [GATEWAY-RELAY-SECURITY.md](GATEWAY-RELAY-SECURITY.md) | Verified source controls, safe external diagnostic and pending Lightsail checks |
+| Gateway relay protection | [GATEWAY-RELAY-SECURITY.md](GATEWAY-RELAY-SECURITY.md) | Verified source controls, safe external diagnostic and pending Ubuntu test checks |
 | Mail-auth utility cleanup | [MAIL-AUTH-REPORT-TRIM.md](MAIL-AUTH-REPORT-TRIM.md) | Removed unused reporting/compression dependencies and retained protocol utilities |
 | Replication codec | [REPLICATION-CODEC.md](REPLICATION-CODEC.md) | Native bincode replacement, unchanged wire format and compatibility checks |
 | First steps | [START-HERE.md](START-HERE.md) | Entry point after unzipping |
 | CLI installer | [INSTALL.md](INSTALL.md) | Prerequisites, options, behavior, failure handling |
-| Your deployment | [MAC-ADMIN-LIGHTSAIL.md](MAC-ADMIN-LIGHTSAIL.md) | Mac Admin, existing local PostgreSQL, paired Lightsail gateway |
+| Test deployment | [MAC-ADMIN-LIGHTSAIL.md](MAC-ADMIN-LIGHTSAIL.md) | M5 Mac Admin, local PostgreSQL and an Ubuntu test gateway; Lightsail is optional |
 | Implemented design | [ARCHITECTURE.md](ARCHITECTURE.md) | Current processes, storage, trust and lifecycle |
-| Suite overview and Mail | [README.md](README.md) | Mail operations, build, limits and historical release sections |
+| Suite overview and Mail | [README.md](README.md) | Suite/Mail operations, build and limits for the TBD 0.1.1 test target |
 | Mail Security | [security/README.md](security/README.md) | Native gateway operations and capability limits |
+| Lazaret archive integration | [LAZARET-ARCHIVE-INTEGRATION.md](LAZARET-ARCHIVE-INTEGRATION.md) | Supported formats, Workglen hardening boundary, limits and validation |
 | Delivery destination wizard | [DELIVERY-DESTINATIONS.md](DELIVERY-DESTINATIONS.md) | In-app SMTP destination creation, Microsoft MX discovery, tests and empty-list recovery |
-| Microsoft 365 recipients | [MICROSOFT-365-RECIPIENTS.md](MICROSOFT-365-RECIPIENTS.md) | Directory discovery, review, manual exceptions, existing-install update and navigation |
+| Microsoft 365 recipients | [MICROSOFT-365-RECIPIENTS.md](MICROSOFT-365-RECIPIENTS.md) | Directory discovery, review, manual exceptions, disposable test updates and navigation |
 | Encryption/BYOK | [security/ENCRYPTED-STORAGE.md](security/ENCRYPTED-STORAGE.md) | Whole-store encryption, keys, backup/restore and boundaries |
 | Pratique integration | [PRATIQUE-INTEGRATION.md](PRATIQUE-INTEGRATION.md) | Cryptography ownership, native PostgreSQL driver, native provisioning and review limits |
 | Native PostgreSQL client | [LAZARET-POSTGRESQL.md](LAZARET-POSTGRESQL.md) and [crate README](vendor/lazaret-pg/README.md) | Lazaret Rust port, handoff boundary and supported features |
 | Dependency policy | [security/DEPENDENCY-POLICY.md](security/DEPENDENCY-POLICY.md) | Native runtime/no additional scanner-service rule |
 | Crate replacement checkpoints | [CRATE-REPLACEMENTS.md](CRATE-REPLACEMENTS.md) | Cumulative source ZIP stages and compatibility evidence |
-| Native DNS, URLs and authentication | [NATIVE-DNS-URL-AUTH.md](NATIVE-DNS-URL-AUTH.md) | Active replacements, candidate limits and remaining mail-auth work |
+| Crate reduction plan | [CRATE-REDUCTION-NEXT.md](CRATE-REDUCTION-NEXT.md) | Current 15-package baseline, retained security/storage boundaries and historical projections |
+| Native DNS, URLs and authentication | [NATIVE-DNS-URL-AUTH.md](NATIVE-DNS-URL-AUTH.md) | Historical DEPS-12 replacements, candidate limits and checkpoint evidence |
+| Native DNS transport | [NATIVE-ASYNC-DNS.md](NATIVE-ASYNC-DNS.md) | Tokio removal, Pratique sockets, deadlines, cancellation and platform evidence |
+| Native typed data and JSON | [NATIVE-DATA.md](NATIVE-DATA.md) | Serde/JSON replacement, schema contracts, compatibility corrections and oracles |
+| Native MIME charsets | [NATIVE-CHARSETS.md](NATIVE-CHARSETS.md) | Native legacy decoding, reusable-library dependency boundary and comparisons |
+| Native email/MIME | [NATIVE-MIME.md](NATIVE-MIME.md) | Parser boundaries, incomplete-scan behavior and historical DEPS-15 evidence |
+| Native TOML | [NATIVE-TOML.md](NATIVE-TOML.md) | Configuration grammar, typed decoding, limits and compatibility evidence |
+| Pratique upstream tracking | [PRATIQUE-UPSTREAM.md](PRATIQUE-UPSTREAM.md) | Patch series, source hashes, restored test fixtures and upstream handoff status |
 | Dependency reduction | [DEPENDENCIES.md](DEPENDENCIES.md) | Current counts, removed crates, retained capabilities and next priorities |
 | TLS/Let's Encrypt | [TLS-CERTIFICATES.md](TLS-CERTIFICATES.md) | Gateway issuance, renewal, challenge routing and certificate status |
 | Accounting | [ACCOUNTING.md](ACCOUNTING.md) | PostgreSQL, journals, edits/locks/audit, Xero, bank feeds, imports/exports |
@@ -33,7 +43,8 @@ All the documents listed below, the implementation, examples, SQL schema, tests 
 | Module design | [MODULES.md](MODULES.md) | Delivered module controls plus explicitly planned foundation features |
 | Scaling design | [SCALING.md](SCALING.md) | Capacity model and future scaling targets |
 | Remote-module design history | [MODULE-HOSTING-AND-MAIL-SECURITY.md](MODULE-HOSTING-AND-MAIL-SECURITY.md) | Original requirements; historical/target sections are labeled |
-| Remaining Security work | [MAIL-SECURITY-BACKLOG.md](MAIL-SECURITY-BACKLOG.md) | Native archive formats and storage/key lifecycle backlog |
+| Remaining Security work | [MAIL-SECURITY-BACKLOG.md](MAIL-SECURITY-BACKLOG.md) | Availability, scaling, archive-coverage and operational hardening backlog |
+| Lazaret archive upstream work | [LAZARET-ARCHIVE-BACKLOG.md](LAZARET-ARCHIVE-BACKLOG.md) | Changes owned by the Lazaret agent; ZIP explicitly remains out of scope |
 | Security review boundary | [SECURITY-REVIEW.md](SECURITY-REVIEW.md) | Delivered review notes and outstanding independent review limits |
 | Validation | [VALIDATION.md](VALIDATION.md) and [validation/](validation/) | Current results and explicitly labeled historical evidence |
 | Contributor instructions | [AGENTS.md](AGENTS.md) | Rules for implementation and verification |

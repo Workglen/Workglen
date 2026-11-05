@@ -4,8 +4,9 @@ Current update: the legacy charset layer described as retained in this earlier
 MIME checkpoint has now been replaced. See NATIVE-CHARSETS.md for the native
 decoders, zero-external-dependency rule and independent comparisons.
 
-The cumulative source now contains **51 external registry package versions**,
-from 54 at the IDNA checkpoint and 96 before native authentication: **45 removed**.
+At the DEPS-15 checkpoint, the cumulative source contained **51 external registry
+package versions**, from 54 at the IDNA checkpoint and 96 before native
+authentication: **45 removed**. Later checkpoints reduce the current source to 15.
 This stage removes `mail-parser 0.11.9`, `hashify 0.2.9` and the exclusive
 `syn 2.0.119`. The retained `syn 3.0.9` remains needed by Serde. There are 57
 lockfile entries including six first-party packages and seven direct external

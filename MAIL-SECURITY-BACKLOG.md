@@ -67,7 +67,7 @@ Remaining before production sizing:
 - Takeover is never automatic from peer timeout. Planned ownership handoff is initiated by the current owner; operator takeover requires that owner to be fenced and explicitly acknowledges incomplete replication or uncertain-delivery risk.
 - Durable per-partition terms fence downstream delivery/remediation. Scans use separate cluster-wide owner/lease generations and synchronized policy/model revisions, allowing all scanner pools to work without creating duplicate authoritative results. A returning stale node can accept new work but cannot deliver a partition transferred under a higher term.
 
-The complete protocol, state, security, observability, handoff and fault-test requirements are in [MAIL-SECURITY-REPLICATION.md](MAIL-SECURITY-REPLICATION.md). Implement it in the staged order defined there; do not describe the current independent-node harness as synchronized HA.
+The complete protocol, state, security, observability, handoff and fault-test requirements are in [MAIL-SECURITY-REPLICATION.md](MAIL-SECURITY-REPLICATION.md). The staged source slice is implemented; continue the remaining activation gates in the order defined there and do not describe the current same-host pre-production evidence as production synchronized HA.
 
 The protocol must remain extensible beyond two nodes: versioned rendezvous placement, bounded replication factors, per-origin ordered logs and placement generations instead of full-mesh replication. Delivery ownership is partitioned initially by accepting/origin node and may later use tenant/domain/route partitions; every partition retains exactly one fenced owner term.
 

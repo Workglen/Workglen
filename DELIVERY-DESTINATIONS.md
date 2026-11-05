@@ -31,8 +31,8 @@ Destinations created in the wizard are immutable entries in the encrypted securi
 
 Back up the encrypted security database and its separate storage key as usual. No schema conversion or reinitialization is required. Route persistence uses the existing store; it introduces no runtime dependency.
 
-## Updating your current installation
+## Updating a disposable test installation
 
-Rebuild and replace the embedded application binary on **both the Mac Admin and Lightsail gateway**, then refresh the browser. Your source directory's `target/` build cache can be retained. Use the existing-install update commands in [MICROSOFT-365-RECIPIENTS.md](MICROSOFT-365-RECIPIENTS.md#updating-already-installed-code). This changes the code, not your installed keys, database, pairing or existing route configuration. Do not rerun `security-init`.
+Rebuild and replace the embedded application binary on **both the M5 Mac Admin and Ubuntu test gateway**, then refresh the browser. Your source directory's `target/` build cache can be retained. Use the test-installation update commands in [MICROSOFT-365-RECIPIENTS.md](MICROSOFT-365-RECIPIENTS.md#updating-a-disposable-test-installation). This changes the code, not the test keys, database, pairing or existing route configuration. Do not rerun `security-init`. No current installation exists.
 
 After this update, delivery destination creation itself requires no further JSON edits or gateway restart. Microsoft 365 directory discovery is a separate optional integration; its one-time Entra credentials and consent are documented in that guide.

@@ -78,9 +78,9 @@ local regression/interoperability checks, not a complete independent cryptograph
 audit or live Microsoft 365 deployment validation. The complete upstream Pratique
 and mail-auth test harnesses are not claimed as executed.
 
-## Install the checkpoint
+## Install the checkpoint in a test environment
 
-Extract the cumulative source ZIP into a source directory and run `bash install.sh build` with the normal build account. Follow the existing Mac/Lightsail stop,
-binary replacement and restart instructions. Keep installed configuration, DKIM
+Extract the cumulative source ZIP into a source directory and run `bash install.sh build` with the normal build account. For a disposable test installation, follow the M5 Mac/Ubuntu test-server stop,
+binary replacement and restart instructions. Keep that test configuration, DKIM
 keys, storage keys and databases. There is no schema, configuration or key conversion.
-This checkpoint changes source only; it does not deploy to either host.
+This checkpoint changes source only; it does not deploy to either test host or update any current installation.
