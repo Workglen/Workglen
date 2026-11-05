@@ -20,9 +20,9 @@ fn json_compatibility_corpus() {
 }
 
 #[test]
-fn json_writer_failure(){
-use pratique::json_value as json;
-let value=json::json!({"x":1});
+fn json_writer_failure() {
+    use pratique::json_value as json;
+    let value = json::json!({"x":1});
     struct Broken;
     impl std::io::Write for Broken {
         fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {

@@ -63,8 +63,12 @@ mod decoder_differential_tests {
             let bytes: Vec<_> = (0..len).map(|i| i as u8).collect();
             let encoded = STANDARD.encode(&bytes);
             for text in [encoded.as_str(), encoded.trim_end_matches('=')] {
-                let raw = format!("Content-Type: application/octet-stream\r\nContent-Transfer-Encoding: base64\r\n\r\n{text}\r\n");
-                let message = workglen_mime::MessageParser::default().parse(raw.as_bytes()).unwrap();
+                let raw = format!(
+                    "Content-Type: application/octet-stream\r\nContent-Transfer-Encoding: base64\r\n\r\n{text}\r\n"
+                );
+                let message = workglen_mime::MessageParser::default()
+                    .parse(raw.as_bytes())
+                    .unwrap();
                 assert_eq!(message.parts[0].contents(), base64(text).unwrap());
                 assert!(!message.parts[0].is_encoding_problem);
             }

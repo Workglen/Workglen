@@ -153,6 +153,7 @@ fn native_dkim2_signing_reconstruction_flags_and_envelope() {
         assert_eq!(result.feedback_domains(), vec!["gateway.example.test"]);
         assert_eq!(result.feedback_relay(), Some("gateway.example.test"));
         assert_eq!(result.return_path(), Some("<bounce@gateway.example.test>"));
+        #[cfg_attr(not(feature = "arc"), allow(unused_mut))]
         let mut all = vec![
             pratique::json_value::json!({"kind":"dkim2","raw":signed,"mail_from":env.mail_from,"rcpt_to":env.rcpt_to}),
         ];
