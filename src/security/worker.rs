@@ -42,7 +42,7 @@ impl Service {
             .map(|c| std::str::from_utf8(c).unwrap())
             .collect::<Vec<_>>()
             .join("\r\n");
-        Ok(format!("From: {sender}\r\nTo: {recipient}\r\nSubject: Workglen quarantine summary\r\nMessage-ID: <{}@{}>\r\nDate: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n{lines}\r\n",s(snap,"id")?,sender.rsplit('@').next().unwrap_or(""),crate::datetime::Utc::now().to_rfc2822()).into_bytes())
+        Ok(format!("From: {sender}\r\nTo: {recipient}\r\nSubject: Workglen quarantine summary\r\nMessage-ID: <{}@{}>\r\nDate: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n{lines}\r\n",s(snap,"id")?,sender.rsplit('@').next().unwrap_or(""),crate::datetime::Utc::now()?.to_rfc2822()).into_bytes())
     }
     pub fn maintenance(&self) -> Result<()> {
         self.db.write(|t| {

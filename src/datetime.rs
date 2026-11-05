@@ -165,10 +165,13 @@ impl fmt::Display for NaiveDate {
     }
 }
 impl Utc {
-    pub fn now() -> DateTime {
-        DateTime::from_system_time(SystemTime::now())
-            .expect("system clock outside supported Gregorian range")
+    pub fn now() -> crate::error::Result<DateTime> {
+        utc_from_system_time(SystemTime::now())
     }
+}
+fn utc_from_system_time(time: SystemTime) -> crate::error::Result<DateTime> {
+    use crate::error::Context;
+    DateTime::from_system_time(time).context("System clock outside supported Gregorian range")
 }
 impl DateTime {
     pub fn from_timestamp(seconds: i64, nanos: u32) -> Option<Self> {
@@ -561,5 +564,26 @@ impl Cursor<'_> {
             return Err(problem(Problem::Range));
         }
         Ok(((h * 3600 + m * 60) * if negative { -1 } else { 1 }) as i32)
+    }
+}
+
+#[cfg(test)]
+mod clock_tests {
+    use super::*;
+
+    #[test]
+    fn utc_conversion_rejects_out_of_range_clocks_without_fallback() {
+        let epoch = utc_from_system_time(UNIX_EPOCH).unwrap();
+        assert_eq!(epoch.timestamp(), 0);
+
+        let out_of_range = UNIX_EPOCH
+            .checked_add(std::time::Duration::from_secs(i64::MAX as u64))
+            .expect("test platform must represent the synthetic clock");
+        let error = utc_from_system_time(out_of_range).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("System clock outside supported Gregorian range")
+        );
     }
 }

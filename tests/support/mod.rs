@@ -40,7 +40,8 @@ impl Drop for TempDir {
     }
 }
 pub fn tempdir() -> io::Result<TempDir> {
-    let parent = std::env::temp_dir();
+    // macOS exposes /var as a symlink; tests must not weaken consumers' real-path checks.
+    let parent = std::env::temp_dir().canonicalize()?;
     for _ in 0..128 {
         let random = pratique::crypto::rand::bytes::<16>()
             .map_err(|_| io::Error::other("OS entropy unavailable for test directory"))?;

@@ -77,7 +77,7 @@ fn state_is_private_exclusive_and_rejects_links() {
 #[test]
 fn fallback_tracks_certificate_lifetime_including_short_certificates() {
     let key = KeyPair::generate_ecdsa(Curve::P256).unwrap();
-    let now = crate::datetime::Utc::now().timestamp();
+    let now = crate::datetime::Utc::now().unwrap().timestamp();
     for days in [90, 64, 45, 6] {
         let mut spec = CertSpec::server(&["mail.example.test"]);
         spec.not_before = now;
@@ -206,7 +206,7 @@ impl Ca {
             "/cert" => Response::bytes(200, "application/pem-certificate-chain", self.certs.lock().unwrap().last().unwrap().as_bytes().to_vec()).with_header("replay-nonce", "bG9jYWwtdGVzdC1ub25jZQ"),
             _ if path.starts_with("/renew/") => {
                 let offset = if self.certs.lock().unwrap().len() == 1 { -60 } else { 15*86400 };
-                let date = |seconds| crate::datetime::DateTime::from_timestamp(crate::datetime::Utc::now().timestamp()+seconds,0).unwrap().to_rfc3339();
+                let date = |seconds| crate::datetime::DateTime::from_timestamp(crate::datetime::Utc::now().unwrap().timestamp()+seconds,0).unwrap().to_rfc3339();
                 self.reply(json!({"suggestedWindow":{"start":date(offset),"end":date(offset+30)}})).with_header("retry-after", "3600")
             }
             _ => Response::new(404),
@@ -273,11 +273,11 @@ fn native_issuance_retry_live_reload_and_cached_restart() {
         assert!(String::from_utf8_lossy(&body).contains("secured"));
         peer
     };
-    until(|| manager.status()["ready"] == true);
+    until(|| manager.status().unwrap()["ready"] == true);
     ca.reject.store(true, Ordering::SeqCst);
     let first = manager.tls.store.as_ref().unwrap().certificates()[0].chain()[0].clone();
     assert_eq!(handshake(), first);
-    until(|| manager.status()["last_error"] == "issuance-or-renewal-failed");
+    until(|| manager.status().unwrap()["last_error"] == "issuance-or-renewal-failed");
     assert_eq!(
         manager.tls.store.as_ref().unwrap().certificates()[0].chain()[0],
         first
@@ -287,7 +287,7 @@ fn native_issuance_retry_live_reload_and_cached_restart() {
     until(|| manager.tls.store.as_ref().unwrap().certificates()[0].chain()[0] != first);
     assert_ne!(handshake(), first); // same listener and configuration use the renewed key
     assert!(ca.replaced.load(Ordering::SeqCst));
-    assert!(manager.status()["last_error"].is_null());
+    assert!(manager.status().unwrap()["last_error"].is_null());
     let port = ca.port.load(Ordering::SeqCst);
     assert_eq!(
         client()
@@ -314,7 +314,7 @@ fn native_issuance_retry_live_reload_and_cached_restart() {
         restarted.tls.store.as_ref().unwrap().certificates()[0].chain()[0],
         current
     );
-    assert_eq!(restarted.status()["ready"], true);
+    assert_eq!(restarted.status().unwrap()["ready"], true);
     assert_eq!(ca.certs.lock().unwrap().len(), 2);
     drop(restarted);
     _ca_server.shutdown(Duration::from_secs(1));

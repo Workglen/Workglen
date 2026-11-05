@@ -130,7 +130,7 @@ pub fn listen(app: Arc<App>) -> Result<()> {
             *app.replication_status
                 .lock()
                 .unwrap_or_else(|e| e.into_inner()) = crate::app::ReplicationStatus {
-                last_contact: Some(crate::datetime::Utc::now().timestamp()),
+                last_contact: Some(crate::datetime::Utc::now()?.timestamp()),
                 peer_sequence: Some(seq),
                 term: Some(term),
                 last_error: None,
@@ -210,7 +210,7 @@ fn sync_once(app: &App) -> Result<()> {
     *app.replication_status
         .lock()
         .unwrap_or_else(|e| e.into_inner()) = crate::app::ReplicationStatus {
-        last_contact: Some(crate::datetime::Utc::now().timestamp()),
+        last_contact: Some(crate::datetime::Utc::now()?.timestamp()),
         peer_sequence: Some(sent),
         term: Some(term),
         last_error: None,

@@ -464,7 +464,7 @@ impl State {
                 ensure!(old.digest == digest, "Send identifier already used");
                 return Ok((vec![], json!({"queued":true,"id":old.blob})));
             }
-            let now = crate::datetime::Utc::now().timestamp();
+            let now = crate::datetime::Utc::now()?.timestamp();
             let mut ops = crate::smtp::delivery_ops(
                 t,
                 &self.app,
@@ -701,7 +701,7 @@ fn compose(
         "Message text exceeds 256 KiB or contains NUL"
     );
     ensure!(d.attachments.len() <= 10, "At most 10 attachments");
-    let date = crate::datetime::Utc::now().to_rfc2822();
+    let date = crate::datetime::Utc::now()?.to_rfc2822();
     let mut raw = format!(
         "Received: by {host} with HTTPS; {date}\r\nFrom: {user}\r\nTo: {}\r\n",
         if to.is_empty() {

@@ -226,7 +226,7 @@ pub fn set(app: &App, id: &str, enabled: bool, expected: Option<u64>) -> Result<
             } else {
                 current.webmail_enabled
             },
-            changed_at: Some(crate::datetime::Utc::now().timestamp()),
+            changed_at: Some(crate::datetime::Utc::now()?.timestamp()),
         };
         Ok((vec![Op::json(STATE_KEY.into(), &next)?], next))
     })

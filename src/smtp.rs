@@ -268,7 +268,7 @@ pub fn serve(tcp: TcpStream, app: Arc<App>, submission: bool) -> Result<()> {
                             ip,
                             app.config.hostname,
                             if w.secure { "ESMTPS" } else { "ESMTP" },
-                            crate::datetime::Utc::now().to_rfc2822()
+                            crate::datetime::Utc::now()?.to_rfc2822()
                         );
                         let mut body = trace.into_bytes();
                         body.extend_from_slice(&raw);
@@ -399,7 +399,7 @@ fn deliver(
     signed: bool,
 ) -> Result<String> {
     let id = store::random_id();
-    let now = crate::datetime::Utc::now().timestamp();
+    let now = crate::datetime::Utc::now()?.timestamp();
     app.mail_commit(|t| {
         Ok((
             delivery_ops(t, app, from, to, &id, &body, junk, signed, false, now)?,

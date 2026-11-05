@@ -116,7 +116,7 @@ pub fn execute(app: &App, access: &Access, r: Request) -> Result<Value> {
         .into_iter()
         .filter_map(|p| p.strip_prefix("security."))
         .collect::<Vec<_>>();
-    let envelope = json!({"version":1,"workspace":app.config.replication.cluster_id,"audience":remote.id,"at":crate::datetime::Utc::now().timestamp(),"nonce":crate::store::random_id(),
+    let envelope = json!({"version":1,"workspace":app.config.replication.cluster_id,"audience":remote.id,"at":crate::datetime::Utc::now()?.timestamp(),"nonce":crate::store::random_id(),
         "actor":{"id":format!("central:{}",access.username),"permissions":permissions,"domains":access.security_domains,"mailboxes":access.security_mailboxes},"command":r.command});
     let bytes = pratique::json_value::to_vec(&envelope)?;
     let key = crate::config::secret(&remote.key_file)?;

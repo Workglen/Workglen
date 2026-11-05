@@ -376,7 +376,7 @@ pub fn audit_ops(
         Op::json("core/access-audit-sequence".into(), &seq)?,
         Op::json(
             format!("{AUDIT}{seq:020}"),
-            &json!({"id":seq,"at":crate::datetime::Utc::now().timestamp(),"actor":actor,"action":action,"target":target,"details":details}),
+            &json!({"id":seq,"at":crate::datetime::Utc::now()?.timestamp(),"actor":actor,"action":action,"target":target,"details":details}),
         )?,
     ];
     if seq > 10000 {

@@ -343,7 +343,7 @@ fn send(app: &App, item: &QueueItem) -> Result<()> {
     Err(last.unwrap_or_else(|| crate::error!("no delivery destination")))
 }
 fn finish(app: &App, key: &str, item: &QueueItem, result: Result<()>) -> Result<()> {
-    let now = crate::datetime::Utc::now().timestamp();
+    let now = crate::datetime::Utc::now()?.timestamp();
     match result {
         Ok(()) => app.commit(|t| {
             let mut ops = vec![Op::del(key.into())];
@@ -378,7 +378,7 @@ fn finish(app: &App, key: &str, item: &QueueItem, result: Result<()>) -> Result<
                     .min(6 * 3600);
             eprintln!("queue {}: {} ({})", key, item.status, item.last_error);
             app.commit(|t|{let mut ops=vec![Op::json(key.into(),&item)?];
-            if failed{let id=store::random_id();let body=format!("From: Mail Delivery System <postmaster@{}>\r\nTo: {}\r\nDate: {}\r\nMessage-ID: <{}@{}>\r\nSubject: Mail delivery failed\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nYour message to {} could not be delivered.\r\nReason: {}\r\nQueue reference: {}\r\nThe original remains available to the administrator in the failed queue.\r\n",app.config.domain,item.sender,crate::datetime::Utc::now().to_rfc2822(),id,app.config.hostname,item.recipient,item.last_error,key).into_bytes();
+            if failed{let id=store::random_id();let body=format!("From: Mail Delivery System <postmaster@{}>\r\nTo: {}\r\nDate: {}\r\nMessage-ID: <{}@{}>\r\nSubject: Mail delivery failed\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nYour message to {} could not be delivered.\r\nReason: {}\r\nQueue reference: {}\r\nThe original remains available to the administrator in the failed queue.\r\n",app.config.domain,item.sender,crate::datetime::Utc::now()?.to_rfc2822(),id,app.config.hostname,item.recipient,item.last_error,key).into_bytes();
                 if let Ok((more,_,_))=store::append_ops(t,&item.sender,"INBOX",&id,body.len(),vec![],now,&app.config.limits){ops.extend(more);ops.push(Op{key:format!("blob/{id}"),value:Some(body)});}else{eprintln!("delivery failure notice could not be stored; inspect failed queue");}}
             Ok((ops,()))
         })
@@ -398,7 +398,7 @@ pub fn run(app: Arc<App>) {
                         let item = app.read_store().and_then(|s| s.get::<QueueItem>(&key));
                         let Ok(Some(item)) = item else { continue };
                         if item.status != "pending"
-                            || item.next_try > crate::datetime::Utc::now().timestamp()
+                            || item.next_try > crate::datetime::Utc::now()?.timestamp()
                         {
                             continue;
                         }
@@ -410,7 +410,7 @@ pub fn run(app: Arc<App>) {
                         if !app.primary() || !app.mail_enabled() {
                             break;
                         }
-                        let result = if crate::datetime::Utc::now()
+                        let result = if crate::datetime::Utc::now()?
                             .timestamp()
                             .saturating_sub(item.created)
                             >= 5 * 86400

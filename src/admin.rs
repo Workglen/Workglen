@@ -122,7 +122,7 @@ pub fn execute(app: &App, r: Request) -> Result<String> {
         "status" => {
             let s = app.read_store()?;
             Ok(pratique::json_value::to_string_pretty(
-                &pratique::json_value::json!({"admin_only":app.config.admin_only,"primary":app.primary(),"term":s.meta("term")?,"sequence":s.seq()?,"ready":s.meta("ready")?==1,"node":app.config.node_id(),"mode":app.config.mode,"hostname":app.config.hostname,"domain":app.config.domain,"peak_rss_kib":peak_rss_kib(),"replication":*app.replication_status.lock().unwrap_or_else(|e| e.into_inner()),"modules":crate::modules::state(&s)?,"limits":app.config.limits,"delivery":crate::relay::status(app),"tls":app.certificates.status()}),
+                &pratique::json_value::json!({"admin_only":app.config.admin_only,"primary":app.primary(),"term":s.meta("term")?,"sequence":s.seq()?,"ready":s.meta("ready")?==1,"node":app.config.node_id(),"mode":app.config.mode,"hostname":app.config.hostname,"domain":app.config.domain,"peak_rss_kib":peak_rss_kib(),"replication":*app.replication_status.lock().unwrap_or_else(|e| e.into_inner()),"modules":crate::modules::state(&s)?,"limits":app.config.limits,"delivery":crate::relay::status(app),"tls":app.certificates.status()?}),
             )?)
         }
         "users" => Ok(pratique::json_value::to_string(&users(app)?)?),

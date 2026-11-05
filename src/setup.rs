@@ -1,6 +1,6 @@
 //! Native provisioning helpers. All key material is local; existing files are refused.
-use crate::error::{Result, ensure};
 use crate::encoding::STANDARD;
+use crate::error::{Result, ensure};
 use pratique::{
     asn1::write as der,
     crypto::{
@@ -156,7 +156,7 @@ pub fn local_tls(directory: &Path) -> Result<()> {
     }
     let ca = SigningKey::generate_ecdsa(Curve::P256)?;
     let key = SigningKey::generate_ecdsa(Curve::P256)?;
-    let now = crate::datetime::Utc::now().timestamp();
+    let now = crate::datetime::Utc::now()?.timestamp();
     let root = certificate(&ca, &ca, true, now)?;
     let leaf = certificate(&key, &ca, false, now)?;
     let mut trust = TrustStore::empty();
@@ -192,7 +192,7 @@ pub fn check_tls(cert: &str, key: &str, host: &str) -> Result<()> {
         .find(|p| p.label == "CERTIFICATE")
         .ok_or_else(|| crate::error!("Missing certificate"))?;
     let leaf = Certificate::from_der(&first.data)?;
-    let now = crate::datetime::Utc::now().timestamp();
+    let now = crate::datetime::Utc::now()?.timestamp();
     ensure!(
         leaf.not_before <= now && now < leaf.not_after && leaf.matches_hostname(host),
         "Certificate is expired, not yet valid or does not match gateway hostname"

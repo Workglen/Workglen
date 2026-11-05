@@ -520,7 +520,7 @@ Ok(())}
     }
 
     fn tls_status(&self) -> Result<Value> {
-        Ok(self.certificates.get().map(|c| c.status()).unwrap_or_else(|| json!({"mode":if self.config.acme.is_some(){"letsencrypt"}else{"manual"},"ready":false,"running":false})))
+        self.certificates.get().map(|c| c.status()).unwrap_or_else(|| Ok(json!({"mode":if self.config.acme.is_some(){"letsencrypt"}else{"manual"},"ready":false,"running":false})))
     }
 
     pub fn settings(&self) -> Result<Value> {

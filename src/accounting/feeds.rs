@@ -306,7 +306,7 @@ pub fn sync(app: &crate::app::App, book: &str, id: &str) -> Result<Value> {
     let db = app.accounting.as_ref().unwrap();
     let key = key_bytes(db)?;
     let lease = crate::store::random_id();
-    let now = crate::datetime::Utc::now().timestamp();
+    let now = crate::datetime::Utc::now()?.timestamp();
     let (secret, start, end, scale, currency) = {
         let mut c = db.connect()?;
         let mut t = c.transaction()?;

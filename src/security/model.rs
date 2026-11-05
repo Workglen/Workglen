@@ -26,7 +26,7 @@ pub const PERMISSIONS: &[&str] = &[
     "cluster.takeover",
 ];
 pub fn now() -> crate::error::Result<i64> {
-    Ok(crate::datetime::Utc::now().timestamp())
+    Ok(crate::datetime::Utc::now()?.timestamp())
 }
 pub fn id() -> String {
     crate::store::random_id()

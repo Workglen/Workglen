@@ -69,7 +69,7 @@ impl Sessions {
             principal,
             csrf: crate::store::random_id(),
             until: now + ttl,
-            expires_at: crate::datetime::Utc::now().timestamp() + ttl.as_secs() as i64,
+            expires_at: crate::datetime::Utc::now()?.timestamp() + ttl.as_secs() as i64,
         };
         self.values.insert(id.clone(), s.clone());
         Ok((id, s))

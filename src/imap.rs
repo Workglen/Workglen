@@ -581,7 +581,7 @@ fn append(w: &mut Wire, app: &App, u: &str, a: &[String]) -> Result<String> {
         .enter()
         .ok_or_else(|| crate::error!("transfer capacity busy"))?;
     let mut fs = vec![];
-    let mut date = crate::datetime::Utc::now().timestamp();
+    let mut date = crate::datetime::Utc::now()?.timestamp();
     for v in &a[1..a.len() - 1] {
         if v.starts_with('(') {
             fs = flags(v)?;

@@ -272,7 +272,18 @@ impl ManagedTls {
                 {
                     let mut e = status.lock().unwrap_or_else(|e| e.into_inner());
                     e.last = Some(kind);
-                    e.at = Some(crate::datetime::Utc::now().timestamp());
+                    let clock_failed = match crate::datetime::Utc::now() {
+                        Ok(now) => {
+                            e.at = Some(now.timestamp());
+                            false
+                        }
+                        Err(error) => {
+                            e.at = None;
+                            e.error = Some("clock-unavailable");
+                            eprintln!("TLS certificate event timestamp unavailable: {error}");
+                            true
+                        }
+                    };
                     if matches!(
                         kind,
                         "issuance-or-renewal-failed"
@@ -280,7 +291,7 @@ impl ManagedTls {
                             | "certificate-expired"
                     ) {
                         e.error = Some(kind);
-                    } else if kind == "certificate-issued-or-renewed" {
+                    } else if kind == "certificate-issued-or-renewed" && !clock_failed {
                         e.error = None;
                     }
                 }
@@ -306,17 +317,19 @@ impl ManagedTls {
         })
     }
 
-    pub fn status(&self) -> Value {
+    pub fn status(&self) -> Result<Value> {
         let certs = self.tls.store.as_ref().unwrap().certificates();
-        let now = crate::datetime::Utc::now().timestamp();
+        let now = crate::datetime::Utc::now()?.timestamp();
         let expires = certs.iter().map(|c| c.not_after()).min();
         let e = self.events.lock().unwrap_or_else(|e| e.into_inner());
-        json!({"mode":self.mode,"staging":self.staging,"automatic_renewal":self.mode=="letsencrypt",
+        Ok(
+            json!({"mode":self.mode,"staging":self.staging,"automatic_renewal":self.mode=="letsencrypt",
             "ready":expires.is_some_and(|t| t>now),"expires_at":expires,
             "expiring_soon":expires.is_some_and(|t| t-now<=7*86400),
             "domains":certs.iter().flat_map(|c| c.dns_names()).collect::<Vec<_>>(),
             "renewal_strategy":if self.mode=="letsencrypt" { "CA renewal window (ARI), with certificate-lifetime fallback" } else { "manual" },
-            "last_event":e.last,"last_event_at":e.at,"last_error":e.error})
+            "last_event":e.last,"last_event_at":e.at,"last_error":e.error}),
+        )
     }
 }
 
