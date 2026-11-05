@@ -79,6 +79,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazaret-archive"
+version = "0.1.9"
+dependencies = [
+ "workglen-lazaret-verify",
+]
+
+[[package]]
 name = "lazaret-pg"
 version = "0.1.0"
 dependencies = [
@@ -155,10 +162,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "workglen-lazaret-verify"
+version = "0.1.0"
+dependencies = [
+ "pratique",
+]
+
+[[package]]
 name = "workglen-mail"
 version = "0.8.0"
 dependencies = [
  "argon2",
+ "lazaret-archive",
  "lazaret-pg",
  "pratique",
  "redb",

@@ -1,0 +1,24 @@
+[package]
+name = "lazaret-archive"
+description = "Bounded, safe, native archive extraction for Lazaret (no I/O, no unsafe, no external crates)"
+version = "0.1.9"
+edition = "2021"
+license = "Apache-2.0 AND Unicode-3.0"
+rust-version = "1.87"
+repository = "https://github.com/lazaret-dev/lazaret"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+lazaret-verify = { package = "workglen-lazaret-verify", path = "../../crates/lazaret-verify" }
+
+[lints.clippy]
+# The vendored source is kept byte-for-byte with Lazaret. Rust 1.99 introduced
+# these style suggestions after Lazaret's current MSRV; track their upstream
+# cleanup in LAZARET-ARCHIVE-BACKLOG.md instead of patching this snapshot.
+manual_div_ceil = "allow"
+manual_is_multiple_of = "allow"
+needless_late_init = "allow"
+field_reassign_with_default = "allow"

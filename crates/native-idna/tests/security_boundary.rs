@@ -1,5 +1,5 @@
 //! Capability boundaries: protocol validity is not domain reputation.
-use workglen_idna::{domain_to_ascii, domain_to_ascii_strict};
+use workglen_idna::{domain_to_ascii, domain_to_ascii_strict, has_mixed_script_labels};
 #[test]
 fn uts46_is_not_idna2008_or_impersonation_detection() {
     for (input, expected) in [
@@ -19,6 +19,31 @@ fn uts46_is_not_idna2008_or_impersonation_detection() {
     ] {
         assert!(domain_to_ascii(input).is_err(), "{input:?}");
     }
+}
+#[test]
+fn mixed_script_check_is_explicit_bounded_and_not_confusable_detection() {
+    for input in [
+        "раypal.com",
+        "xn--ypal-43d9g.com",
+        "aβ.example",
+        "officeпривет.example",
+    ] {
+        assert!(has_mixed_script_labels(input).unwrap(), "{input:?}");
+    }
+    for input in [
+        "paypal.com",
+        "почта.рф",
+        "παράδειγμα.ελ",
+        "example.中国",
+        "example.123",
+    ] {
+        assert!(!has_mixed_script_labels(input).unwrap(), "{input:?}");
+    }
+    // Japanese script combinations can be legitimate: this is a risk signal,
+    // not a malicious-domain verdict or a same-script confusable skeleton.
+    assert!(has_mixed_script_labels("日本語テスト.example").unwrap());
+    assert!(has_mixed_script_labels("a\u{200d}b.test").is_err());
+    assert!(has_mixed_script_labels(&"a".repeat(65_537)).is_err());
 }
 #[test]
 fn hostile_contextual_sequences_are_bounded() {

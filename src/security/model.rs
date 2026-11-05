@@ -22,9 +22,11 @@ pub const PERMISSIONS: &[&str] = &[
     "jobs",
     "audit",
     "learn",
+    "cluster.operate",
+    "cluster.takeover",
 ];
-pub fn now() -> i64 {
-    crate::datetime::Utc::now().timestamp()
+pub fn now() -> crate::error::Result<i64> {
+    Ok(crate::datetime::Utc::now().timestamp())
 }
 pub fn id() -> String {
     crate::store::random_id()
@@ -110,6 +112,51 @@ pratique::data_encode!(Connector {
 pratique::data_decode!(Connector, deny_unknown=true, { r#type, mailboxes, allow_hard_delete = Default::default(), host, port, ca_file, password_files = Default::default(), tenant, client_id, secret_file, token_file, endpoint, username, password_file });
 
 #[derive(Clone, Debug)]
+pub struct ReplicationPeer {
+    pub node_id: String,
+    pub origin: String,
+    pub ca_file: Option<String>,
+    pub key_file: String,
+}
+pratique::data_encode!(ReplicationPeer {
+    node_id,
+    origin,
+    ca_file,
+    key_file
+});
+pratique::data_decode!(ReplicationPeer, deny_unknown=true, { node_id, origin, ca_file, key_file });
+
+#[derive(Clone, Debug)]
+pub struct ReplicationConfig {
+    pub peers: Vec<ReplicationPeer>,
+    pub durable_copies: u8,
+    pub acknowledgement_timeout_seconds: u64,
+    pub degraded_acceptance: bool,
+    pub max_degraded_operations: u64,
+    pub max_degraded_bytes: u64,
+}
+pratique::data_encode!(ReplicationConfig {
+    peers,
+    durable_copies,
+    acknowledgement_timeout_seconds,
+    degraded_acceptance,
+    max_degraded_operations,
+    max_degraded_bytes
+});
+pratique::data_decode!(ReplicationConfig, deny_unknown=true, {
+    peers,
+    durable_copies,
+    acknowledgement_timeout_seconds = default_replication_timeout(),
+    degraded_acceptance = Default::default(),
+    max_degraded_operations = Default::default(),
+    max_degraded_bytes = Default::default()
+});
+
+fn default_replication_timeout() -> u64 {
+    10
+}
+
+#[derive(Clone, Debug)]
 pub struct Config {
     pub data_dir: String,
     pub storage_key_file: String,
@@ -130,8 +177,9 @@ pub struct Config {
     pub admin_origin: Option<String>,
     pub dns_server: Option<SocketAddr>,
     pub trusted_admin: Option<Actor>,
+    pub replication: Option<ReplicationConfig>,
 }
-pratique::data_decode!(Config, deny_unknown=true, { data_dir, storage_key_file, workspace, instance, origin, hostname, tls_cert = Default::default(), tls_key = Default::default(), acme, control_key_file, smtp_listen, https_listen, require_inbound_tls = Default::default(), routes = Default::default(), connectors = Default::default(), recipient_directory, admin_origin, dns_server, trusted_admin });
+pratique::data_decode!(Config, deny_unknown=true, { data_dir, storage_key_file, workspace, instance, origin, hostname, tls_cert = Default::default(), tls_key = Default::default(), acme, control_key_file, smtp_listen, https_listen, require_inbound_tls = Default::default(), routes = Default::default(), connectors = Default::default(), recipient_directory, admin_origin, dns_server, trusted_admin, replication });
 
 impl Config {
     pub fn load(path: &str) -> Result<Self> {
@@ -209,6 +257,69 @@ impl Config {
             );
             for a in &c.mailboxes {
                 address(a)?;
+            }
+        }
+        if let Some(replication) = &self.replication {
+            ensure!(
+                !replication.peers.is_empty() && replication.peers.len() <= 15,
+                "Configure 1–15 replication peers"
+            );
+            ensure!(
+                (2..=replication.peers.len() + 1)
+                    .contains(&usize::from(replication.durable_copies)),
+                "Durable copies must include the local node and at least one peer"
+            );
+            ensure!(
+                (1..=30).contains(&replication.acknowledgement_timeout_seconds),
+                "Replication acknowledgement timeout must be 1–30 seconds"
+            );
+            ensure!(
+                !replication.degraded_acceptance
+                    || (replication.max_degraded_operations > 0
+                        && replication.max_degraded_bytes > 0),
+                "Degraded acceptance requires explicit operation and byte limits"
+            );
+            ensure!(
+                replication.degraded_acceptance
+                    || (replication.max_degraded_operations == 0
+                        && replication.max_degraded_bytes == 0),
+                "Degraded limits require degraded acceptance"
+            );
+            let mut nodes = std::collections::BTreeSet::new();
+            let mut origins = std::collections::BTreeSet::new();
+            for peer in &replication.peers {
+                key(&peer.node_id)?;
+                ensure!(
+                    peer.node_id != self.instance,
+                    "Replication peer cannot be this node"
+                );
+                ensure!(
+                    nodes.insert(&peer.node_id),
+                    "Duplicate replication peer node"
+                );
+                let origin = crate::url::Url::parse(&peer.origin)?;
+                ensure!(
+                    origin.scheme() == "https"
+                        && origin.origin().ascii_serialization() == peer.origin
+                        && origin.path() == "/"
+                        && origin.query().is_none()
+                        && origin.fragment().is_none()
+                        && origin.username().is_empty()
+                        && origin.password().is_none(),
+                    "Use a canonical HTTPS replication peer origin"
+                );
+                ensure!(
+                    peer.origin != self.origin,
+                    "Replication peer cannot use this node origin"
+                );
+                ensure!(
+                    origins.insert(&peer.origin),
+                    "Duplicate replication peer origin"
+                );
+                ensure!(
+                    crate::config::secret(&peer.key_file)?.len() >= 32,
+                    "Replication peer key needs at least 32 characters"
+                );
             }
         }
         Ok(())
@@ -299,7 +410,7 @@ pratique::data_encode!(Command {
 pratique::data_decode!(Command, deny_unknown=true, { action, data = Default::default(), request_id });
 
 pub fn settings() -> Value {
-    json!({"enabled":false,"domains":[],"routes":{},"mailboxes":{},"protected_people":[],"protected_domains":[],"connectors":{},"retention_days":30,"digest_hours":24,"digest_sender":"","max_messages":10000,"max_bytes":1073741824u64,"max_jobs":20000,"revision":0,"retrospective_default":false})
+    json!({"enabled":false,"domains":[],"routes":{},"mailboxes":{},"protected_people":[],"protected_domains":[],"mixed_script_check":false,"connectors":{},"retention_days":30,"digest_hours":24,"digest_sender":"","max_messages":10000,"max_bytes":1073741824u64,"max_jobs":20000,"min_free_bytes":268435456u64,"scan_input_bytes":10485760,"scan_decoded_bytes":33554432,"scan_parts":200,"scan_concurrency":2,"delivery_concurrency":4,"revision":0,"retrospective_default":false})
 }
 pub fn rules() -> Value {
     json!([
@@ -444,7 +555,8 @@ mod record_contracts {
         recipient_directory,
         admin_origin,
         dns_server,
-        trusted_admin
+        trusted_admin,
+        replication => Option::is_none
     });
     #[test]
     fn record_contract_config() {
@@ -453,7 +565,7 @@ mod record_contracts {
             &[
                 r###"{"data_dir":"sample-\u00e9\ud83d\ude00","storage_key_file":"sample-\u00e9\ud83d\ude00","workspace":"sample-\u00e9\ud83d\ude00","instance":"sample-\u00e9\ud83d\ude00","origin":"sample-\u00e9\ud83d\ude00","hostname":"sample-\u00e9\ud83d\ude00","tls_cert":"sample-\u00e9\ud83d\ude00","tls_key":"sample-\u00e9\ud83d\ude00","acme":null,"control_key_file":"sample-\u00e9\ud83d\ude00","smtp_listen":["127.0.0.1",12345],"https_listen":["127.0.0.1",12345],"require_inbound_tls":true,"routes":{},"connectors":{},"recipient_directory":null,"admin_origin":null,"dns_server":null,"trusted_admin":null}"###,
                 r###"{}"###,
-                r###"["sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00",null,"sample-\u00e9\ud83d\ude00",["127.0.0.1",12345],["127.0.0.1",12345],true,{},{},null,null,null,null]"###,
+                r###"["sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00","sample-\u00e9\ud83d\ude00",null,"sample-\u00e9\ud83d\ude00",["127.0.0.1",12345],["127.0.0.1",12345],true,{},{},null,null,null,null,null]"###,
                 r###"{"data_dir":"sample-\u00e9\ud83d\ude00","storage_key_file":"sample-\u00e9\ud83d\ude00","workspace":"sample-\u00e9\ud83d\ude00","instance":"sample-\u00e9\ud83d\ude00","origin":"sample-\u00e9\ud83d\ude00","hostname":"sample-\u00e9\ud83d\ude00","tls_cert":"sample-\u00e9\ud83d\ude00","tls_key":"sample-\u00e9\ud83d\ude00","acme":null,"control_key_file":"sample-\u00e9\ud83d\ude00","smtp_listen":["127.0.0.1",12345],"https_listen":["127.0.0.1",12345],"require_inbound_tls":true,"routes":{},"connectors":{},"recipient_directory":null,"admin_origin":null,"dns_server":null,"trusted_admin":null,"unexpected_field":1}"###,
                 r###"{"data_dir":"sample-\u00e9\ud83d\ude00","storage_key_file":"sample-\u00e9\ud83d\ude00","workspace":"sample-\u00e9\ud83d\ude00","instance":"sample-\u00e9\ud83d\ude00","origin":"sample-\u00e9\ud83d\ude00","hostname":"sample-\u00e9\ud83d\ude00","control_key_file":"sample-\u00e9\ud83d\ude00","smtp_listen":["127.0.0.1",12345],"https_listen":["127.0.0.1",12345]}"###,
                 r###"{"storage_key_file":"sample-\u00e9\ud83d\ude00","workspace":"sample-\u00e9\ud83d\ude00","instance":"sample-\u00e9\ud83d\ude00","origin":"sample-\u00e9\ud83d\ude00","hostname":"sample-\u00e9\ud83d\ude00","tls_cert":"sample-\u00e9\ud83d\ude00","tls_key":"sample-\u00e9\ud83d\ude00","acme":null,"control_key_file":"sample-\u00e9\ud83d\ude00","smtp_listen":["127.0.0.1",12345],"https_listen":["127.0.0.1",12345],"require_inbound_tls":true,"routes":{},"connectors":{},"recipient_directory":null,"admin_origin":null,"dns_server":null,"trusted_admin":null}"###,

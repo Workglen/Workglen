@@ -24,7 +24,7 @@ const server=http.createServer(async(req,res)=>{
  try{
   const p=await b.newPage({viewport:{width:1280,height:900}}),errors=[],external=[];p.on('pageerror',e=>errors.push(e.message));
   await p.route('**/*',r=>{const u=new URL(r.request().url());if(u.hostname!=='127.0.0.1'){external.push(u.href);return r.abort();}return r.continue();});
-  await p.goto('http://127.0.0.1:'+server.address().port+'/mail-security');await p.getByRole('heading',{name:'Protection at a glance'}).waitFor();
+  await p.goto('http://127.0.0.1:'+server.address().port+'/mail-security');await p.getByRole('heading',{name:'Operations',exact:true}).waitFor();
   await p.evaluate(async()=>{wizardStep=6;await show('Setup');});
   await p.getByRole('heading',{name:'Microsoft 365 protection',exact:true}).waitFor();
   assert((await p.getByLabel('Microsoft 365 destination',{exact:true}).textContent()).includes('example.test → example.mail.protection.outlook.com'));
@@ -39,7 +39,7 @@ const server=http.createServer(async(req,res)=>{
   await p.getByRole('button',{name:'Save and continue',exact:true}).click();await p.getByRole('heading',{name:'Go live',exact:true}).waitFor();await p.getByText('Microsoft 365 bypass protection is not verified by Workglen.',{exact:false}).waitFor();await p.getByRole('button',{name:'Review Microsoft 365 protection'}).click();assert.equal(await p.getByLabel('Partner connector name',{exact:true}).inputValue(),'Changed connector');assert.equal(await review().isChecked(),false);pass('go-live preserves the unverified status without a circular activation gate');
   await p.setViewportSize({width:390,height:844});await review().check();await p.getByRole('button',{name:'Prepare Microsoft 365 commands'}).click();assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   if(process.argv[2])await p.screenshot({path:path.join(path.dirname(process.argv[2]),'microsoft365-mobile.png'),fullPage:true});pass('guide and commands fit a narrow viewport');
-  await p.getByLabel('Security instance',{exact:true}).selectOption('b');await p.getByRole('heading',{name:'Protection at a glance'}).waitFor();await p.evaluate(async()=>{wizardStep=6;await show('Setup');});assert.equal(await p.getByLabel('Gateway public outbound IPv4 addresses',{exact:true}).inputValue(),'');assert.equal(await p.getByLabel('Partner connector name',{exact:true}).inputValue(),'Workglen gateway only');pass('switching gateways clears the tenant-specific draft');
+  await p.getByLabel('Security instance',{exact:true}).selectOption('b');await p.getByRole('heading',{name:'Operations',exact:true}).waitFor();await p.evaluate(async()=>{wizardStep=6;await show('Setup');});assert.equal(await p.getByLabel('Gateway public outbound IPv4 addresses',{exact:true}).inputValue(),'');assert.equal(await p.getByLabel('Partner connector name',{exact:true}).inputValue(),'Workglen gateway only');pass('switching gateways clears the tenant-specific draft');
   assert.equal(mutations,0);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);pass('guide never mutates a tenant, sends mail, loads external code or raises browser errors');
   if(process.argv[2])fs.writeFileSync(process.argv[2],JSON.stringify({passed:checks.length,checks},null,2));
  }finally{await b.close();server.close();}

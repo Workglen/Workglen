@@ -19,6 +19,9 @@
     "workglen-idna": {
       "path": "crates/native-idna"
     },
+    "lazaret-archive": {
+      "path": "vendor/lazaret-archive"
+    },
     "argon2": {
       "version": "0.5",
       "default-features": false,

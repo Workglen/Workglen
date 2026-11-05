@@ -46,6 +46,7 @@ impl Service {
     }
     pub fn maintenance(&self) -> Result<()> {
         self.db.write(|t| {
+            let current_time = now()?;
             let settings = must(t, "settings")?;
             for (recipient, prefs) in settings["mailboxes"]
                 .as_object()
@@ -61,16 +62,19 @@ impl Service {
                     continue;
                 }
                 let k = format!("digest_due/{recipient}");
-                if get(t, &k)?.and_then(|v| v.as_i64()).unwrap_or(0) <= now() {
+                if get(t, &k)?.and_then(|v| v.as_i64()).unwrap_or(0) <= current_time {
                     self.create_digest(t, recipient, &settings)?;
-                    put(t, &k, &json!(now() + hours as i64 * 3600))?;
+                    put(t, &k, &json!(now()? + hours as i64 * 3600))?;
                 }
             }
             let mut keep = std::collections::BTreeSet::new();
+            for pending in list(t, "ingress/")? {
+                keep.insert(format!("blob/{}", s(&pending, "hash")?));
+            }
             for mut m in list(t, "message/")? {
                 if ["quarantined", "discarded", "delivered"].contains(&s(&m, "state")?)
                     && m["hold"] != true
-                    && m["expires"].as_i64().unwrap_or(i64::MAX) <= now()
+                    && m["expires"].as_i64().unwrap_or(i64::MAX) <= current_time
                 {
                     m["state"] = json!("expired");
                     m["revision"] = json!(n(&m, "revision")? + 1);
@@ -82,6 +86,7 @@ impl Service {
                         s(&m, "recipient")?,
                         json!({"id":m["id"]}),
                     )?;
+                    super::cluster::record_message_state(t, s(&m, "id")?)?;
                 }
                 if m["state"] != "expired" {
                     keep.insert(format!("blob/{}", s(&m, "hash")?));
@@ -98,42 +103,50 @@ impl Service {
                 }
             }
             for (k, v) in keyed(t, "nonce/")? {
-                if v.as_i64().unwrap_or(0) < now() {
+                if v.as_i64().unwrap_or(0) < now()? {
                     remove(t, &k)?;
                 }
             }
             Ok(())
         })
     }
-    pub fn worker_once(&self) -> Result<bool> {
-        let selected = self.db.write(|t| {
-            let mut jobs: Vec<_> = list(t, "job/")?
-                .into_iter()
-                .filter(|j| {
-                    ["queued", "retrying"].contains(&j["state"].as_str().unwrap_or(""))
-                        && j["due"].as_i64().unwrap_or(i64::MAX) <= now()
-                })
-                .collect();
-            jobs.sort_by_key(|j| j["due"].as_i64());
-            let Some(mut j) = jobs.into_iter().next() else {
+    pub(super) fn claim_delivery(&self) -> Result<Option<Value>> {
+        self.db.write(|t| {
+            if !super::cluster::delivery_eligible(t)? {
+                return Ok(None);
+            }
+            let Some(mut job) = next_delivery_job(t, now()?)? else {
                 return Ok(None);
             };
-            j["state"] = json!("running");
-            j["attempts"] = json!(n(&j, "attempts")? + 1);
-            put(t, &format!("job/{}", s(&j, "id")?), &j)?;
+            job["state"] = json!("running");
+            job["attempts"] = json!(n(&job, "attempts")? + 1);
+            put(t, &format!("job/{}", s(&job, "id")?), &job)?;
             audit(
                 t,
                 "worker",
                 "job-start",
-                s(&j["data"], "recipient")?,
-                json!({"job":j["id"],"attempt":j["attempts"]}),
+                s(&job["data"], "recipient")?,
+                json!({"job":job["id"],"attempt":job["attempts"]}),
             )?;
-            Ok(Some(j))
-        })?;
-        let Some(mut j) = selected else {
+            let state_sequence = if job["kind"] == "delivery" {
+                super::cluster::record_message_state(t, s(&job["data"], "message")?)?
+            } else {
+                0
+            };
+            job["replication_state_sequence"] = json!(state_sequence);
+            Ok(Some(job))
+        })
+    }
+    pub fn worker_once(&self) -> Result<bool> {
+        let Some(mut j) = self.claim_delivery()? else {
             return Ok(false);
         };
+        let _permit = self.begin_delivery();
         let result = crate::resilience::boundary("security job", || -> Result<()> {
+            super::cluster_transport::wait_for_state(
+                self,
+                j["replication_state_sequence"].as_u64().unwrap_or(0),
+            )?;
             if j["kind"] == "remediation" {
                 return super::connectors::execute(self, &j["data"]);
             }
@@ -142,11 +155,27 @@ impl Service {
                 if j["kind"] == "delivery" {
                     let m = message(t, s(&j["data"], "message")?)?;
                     ensure!(
+                        super::cluster::delivery_owned(t, &m)?,
+                        "Delivery ownership changed"
+                    );
+                    ensure!(
                         m["state"] == "queued" || m["state"] == "release-queued",
                         "Message no longer queued"
                     );
                     let raw = body(t, &m)?;
                     if j["data"]["released"] == true {
+                        if m.get("ingress_id").is_some() {
+                            ensure!(
+                                m["engines"]["engine"] == super::scan::ENGINE
+                                    && m["engines"]["api_version"]
+                                        == super::scan::ANALYSIS_API_VERSION
+                                    && m["engines"]["profile_version"]
+                                        == super::scan::ANALYSIS_PROFILE_VERSION
+                                    && m["engines"]["coverage_version"]
+                                        == super::scan::COVERAGE_VERSION,
+                                "Scanner/control versions differ; review before release"
+                            );
+                        }
                         let v = super::service::active(t)?;
                         ensure!(
                             !super::service::nonspam(&self.evaluate(
@@ -168,7 +197,7 @@ impl Service {
                     ensure!(j["kind"] == "digest", "Unknown job kind");
                     let snap = must(t, &format!("digest/{}", s(&j["data"], "digest")?))?;
                     ensure!(
-                        snap["expires"].as_i64().unwrap_or(0) > now(),
+                        snap["expires"].as_i64().unwrap_or(0) > now()?,
                         "Digest expired before delivery"
                     );
                     let r = s(&j["data"], "recipient")?;
@@ -220,13 +249,16 @@ impl Service {
         self.db.write(|t| {
             j["state"] = json!(state);
             j["error"] = json!(error);
-            j["due"] = json!(now() + delay);
+            j["due"] = json!(now()? + delay);
             put(t, &format!("job/{}", s(&j, "id")?), &j)?;
             if state == "succeeded" && j["kind"] == "delivery" {
                 let mut m = message(t, s(&j["data"], "message")?)?;
                 m["state"] = json!("delivered");
                 m["revision"] = json!(n(&m, "revision")? + 1);
                 save_message(t, &m)?;
+            }
+            if j["kind"] == "delivery" {
+                super::cluster::record_message_state(t, s(&j["data"], "message")?)?;
             }
             if j["kind"] == "remediation" {
                 let k = format!("plan/{}", s(&j["data"], "plan")?);
@@ -268,9 +300,10 @@ impl Service {
             )?;
             Ok(())
         })?;
+        self.record_delivery_result(state == "succeeded");
         Ok(true)
     }
-    pub fn work(self: std::sync::Arc<Self>) {
+    pub fn work(self: std::sync::Arc<Self>) -> Result<()> {
         let destinations = self.clone();
         std::thread::spawn(move || {
             loop {
@@ -295,6 +328,27 @@ impl Service {
                 std::thread::sleep(std::time::Duration::from_secs(2));
             }
         });
+        let delivery_workers = usize::try_from(n(&self.settings()?, "delivery_concurrency")?)?;
+        for index in 0..delivery_workers {
+            let delivery = self.clone();
+            std::thread::Builder::new()
+                .name(format!("security-delivery-{}", index + 1))
+                .spawn(move || {
+                    loop {
+                        match crate::resilience::boundary("security worker", || {
+                            delivery.worker_once()
+                        }) {
+                            Ok(true) => {}
+                            Ok(false) => std::thread::sleep(std::time::Duration::from_millis(500)),
+                            Err(_) => {
+                                eprintln!("security worker requires review");
+                                std::thread::sleep(std::time::Duration::from_secs(5));
+                            }
+                        }
+                    }
+                })?;
+        }
+        self.set_delivery_workers(delivery_workers);
         let mut next = std::time::Instant::now();
         loop {
             if std::time::Instant::now() >= next {
@@ -305,14 +359,7 @@ impl Service {
                 }
                 next = std::time::Instant::now() + std::time::Duration::from_secs(60);
             }
-            match crate::resilience::boundary("security worker", || self.worker_once()) {
-                Ok(true) => {}
-                Ok(false) => std::thread::sleep(std::time::Duration::from_secs(1)),
-                Err(_) => {
-                    eprintln!("security worker requires review");
-                    std::thread::sleep(std::time::Duration::from_secs(5));
-                }
-            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
         }
     }
 }

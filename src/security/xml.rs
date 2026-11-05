@@ -39,8 +39,7 @@ fn unescape(s: &str) -> Result<String> {
                 } else {
                     bail!("Unknown XML entity")
                 };
-                let c =
-                    char::from_u32(n).ok_or_else(|| crate::error!("Invalid XML character"))?;
+                let c = char::from_u32(n).ok_or_else(|| crate::error!("Invalid XML character"))?;
                 ensure!(
                     !c.is_control() || ['\t', '\r', '\n'].contains(&c),
                     "Invalid XML control"

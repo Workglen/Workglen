@@ -3,9 +3,12 @@ use super::{db::*, model::*, scan, service::event};
 use crate::error::{Result, ensure};
 use pratique::json_value::{Value, json};
 use std::collections::BTreeSet;
-fn tokens(raw: &[u8]) -> Result<BTreeSet<String>> {
-    let m = scan::inspect(raw)?;
-    let text = scan::normalize(&format!("{} {}", s(&m, "subject")?, s(&m, "text")?));
+fn tokens(raw: &[u8], settings: &Value) -> Result<BTreeSet<String>> {
+    let m = scan::inspect_with_settings(raw, settings)?;
+    tokens_inspected(&m)
+}
+fn tokens_inspected(m: &Value) -> Result<BTreeSet<String>> {
+    let text = scan::normalize(&format!("{} {}", s(m, "subject")?, s(m, "text")?));
     Ok(text
         .split(|c: char| !c.is_alphanumeric())
         .filter(|s| (3..=40).contains(&s.len()))
@@ -16,7 +19,13 @@ fn tokens(raw: &[u8]) -> Result<BTreeSet<String>> {
         .take(512)
         .collect())
 }
-pub fn score(t: &Table, raw: &[u8]) -> Result<f64> {
+pub fn score(t: &Table, raw: &[u8], settings: &Value) -> Result<f64> {
+    score_tokens(t, tokens(raw, settings)?)
+}
+pub fn score_inspected(t: &Table, inspected: &Value) -> Result<f64> {
+    score_tokens(t, tokens_inspected(inspected)?)
+}
+fn score_tokens(t: &Table, tokens: BTreeSet<String>) -> Result<f64> {
     let m = get(t, "learning")?.unwrap_or(json!({}));
     let spam = m["spam"].as_u64().unwrap_or(0);
     let ham = m["ham"].as_u64().unwrap_or(0);
@@ -24,7 +33,7 @@ pub fn score(t: &Table, raw: &[u8]) -> Result<f64> {
         return Ok(0.);
     }
     let mut weights = Vec::new();
-    for token in tokens(raw)? {
+    for token in tokens {
         if let Some(v) = get(t, &format!("token/{token}"))? {
             let p = (v["spam"].as_u64().unwrap_or(0) as f64 + 1.) / (spam as f64 + 2.);
             let q = (v["ham"].as_u64().unwrap_or(0) as f64 + 1.) / (ham as f64 + 2.);
@@ -67,7 +76,7 @@ pub fn command(t: &mut Table, a: &Actor, action: &str, d: &Value, rid: &str) -> 
             n(&model, "spam")? + n(&model, "ham")? < 50000,
             "Training corpus capacity reached"
         );
-        let words = tokens(&body(t, &m)?)?;
+        let words = tokens(&body(t, &m)?, &settings)?;
         let mut count = list(t, "token/")?.len();
         for token in words {
             let k = format!("token/{token}");

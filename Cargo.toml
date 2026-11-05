@@ -21,6 +21,7 @@ workglen-mime = { path = "crates/native-mime" }
 workglen-dns = { path = "crates/native-dns" }
 workglen-toml = { path = "crates/native-toml" }
 workglen-idna = { path = "crates/native-idna" }
+lazaret-archive = { path = "vendor/lazaret-archive" }
 argon2 = { version = "0.5", default-features = false, features = ["alloc", "password-hash"] }
 subtle = "2"
 
@@ -39,7 +40,7 @@ strip = true
 unsafe_code = "forbid"
 
 [workspace]
-members = ["vendor/lazaret-pg", "crates/native-dns", "crates/native-idna", "crates/native-mime", "crates/native-toml"]
+members = ["vendor/lazaret-pg", "vendor/lazaret-archive", "crates/lazaret-verify", "crates/native-dns", "crates/native-idna", "crates/native-mime", "crates/native-toml"]
 default-members = [".", "vendor/lazaret-pg"]
 exclude = ["vendor/pratique"]
 resolver = "3"

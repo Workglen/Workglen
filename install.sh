@@ -491,7 +491,7 @@ gateway() {
     for file in config.json control.key admin.hash; do private_file "$BUNDLE/$file"; done
     for file in storage.key fullchain.pem privkey.pem; do [ ! -e "$BUNDLE/$file" ] || private_file "$BUNDLE/$file"; done
     [ -x "$BINARY" ] || die "Build a native Linux executable first, or provide --binary"
-    local root= etc data bin docs unit file
+    local root= etc data bin docs unit scanner_unit file
     if [ -n "$DESTDIR" ]; then
         absolute "$DESTDIR"; [ ! -e "$DESTDIR" ] && [ ! -L "$DESTDIR" ] || die "Staging destination must be new"
         ! $START || die "Cannot start services in --destdir mode"
@@ -507,7 +507,8 @@ gateway() {
     etc="$root/etc/workglen-security"; data="$root/var/lib/workglen-security"
     bin="$root/usr/local/bin/workglen"; docs="$root/usr/local/share/doc/workglen"
     unit="$root/etc/systemd/system/workglen-security.service"
-    for file in "$etc" "$data" "$unit"; do [ ! -e "$file" ] && [ ! -L "$file" ] || die "Existing installation or partial setup found: $file"; done
+    scanner_unit="$root/etc/systemd/system/workglen-security-scanner.service"
+    for file in "$etc" "$data" "$unit" "$scanner_unit"; do [ ! -e "$file" ] && [ ! -L "$file" ] || die "Existing installation or partial setup found: $file"; done
     if [ -e "$bin" ]; then [ ! -L "$bin" ] && cmp -s "$BINARY" "$bin" || die "A different Workglen executable is already installed"; fi
     mkdir -p "$etc" "$data" "$(dirname "$bin")" "$(dirname "$unit")"
     chmod 700 "$etc" "$data"
@@ -516,6 +517,7 @@ gateway() {
         if [ -f "$BUNDLE/$file" ]; then cp -- "$BUNDLE/$file" "$etc/$file"; chmod 600 "$etc/$file"; fi
     done
     cp "$SOURCE/deploy/workglen-security.service" "$unit"; chmod 644 "$unit"
+    cp "$SOURCE/deploy/workglen-security-scanner.service" "$scanner_unit"; chmod 644 "$scanner_unit"
     copy_docs "$docs"
     if [ -n "$DESTDIR" ]; then say "Staged files at $DESTDIR; no accounts, databases or services were created."; return; fi
     if ! id workglen-security >/dev/null 2>&1; then
@@ -528,10 +530,11 @@ gateway() {
     runuser -u workglen-security -- "$bin" security-init "$etc/config.json" admin "$etc/admin.hash"
     systemctl daemon-reload
     if $START; then
-        systemctl enable --now workglen-security.service
-        systemctl is-active --quiet workglen-security.service || die "Service failed; inspect journalctl -u workglen-security"
-        say "Gateway service started. Certificate issuance may still be pending; check its journal."
-    else say "Gateway initialized. Start when DNS/firewall are ready: sudo systemctl enable --now workglen-security"; fi
+        systemctl enable --now workglen-security.service workglen-security-scanner.service
+        systemctl is-active --quiet workglen-security.service || die "Ingress service failed; inspect journalctl -u workglen-security"
+        systemctl is-active --quiet workglen-security-scanner.service || die "Scanner service failed; inspect journalctl -u workglen-security-scanner"
+        say "Gateway ingress and scanner services started. Certificate issuance may still be pending; check their journals."
+    else say "Gateway initialized. Start when DNS/firewall are ready: sudo systemctl enable --now workglen-security workglen-security-scanner"; fi
     say "Back up storage.key separately. Keep port 80 reachable for ACME and configure mail flow in the Mac console."
 }
 case "$COMMAND" in

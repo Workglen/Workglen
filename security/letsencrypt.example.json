@@ -37,7 +37,9 @@
       "retention",
       "jobs",
       "audit",
-      "learn"
+      "learn",
+      "cluster.operate",
+      "cluster.takeover"
     ],
     "domains": [
       "example.com"

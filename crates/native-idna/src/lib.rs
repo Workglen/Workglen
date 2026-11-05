@@ -313,6 +313,58 @@ pub fn domain_to_ascii_strict(input: &str) -> Result<String> {
         },
     )
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Script {
+    Latin,
+    Greek,
+    Cyrillic,
+    Armenian,
+    Hebrew,
+    Arabic,
+    Devanagari,
+    Thai,
+    Georgian,
+    Han,
+    Hiragana,
+    Katakana,
+    Hangul,
+}
+fn script(c: char) -> Option<Script> {
+    let cp = c as u32;
+    match cp {
+        0x0041..=0x024f | 0x1e00..=0x1eff => Some(Script::Latin),
+        0x0370..=0x03ff | 0x1f00..=0x1fff => Some(Script::Greek),
+        0x0400..=0x052f | 0x2de0..=0x2dff | 0xa640..=0xa69f => Some(Script::Cyrillic),
+        0x0530..=0x058f => Some(Script::Armenian),
+        0x0590..=0x05ff => Some(Script::Hebrew),
+        0x0600..=0x06ff | 0x0750..=0x077f | 0x08a0..=0x08ff => Some(Script::Arabic),
+        0x0900..=0x097f => Some(Script::Devanagari),
+        0x0e00..=0x0e7f => Some(Script::Thai),
+        0x10a0..=0x10ff | 0x2d00..=0x2d2f => Some(Script::Georgian),
+        0x3040..=0x309f => Some(Script::Hiragana),
+        0x30a0..=0x30ff | 0x31f0..=0x31ff => Some(Script::Katakana),
+        0x1100..=0x11ff | 0x3130..=0x318f | 0xa960..=0xa97f | 0xac00..=0xd7af => {
+            Some(Script::Hangul)
+        }
+        0x3400..=0x4dbf | 0x4e00..=0x9fff | 0xf900..=0xfaff | 0x20000..=0x323af => {
+            Some(Script::Han)
+        }
+        _ => None,
+    }
+}
+/// Opt-in mixed-script risk heuristic over validated, decoded Unicode labels.
+/// ASCII, digits, punctuation, combining marks and unrecognized script ranges
+/// do not form a script set. This is not UTS #39 confusable detection: legitimate
+/// multilingual names can match, and same-script lookalikes do not match.
+pub fn has_mixed_script_labels(input: &str) -> Result<bool> {
+    Ok(labels(input, Options::default())?.iter().any(|label| {
+        let mut scripts = label.iter().filter_map(|c| script(*c));
+        let Some(first) = scripts.next() else {
+            return false;
+        };
+        scripts.any(|next| next != first)
+    }))
+}
 /// Validated Unicode form. Invalid input returns an error, never a display name.
 pub fn to_unicode(input: &str, options: Options) -> Result<String> {
     Ok(labels(input, options)?

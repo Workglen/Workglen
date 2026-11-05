@@ -1,0 +1,28 @@
+[Unit]
+Description=Workglen Mail Security scanner worker
+After=network-online.target workglen-security.service
+Wants=network-online.target
+
+[Service]
+User=workglen-security
+Group=workglen-security
+ExecStart=/usr/local/bin/workglen security-scan-worker /etc/workglen-security/config.json
+Restart=on-failure
+RestartSec=2
+UMask=0077
+LimitCORE=0
+NoNewPrivileges=true
+CapabilityBoundingSet=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

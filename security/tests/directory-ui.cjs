@@ -29,7 +29,7 @@ const server=http.createServer(async(req,res)=>{
  const b=await chromium.launch({headless:true,executablePath:process.env.WORKGLEN_CHROMIUM,args:['--no-sandbox','--single-process','--no-zygote']});
  try{
   const p=await b.newPage({viewport:{width:1280,height:900}}),errors=[];p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());
-  await p.goto('http://127.0.0.1:'+server.address().port+'/mail-security');await p.getByRole('heading',{name:'Protection at a glance'}).waitFor();
+  await p.goto('http://127.0.0.1:'+server.address().port+'/mail-security');await p.getByRole('heading',{name:'Operations',exact:true}).waitFor();
   assert(await p.getByRole('link',{name:'Back to Admin',exact:false}).isVisible());
   await p.getByRole('button',{name:'Setup',exact:true}).click();await p.getByRole('button',{name:'Save and continue'}).click();
   await p.getByRole('heading',{name:'Microsoft 365 recipient discovery'}).waitFor();

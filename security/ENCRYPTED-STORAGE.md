@@ -37,7 +37,7 @@ insecure key permissions and unsupported plaintext stores prevent startup.
 
 ## Backup and recovery
 
-Stop the service and copy `security.redb` for an encrypted offline backup. Retain
+Stop both `workglen-security` and `workglen-security-scanner`, then copy `security.redb` for an encrypted offline backup. Retain
 the installation configuration separately; it contains paths and endpoint settings,
 not the storage key itself. Copying a live file during journal append or compaction
 is not a supported backup procedure. Keep a separate protected backup of the key,

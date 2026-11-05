@@ -6,14 +6,53 @@ use crate::encoding::STANDARD;
 
 use pratique::json_value::{Value, json};
 
-use std::{collections::BTreeSet, os::unix::fs::PermissionsExt, sync::Arc};
+use std::{
+    collections::BTreeSet,
+    os::unix::fs::PermissionsExt,
+    sync::{
+        Arc,
+        atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering},
+    },
+};
 
 pub struct Service {
     pub config: Config,
     pub db: Arc<Db>,
+    pub(super) acceptance: super::transport::AcceptanceBatcher,
     pub checker: crate::auth::Checker,
     pub certificates: std::sync::OnceLock<crate::certificates::ManagedTls>,
+    scan_active: AtomicUsize,
+    scanner_seen: AtomicI64,
+    started_at: i64,
+    smtp_accepted: AtomicU64,
+    smtp_deferred: AtomicU64,
+    scan_retries: AtomicU64,
+    delivery_workers: AtomicUsize,
+    delivery_active: AtomicUsize,
+    delivery_attempts: AtomicU64,
+    delivery_succeeded: AtomicU64,
+    delivery_deferred: AtomicU64,
+    pub(super) replication_sync: std::sync::Mutex<()>,
     _lock: std::fs::File,
+}
+pub(super) struct DeliveryPermit<'a>(&'a AtomicUsize);
+impl Drop for DeliveryPermit<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+struct ScanPermit<'a>(&'a AtomicUsize);
+impl Drop for ScanPermit<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+fn acquire_scan(active: &AtomicUsize, limit: usize) -> Result<ScanPermit<'_>> {
+    let acquired = active.try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+        (current < limit).then_some(current + 1)
+    });
+    ensure!(acquired.is_ok(), "Scan concurrency budget reached");
+    Ok(ScanPermit(active))
 }
 
 pub fn event(
@@ -30,26 +69,110 @@ pub fn event(
 }
 
 pub fn public(m: &Value) -> Value {
-    let mut out = json!({});
+    let reasons = m["verdict"]["matches"]
+        .as_array()
+        .map(|matches| {
+            matches
+                .iter()
+                .filter_map(|matched| matched["reason"].as_str().map(str::to_string))
+                .take(8)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    json!({
+        "id":m["id"],
+        "ingress_id":m["ingress_id"],
+        "recipient":m["recipient"],
+        "arrived":m["arrived"],
+        "state":m["state"],
+        "revision":m["revision"],
+        "subject":m["subject"],
+        "sender":m["sender"],
+        "releasable":m["releasable"],
+        "expires":m["expires"],
+        "hold":m["hold"],
+        "rule_version":m["rule_version"],
+        "origin_node":m["origin_node"],
+        "scan_owner":m["scan_owner"],
+        "delivery_owner":m["delivery_owner"],
+        "decision":m["verdict"]["action"],
+        "coverage_complete":m["verdict"]["coverage"]["complete"],
+        "reasons":reasons
+    })
+}
 
-    for k in [
-        "id",
-        "recipient",
-        "arrived",
-        "state",
-        "revision",
-        "subject",
-        "sender",
-        "releasable",
-        "expires",
-        "hold",
-        "verdict",
-        "rule_version",
-    ] {
-        out[k] = m[k].clone();
+fn list_filters(d: &Value, field: &str, allowed: &[&str]) -> Result<BTreeSet<String>> {
+    let Some(values) = d[field].as_array() else {
+        ensure!(d[field].is_null(), "{field} must be an array");
+        return Ok(BTreeSet::new());
+    };
+    ensure!(values.len() <= allowed.len(), "Too many {field} filters");
+    values
+        .iter()
+        .map(|value| {
+            let value = value
+                .as_str()
+                .ok_or_else(|| crate::error!("{field} filter must be text"))?;
+            ensure!(allowed.contains(&value), "Unknown {field} filter");
+            Ok(value.to_string())
+        })
+        .collect()
+}
+
+fn list_query(d: &Value) -> Result<String> {
+    let query = d["search"].as_str().unwrap_or("");
+    ensure!(query.len() <= 200, "Search is too long");
+    Ok(query.to_lowercase())
+}
+
+fn list_limit(d: &Value) -> Result<usize> {
+    let limit = d["limit"].as_u64().unwrap_or(100);
+    ensure!(
+        (1..=200).contains(&limit),
+        "List limit must be between 1 and 200"
+    );
+    Ok(usize::try_from(limit)?)
+}
+
+fn list_cursor(d: &Value, descending: bool) -> Result<(i64, String)> {
+    if d["cursor"].is_null() {
+        return Ok((if descending { i64::MAX } else { i64::MIN }, String::new()));
     }
+    ensure!(d["cursor"].as_object().is_some(), "Invalid list cursor");
+    let at = d["cursor"]["at"]
+        .as_i64()
+        .ok_or_else(|| crate::error!("Invalid list cursor time"))?;
+    let id = d["cursor"]["id"]
+        .as_str()
+        .ok_or_else(|| crate::error!("Invalid list cursor identity"))?;
+    key(id)?;
+    Ok((at, id.to_string()))
+}
 
-    out
+fn job_public(t: &Table, job: &Value) -> Result<Value> {
+    let message = job["data"]["message"].as_str();
+    let route = match message {
+        Some(id) => get(t, &format!("message/{id}"))?
+            .map(|message| message["route"].clone())
+            .unwrap_or(Value::Null),
+        None => Value::Null,
+    };
+    Ok(json!({
+        "id":job["id"],
+        "kind":job["kind"],
+        "state":job["state"],
+        "due":job["due"],
+        "attempts":job["attempts"],
+        "error":job["error"],
+        "recipient":job["data"]["recipient"],
+        "message":job["data"]["message"],
+        "plan":job["data"]["plan"],
+        "released":job["data"]["released"],
+        "route":route,
+        "delivery_partition":job["delivery_partition"],
+        "delivery_owner":job["delivery_owner"],
+        "delivery_term":job["delivery_term"]
+    }))
 }
 
 pub fn active(t: &Table) -> Result<Value> {
@@ -58,6 +181,35 @@ pub fn active(t: &Table) -> Result<Value> {
     ensure!(id.is_u64(), "No active rules");
 
     must(t, &format!("rule/{id}"))
+}
+
+pub(super) fn capacity_check(
+    t: &Table,
+    settings: &Value,
+    bytes: usize,
+    count: usize,
+    jobs: usize,
+) -> Result<()> {
+    let usage = capacity_usage(t)?;
+    let count = n(&usage, "messages")?
+        .checked_add(u64::try_from(count)?)
+        .ok_or_else(|| crate::error!("Message capacity overflow"))?;
+    ensure!(
+        count <= n(settings, "max_messages")?,
+        "Message capacity reached"
+    );
+    let used = n(&usage, "bytes")?
+        .checked_add(u64::try_from(bytes)?)
+        .ok_or_else(|| crate::error!("Content capacity overflow"))?;
+    ensure!(
+        used <= n(settings, "max_bytes")?,
+        "Content capacity reached"
+    );
+    let pending = n(&usage, "jobs")?
+        .checked_add(u64::try_from(jobs)?)
+        .ok_or_else(|| crate::error!("Job capacity overflow"))?;
+    ensure!(pending <= n(settings, "max_jobs")?, "Job capacity reached");
+    Ok(())
 }
 
 impl Service {
@@ -83,7 +235,7 @@ impl Service {
         )?;
         let storage_key =
             crate::encrypted_store::Key::load(std::path::Path::new(&config.storage_key_file))?;
-        let db = Db::open(&config.db_path(), storage_key)?;
+        let db = Arc::new(Db::open(&config.db_path(), storage_key)?);
 
         std::fs::set_permissions(config.db_path(), std::fs::Permissions::from_mode(0o600))?;
 
@@ -99,7 +251,7 @@ ensure!(get(t,"settings")?.is_none(),"Unbound database");
 put(t,"installation",&binding)?;
 put(t,"settings",&settings())?;
 put(t,"rule/1",&json!({
-"id":1,"state":"development","rules":rules(),"author":"bootstrap","created":now()}
+"id":1,"state":"development","rules":rules(),"author":"bootstrap","created":now()?}
 ))?;
 put(t,"rule_next",&json!(2))?;
 put(t,"active",&Value::Null)?;
@@ -107,6 +259,7 @@ audit(t,"bootstrap","initialize","",json!({
 "schema":2,"engine":scan::ENGINE}
 ))?;
 }
+super::cluster::initialize(t,&config)?;
 for mut j in list(t,"job/")?{
 if j["state"]=="running"{
 j["state"]=json!("uncertain");
@@ -115,6 +268,25 @@ put(t,&format!("job/{}",s(&j,"id")?),&j)?;
 audit(t,"recovery","job-uncertain",s(&j["data"],"recipient")?,json!({
 "job":j["id"]}
 ))?;
+}
+}
+for mut ingress in list(t,"ingress/")?{
+let mut changed=super::cluster::stamp_ingress(t,&mut ingress)?;
+if ingress["state"]=="leased"{
+ingress["state"]=json!("queued");
+ingress["due"]=json!(now()?);
+ingress["lease_token"]=Value::Null;
+ingress["lease_until"]=json!(0);
+ingress["cancel_requested"]=json!(false);
+ingress["error"]=json!("service-restarted");
+changed=true;
+audit(t,"recovery","scan-lease-requeued","",json!({
+"ingress":ingress["id"]
+}
+))?;
+}
+if changed{
+put(t,&format!("ingress/{}",s(&ingress,"id")?),&ingress)?;
 }
 }
 if let Some(mut task) = get(t, "destination/current")?
@@ -131,6 +303,8 @@ if let Some(mut task) = get(t, "directory/current")?
         put(t, "directory/current", &task)?;
         audit(t, "recovery", "recipient-discovery-interrupted", "", json!({"id":task["id"]}))?;
 }
+super::cluster::rebuild_replication_state(t)?;
+rebuild_derived(t)?;
 Ok(())}
 )?;
 
@@ -138,11 +312,176 @@ Ok(())}
 
         Ok(Arc::new(Self {
             config,
-            db: Arc::new(db),
+            acceptance: super::transport::AcceptanceBatcher::new(db.clone())?,
+            db,
             checker,
             certificates: std::sync::OnceLock::new(),
+            scan_active: AtomicUsize::new(0),
+            scanner_seen: AtomicI64::new(0),
+            started_at: now()?,
+            smtp_accepted: AtomicU64::new(0),
+            smtp_deferred: AtomicU64::new(0),
+            scan_retries: AtomicU64::new(0),
+            delivery_workers: AtomicUsize::new(0),
+            delivery_active: AtomicUsize::new(0),
+            delivery_attempts: AtomicU64::new(0),
+            delivery_succeeded: AtomicU64::new(0),
+            delivery_deferred: AtomicU64::new(0),
+            replication_sync: std::sync::Mutex::new(()),
             _lock: lock,
         }))
+    }
+
+    pub(super) fn mark_scanner_seen(&self) -> Result<()> {
+        self.scanner_seen.store(now()?, Ordering::Release);
+        Ok(())
+    }
+
+    pub(super) fn record_smtp_result(&self, accepted: bool) {
+        if accepted {
+            self.smtp_accepted.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.smtp_deferred.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    pub(super) fn record_scan_retry(&self) {
+        self.scan_retries.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(super) fn set_delivery_workers(&self, workers: usize) {
+        self.delivery_workers.store(workers, Ordering::Release);
+    }
+
+    pub(super) fn begin_delivery(&self) -> DeliveryPermit<'_> {
+        self.delivery_attempts.fetch_add(1, Ordering::Relaxed);
+        self.delivery_active.fetch_add(1, Ordering::Relaxed);
+        DeliveryPermit(&self.delivery_active)
+    }
+
+    pub(super) fn record_delivery_result(&self, succeeded: bool) {
+        if succeeded {
+            self.delivery_succeeded.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.delivery_deferred.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn replication_export(&self, sequence: u64) -> Result<Option<(Value, Vec<u8>)>> {
+        self.db
+            .write(|t| super::cluster::export_acceptance(t, sequence))
+    }
+
+    pub(super) fn replication_export_batch(
+        &self,
+        after_sequence: u64,
+        max_operations: usize,
+        max_bytes: usize,
+    ) -> Result<Vec<(Value, Vec<u8>)>> {
+        self.db
+            .write(|t| super::cluster::export_batch(t, after_sequence, max_operations, max_bytes))
+    }
+
+    pub(super) fn replication_expected_sequence(&self, origin: &str) -> Result<u64> {
+        self.db
+            .write(|t| super::cluster::expected_sequence(t, origin))
+    }
+
+    pub(super) fn replication_acknowledge(&self, peer: &str, sequence: u64) -> Result<u64> {
+        self.db
+            .write(|t| super::cluster::acknowledge(t, peer, sequence))
+    }
+
+    #[cfg(test)]
+    pub(super) fn replication_apply(&self, operation: &Value, raw: &[u8]) -> Result<u64> {
+        self.db.write(|t| {
+            let record = &operation["record"];
+            ensure!(
+                record["api_version"] == scan::ANALYSIS_API_VERSION
+                    && record["profile_version"] == scan::ANALYSIS_PROFILE_VERSION
+                    && record["coverage_version"] == scan::COVERAGE_VERSION,
+                "Replicated analysis profile mismatch"
+            );
+            must(t, &format!("rule/{}", n(record, "rule_version")?))?;
+            let origin = s(operation, "origin")?;
+            let sequence = n(operation, "sequence")?;
+            let applied = get(t, &format!("replication_applied/{origin}"))?
+                .and_then(|value| value.as_u64())
+                .unwrap_or(0);
+            if sequence > applied {
+                let settings = must(t, "settings")?;
+                let recipients = arr(record, "recipients")?.len();
+                self.capacity(t, &settings, raw.len(), recipients, recipients)?;
+            }
+            super::cluster::apply_acceptance(t, operation, raw)
+        })
+    }
+
+    pub(super) fn replication_apply_batch(&self, operations: &[(Value, Vec<u8>)]) -> Result<u64> {
+        ensure!(!operations.is_empty(), "Replication batch is empty");
+        self.db.write(|t| {
+            let origin = s(&operations[0].0, "origin")?;
+            let mut applied = get(t, &format!("replication_applied/{origin}"))?
+                .and_then(|value| value.as_u64())
+                .unwrap_or(0);
+            for (operation, raw) in operations {
+                ensure!(
+                    s(operation, "origin")? == origin,
+                    "Mixed replication origins"
+                );
+                let record = &operation["record"];
+                ensure!(
+                    record["api_version"] == scan::ANALYSIS_API_VERSION
+                        && record["profile_version"] == scan::ANALYSIS_PROFILE_VERSION
+                        && record["coverage_version"] == scan::COVERAGE_VERSION,
+                    "Replicated analysis profile mismatch"
+                );
+                must(t, &format!("rule/{}", n(record, "rule_version")?))?;
+                let sequence = n(operation, "sequence")?;
+                if sequence > applied {
+                    let settings = must(t, "settings")?;
+                    let recipients = arr(record, "recipients")?.len();
+                    self.capacity(t, &settings, raw.len(), recipients, recipients)?;
+                }
+                applied = super::cluster::apply_acceptance(t, operation, raw)?;
+            }
+            Ok(applied)
+        })
+    }
+
+    pub(super) fn replication_export_state_batch(
+        &self,
+        after_sequence: u64,
+        max_operations: usize,
+        max_bytes: usize,
+    ) -> Result<Vec<Value>> {
+        self.db.write(|table| {
+            super::cluster::export_state_batch(table, after_sequence, max_operations, max_bytes)
+        })
+    }
+
+    pub(super) fn replication_expected_state_sequence(&self, origin: &str) -> Result<u64> {
+        self.db
+            .write(|table| super::cluster::expected_state_sequence(table, origin))
+    }
+
+    pub(super) fn replication_acknowledge_state(&self, peer: &str, sequence: u64) -> Result<u64> {
+        self.db
+            .write(|table| super::cluster::acknowledge_state(table, peer, sequence))
+    }
+
+    pub(super) fn replication_apply_state_batch(&self, operations: &[Value]) -> Result<u64> {
+        ensure!(!operations.is_empty(), "Replication state batch is empty");
+        self.db.write(|table| {
+            let origin = s(&operations[0], "origin")?;
+            let mut applied = 0;
+            for operation in operations {
+                ensure!(s(operation, "origin")? == origin, "Mixed state origins");
+                applied = super::cluster::apply_state(table, operation)?;
+            }
+            Ok(applied)
+        })
     }
 
     pub fn start_tls(self: &Arc<Self>) -> Result<()> {
@@ -180,8 +519,8 @@ Ok(())}
             .clone())
     }
 
-    fn tls_status(&self) -> Value {
-        self.certificates.get().map(|c| c.status()).unwrap_or_else(|| json!({"mode":if self.config.acme.is_some(){"letsencrypt"}else{"manual"},"ready":false,"running":false}))
+    fn tls_status(&self) -> Result<Value> {
+        Ok(self.certificates.get().map(|c| c.status()).unwrap_or_else(|| json!({"mode":if self.config.acme.is_some(){"letsencrypt"}else{"manual"},"ready":false,"running":false})))
     }
 
     pub fn settings(&self) -> Result<Value> {
@@ -265,7 +604,7 @@ Ok(())}
             .as_i64()
             .ok_or_else(|| crate::error!("Invalid timestamp"))?;
 
-        ensure!(now().abs_diff(at) <= 60, "Expired command");
+        ensure!(now()?.abs_diff(at) <= 60, "Expired command");
 
         let nonce = s(&e, "nonce")?;
 
@@ -304,7 +643,7 @@ Ok(())}
 
         self.db.write(|t| {
             for (k, v) in keyed(t, "nonce/")? {
-                if v.as_i64().unwrap_or(0) < now() {
+                if v.as_i64().unwrap_or(0) < now()? {
                     remove(t, &k)?;
                 }
             }
@@ -318,7 +657,7 @@ Ok(())}
 
             ensure!(get(t, &k)?.is_none(), "Replay rejected");
 
-            put(t, &k, &json!(now() + 120))
+            put(t, &k, &json!(now()? + 120))
         })?;
 
         self.command(&a, pratique::json_value::from_value(e["command"].clone())?)
@@ -368,7 +707,9 @@ Ok(())}
                 "recipient-discovery",
                 "delivery-status",
                 "rules",
+                "ingress",
                 "messages",
+                "message-detail",
                 "content",
                 "digests",
                 "digest-review",
@@ -389,7 +730,7 @@ Ok(())}
                     t,
                     &receipt_key,
                     &json!({
-                    "hash":fingerprint,"result":result,"at":now()}
+                    "hash":fingerprint,"result":result,"at":now()?}
                     ),
                 )?;
             }
@@ -441,45 +782,212 @@ Ok(())}
                 Ok(result)
             }
             "status" => {
-                let mut counts = json!({});
-
-                let mut jobs = json!({});
-
-                let mut hashes = BTreeSet::new();
-
-                for m in list(t, "message/")? {
-                    if a.visible(s(&m, "recipient")?) {
-                        let state = s(&m, "state")?;
-
-                        counts[state] = json!(counts[state].as_u64().unwrap_or(0) + 1);
-
-                        hashes.insert(s(&m, "hash")?.to_string());
+                let global = a.global(&settings).is_ok();
+                let usage = capacity_usage(t)?;
+                let (
+                    mut counts,
+                    jobs,
+                    bytes,
+                    receive_records,
+                    pending_recipients,
+                    oldest_arrival,
+                    receive_states,
+                ) = if global {
+                    let receive_states = state_counts(t, "ingress")?;
+                    let receive_records = receive_states
+                        .as_object()
+                        .ok_or_else(|| crate::error!("Invalid ingress status counters"))?
+                        .values()
+                        .try_fold(0u64, |total, value| -> Result<u64> {
+                            let count = value
+                                .as_u64()
+                                .ok_or_else(|| crate::error!("Invalid ingress status counter"))?;
+                            total
+                                .checked_add(count)
+                                .ok_or_else(|| crate::error!("Ingress status counter overflow"))
+                        })?;
+                    (
+                        state_counts(t, "message")?,
+                        state_counts(t, "job")?,
+                        n(&usage, "bytes")?,
+                        receive_records,
+                        ingress_recipient_count(t)?,
+                        oldest_ingress_arrival(t)?,
+                        receive_states,
+                    )
+                } else {
+                    let mut counts = json!({});
+                    let mut jobs = json!({});
+                    let mut hashes = BTreeSet::new();
+                    for message in list(t, "message/")? {
+                        if a.visible(s(&message, "recipient")?) {
+                            let state = s(&message, "state")?;
+                            counts[state] = json!(counts[state].as_u64().unwrap_or(0) + 1);
+                            hashes.insert(s(&message, "hash")?.to_string());
+                        }
                     }
+                    let mut receive_records = 0u64;
+                    let mut pending_recipients = 0u64;
+                    let mut oldest_arrival: Option<i64> = None;
+                    let mut receive_states = json!({});
+                    for pending in list(t, "ingress/")? {
+                        let visible = arr(&pending, "recipients")?
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .filter(|recipient| a.visible(recipient))
+                            .count() as u64;
+                        if visible > 0 {
+                            hashes.insert(s(&pending, "hash")?.to_string());
+                            receive_records += 1;
+                            pending_recipients += visible;
+                            oldest_arrival =
+                                Some(oldest_arrival.map_or(
+                                    pending["arrived"].as_i64().unwrap_or(0),
+                                    |oldest| {
+                                        oldest.min(pending["arrived"].as_i64().unwrap_or(oldest))
+                                    },
+                                ));
+                            let state = s(&pending, "state")?;
+                            receive_states[state] =
+                                json!(receive_states[state].as_u64().unwrap_or(0) + 1);
+                        }
+                    }
+                    for job in list(t, "job/")? {
+                        if a.visible(s(&job["data"], "recipient")?) {
+                            let state = s(&job, "state")?;
+                            jobs[state] = json!(jobs[state].as_u64().unwrap_or(0) + 1);
+                        }
+                    }
+                    use redb::ReadableTable;
+                    let bytes = hashes
+                        .iter()
+                        .filter_map(|hash| {
+                            t.get(format!("blob/{hash}").as_str())
+                                .ok()
+                                .flatten()
+                                .map(|blob| blob.value().len() as u64)
+                        })
+                        .sum();
+                    (
+                        counts,
+                        jobs,
+                        bytes,
+                        receive_records,
+                        pending_recipients,
+                        oldest_arrival,
+                        receive_states,
+                    )
+                };
+                if pending_recipients > 0 {
+                    counts["pending-scan"] = json!(pending_recipients);
                 }
 
-                for j in list(t, "job/")? {
-                    if a.visible(s(&j["data"], "recipient")?) {
-                        let state = s(&j, "state")?;
+                let current = now()?;
+                let scanner_seen = self.scanner_seen.load(Ordering::Acquire);
+                let scanner_last_seen = (scanner_seen > 0).then_some(scanner_seen);
+                let scanner_online = scanner_last_seen
+                    .is_some_and(|seen| (0..=45).contains(&current.saturating_sub(seen)));
+                let scanner = json!({
+                    "online":scanner_online,
+                    "last_seen":scanner_last_seen,
+                    "stale_after_seconds":45,
+                    "configured_workers":settings["scan_concurrency"],
+                    "active":self.scan_active.load(Ordering::Relaxed),
+                    "receive_records":receive_records,
+                    "pending_recipients":pending_recipients,
+                    "oldest_pending_seconds":oldest_arrival.map(|arrival| current.saturating_sub(arrival).max(0)),
+                    "states":receive_states,
+                    "retries_since_start":self.scan_retries.load(Ordering::Relaxed),
+                    "protocol_version":super::scan_worker::PROTOCOL_VERSION,
+                    "api_version":scan::ANALYSIS_API_VERSION,
+                    "profile_version":scan::ANALYSIS_PROFILE_VERSION,
+                    "coverage_version":scan::COVERAGE_VERSION
+                });
 
-                        jobs[state] = json!(jobs[state].as_u64().unwrap_or(0) + 1);
-                    }
-                }
-
-                use redb::ReadableTable;
-
-                let bytes: usize = hashes
-                    .iter()
-                    .filter_map(|h| {
-                        t.get(format!("blob/{h}").as_str())
-                            .ok()
-                            .flatten()
-                            .map(|b| b.value().len())
+                let capacity = if global {
+                    json!({
+                        "messages":{"used":usage["messages"],"limit":settings["max_messages"]},
+                        "jobs":{"used":usage["jobs"],"limit":settings["max_jobs"]},
+                        "bytes":{"used":usage["bytes"],"limit":settings["max_bytes"]}
                     })
-                    .sum();
+                } else {
+                    Value::Null
+                };
+                let storage_host = if global {
+                    let available =
+                        super::filesystem::available(std::path::Path::new(&self.config.data_dir))?;
+                    let minimum = n(&settings, "min_free_bytes")?;
+                    json!({
+                        "available_bytes":available,
+                        "minimum_free_bytes":minimum,
+                        "state":if available < minimum { "critical" } else if available < minimum.saturating_mul(2) { "warning" } else { "healthy" },
+                        "admission":"fail-closed"
+                    })
+                } else {
+                    Value::Null
+                };
+                let cluster = super::cluster::status(t, settings["enabled"] == true)?;
 
                 Ok(json!({
-                "instance":self.config.instance,"workspace":self.config.workspace,"version":1,"storage_schema":2,"tls":self.tls_status(),"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"at":now(),"enabled":settings["enabled"],"active":must(t,"active")?,"messages":counts,"jobs":jobs,"bytes":bytes,"capabilities":["native-inspection","smtp-gateway","rules","quarantine","digests","workglen","graph","ews","ai-instructions"],"engine":scan::ENGINE}
+                "instance":self.config.instance,"workspace":self.config.workspace,"version":1,"storage_schema":2,"tls":self.tls_status()?,"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"storage_host":storage_host,"at":current,"enabled":settings["enabled"],"active":must(t,"active")?,"messages":counts,"jobs":jobs,"bytes":bytes,"scanner":scanner,"delivery":{"configured_workers":settings["delivery_concurrency"],"running_workers":self.delivery_workers.load(Ordering::Acquire),"active":self.delivery_active.load(Ordering::Relaxed),"attempts_since_start":self.delivery_attempts.load(Ordering::Relaxed),"succeeded_since_start":self.delivery_succeeded.load(Ordering::Relaxed),"deferred_since_start":self.delivery_deferred.load(Ordering::Relaxed)},"cluster":cluster,"smtp":{"since":self.started_at,"accepted":self.smtp_accepted.load(Ordering::Relaxed),"deferred":self.smtp_deferred.load(Ordering::Relaxed),"acceptance_storage":self.acceptance.status()},"capacity":capacity,"capabilities":["native-inspection","smtp-gateway","rules","quarantine","digests","workglen","graph","ews","ai-instructions","authenticated-peer-replication","replicated-processing-state","fenced-ownership-operations","native-free-space-admission","cluster-replication-telemetry","bounded-acceptance-group-commit","indexed-concurrent-delivery","bounded-operational-lists","message-journey"],"engine":scan::ENGINE}
                 ))
+            }
+
+            "cluster-drain" => {
+                a.global(&settings)?;
+                ensure!(d["confirm"] == true, "Confirm cluster drain");
+                super::cluster::begin_drain(
+                    t,
+                    &a.id,
+                    s(d, "partition")?,
+                    s(d, "new_owner")?,
+                    n(d, "expected_term")?,
+                )
+            }
+
+            "cluster-handoff" => {
+                a.global(&settings)?;
+                ensure!(d["confirm"] == true, "Confirm ownership handoff");
+                super::cluster::complete_handoff(
+                    t,
+                    &a.id,
+                    s(d, "partition")?,
+                    s(d, "new_owner")?,
+                    n(d, "expected_term")?,
+                )
+            }
+
+            "cluster-takeover" => {
+                a.global(&settings)?;
+                ensure!(
+                    d["confirm"] == true
+                        && d["old_owner_fenced"] == true
+                        && d["acknowledge_incomplete_replication"] == true,
+                    "Confirm the old owner is fenced and acknowledge incomplete-replication risk"
+                );
+                let partition = s(d, "partition")?;
+                let current = must(t, &format!("ownership/{partition}"))?;
+                ensure!(
+                    current["owner"] == s(d, "expected_owner")?
+                        && current["term"] == d["expected_term"],
+                    "Ownership changed; refresh cluster state"
+                );
+                super::cluster::operator_takeover(t, &a.id, partition, n(d, "expected_term")?)
+            }
+
+            "cluster-rejoin" => {
+                a.global(&settings)?;
+                ensure!(d["confirm"] == true, "Confirm cluster rejoin");
+                super::cluster::rejoin(t, &a.id)
+            }
+
+            "cluster-resync" => {
+                a.global(&settings)?;
+                ensure!(
+                    d["confirm"] == true && d["acknowledge_acceptance_pause"] == true,
+                    "Confirm resynchronization and its acceptance pause"
+                );
+                super::cluster::begin_resync(t, &a.id, s(d, "peer")?)
             }
 
             "setup" => {
@@ -488,10 +996,10 @@ Ok(())}
                 Ok(json!({
                 "settings":settings,"admin_origin":self.config.admin_origin,"recipient_directory":{"configured":self.config.recipient_directory.is_some(),"provider":"microsoft365","mode":"review-and-add"},"routes":self.destination_summaries(&settings)?,"connector_profiles":self.config.connectors.iter().map(|(k,c)|(k.clone(),json!({
                 "type":c.r#type,"mailboxes":c.mailboxes}
-                ))).collect::<pratique::json_value::Map<_,_>>(),"origin":self.config.origin,"instance":self.config.instance,"tls":self.tls_status(),"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"tests":get(t,"connection_tests")?.unwrap_or(json!({
+                ))).collect::<pratique::json_value::Map<_,_>>(),"origin":self.config.origin,"instance":self.config.instance,"tls":self.tls_status()?,"storage_encryption":{"enabled":true,"cipher":"AES-256-GCM","key_custody":"installation-managed"},"tests":get(t,"connection_tests")?.unwrap_or(json!({
                 }
                 )),"native_scanner":{
-                "engine":scan::ENGINE,"archives":["ZIP stored/deflate","GZIP","USTAR regular files"],"unsupported":"Administrator-only quarantine","external_services":false}
+                "engine":scan::ENGINE,"archives":["ZIP stored/deflate","TAR/USTAR/PAX/GNU names","GZIP/TAR.GZ","RAR4/5 stored members","7z Copy/DEFLATE/LZMA1/LZMA2","BZIP2","XZ single-filter LZMA2","LZMA-alone"],"unsupported":"Compressed/encrypted/solid/multi-volume archives and unsupported features are administrator-only quarantine","external_services":false}
                 }
                 ))
             }
@@ -537,7 +1045,7 @@ Ok(())}
                     ensure!(
                         tests["ok"] == true
                             && tests["fingerprint"] == self.connection_fingerprint(&new)?
-                            && now().saturating_sub(tests["at"].as_i64().unwrap_or(0)) < 3600,
+                            && now()?.saturating_sub(tests["at"].as_i64().unwrap_or(0)) < 3600,
                         "Run successful connection tests for these settings first"
                     );
                 }
@@ -617,7 +1125,7 @@ Ok(())}
                 ensure!(version < 10000, "Rule history capacity reached");
 
                 let v = json!({
-                "id":version,"state":"development","rules":d["rules"],"author":a.id,"created":now(),"based_on":d["based_on"]}
+                "id":version,"state":"development","rules":d["rules"],"author":a.id,"created":now()?,"based_on":d["based_on"]}
                 );
 
                 put(t, &format!("rule/{version}"), &v)?;
@@ -703,7 +1211,7 @@ Ok(())}
 
                 v["state"] = json!("test");
 
-                v["tested_at"] = json!(now());
+                v["tested_at"] = json!(now()?);
 
                 v["test"] = json!({
                 "actor":a.id,"messages":report,"count":report.len(),"complete":true,"scope":"selected samples only","settings_revision":settings["revision"],"engine":scan::ENGINE}
@@ -755,7 +1263,7 @@ Ok(())}
                 v["state"] = json!("active");
 
                 if v.get("published_at").is_none() {
-                    v["published_at"] = json!(now());
+                    v["published_at"] = json!(now()?);
                 }
 
                 v["activated_by"] = json!(a.id);
@@ -780,69 +1288,270 @@ Ok(())}
                 ))
             }
 
-            "messages" => {
-                let mut rows = list(t, "message/")?;
+            "ingress" => {
+                let states = list_filters(d, "states", &["queued", "leased", "retrying"])?;
+                let query = list_query(d)?;
+                let node = d["node"].as_str().unwrap_or("");
+                ensure!(
+                    node.is_empty() || node.len() <= 100,
+                    "Node filter is too long"
+                );
+                let limit = list_limit(d)?;
+                let (after, last) = list_cursor(d, false)?;
+                let mut rows = list(t, "ingress/")?;
+                rows.sort_by(|a, b| {
+                    (a["arrived"].as_i64(), a["id"].as_str())
+                        .cmp(&(b["arrived"].as_i64(), b["id"].as_str()))
+                });
+                let candidates: Vec<_> = rows
+                    .into_iter()
+                    .filter(|record| {
+                        record["arrived"].as_i64().unwrap_or(0) > after
+                            || (record["arrived"] == after
+                                && record["id"].as_str().unwrap_or("") > last.as_str())
+                    })
+                    .collect();
+                let mut result = Vec::new();
+                let mut cursor = Value::Null;
+                let mut scanned = 0;
+                for record in &candidates {
+                    scanned += 1;
+                    cursor = json!({"at":record["arrived"],"id":record["id"]});
+                    let recipients = arr(record, "recipients")?
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .filter(|recipient| a.visible(recipient))
+                        .map(str::to_string)
+                        .collect::<Vec<_>>();
+                    let state_match = states.is_empty() || states.contains(s(record, "state")?);
+                    let query_match = format!(
+                        "{} {} {}",
+                        s(record, "id")?,
+                        s(record, "envelope_from")?,
+                        recipients.join(" ")
+                    )
+                    .to_lowercase()
+                    .contains(&query);
+                    let node_match = node.is_empty()
+                        || record["origin_node"] == node
+                        || record["scan_owner"] == node
+                        || record["delivery_owner"] == node;
+                    if !recipients.is_empty() && state_match && query_match && node_match {
+                        result.push(json!({
+                            "id":record["id"],
+                            "state":record["state"],
+                            "arrived":record["arrived"],
+                            "due":record["due"],
+                            "attempts":record["attempts"],
+                            "lease_until":record["lease_until"],
+                            "error":record["error"],
+                            "sender":record["envelope_from"],
+                            "recipients":recipients,
+                            "rule_version":record["rule_version"],
+                            "api_version":record["api_version"],
+                            "profile_version":record["profile_version"],
+                            "coverage_version":record["coverage_version"],
+                            "origin_node":record["origin_node"],
+                            "scan_owner":record["scan_owner"],
+                            "scan_generation":record["scan_generation"],
+                            "delivery_owner":record["delivery_owner"],
+                            "delivery_partition":record["delivery_partition"],
+                            "replication":if record["origin_sequence"].as_u64().unwrap_or(0)>0{"tracked"}else{"standalone"}
+                        }));
+                    }
+                    if result.len() == limit || scanned == 2000 {
+                        break;
+                    }
+                }
+                if scanned == candidates.len() {
+                    cursor = Value::Null;
+                }
+                let (totals, total_recipients) = if a.global(&settings).is_ok() {
+                    (state_counts(t, "ingress")?, ingress_recipient_count(t)?)
+                } else {
+                    let mut totals = json!({});
+                    let mut total_recipients = 0u64;
+                    for record in list(t, "ingress/")? {
+                        let visible = arr(&record, "recipients")?
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .filter(|recipient| a.visible(recipient))
+                            .count() as u64;
+                        if visible > 0 {
+                            let state = s(&record, "state")?;
+                            totals[state] = json!(totals[state].as_u64().unwrap_or(0) + 1);
+                            total_recipients = total_recipients.saturating_add(visible);
+                        }
+                    }
+                    (totals, total_recipients)
+                };
+                Ok(json!({
+                    "instance":self.config.instance,
+                    "records":result,
+                    "totals":totals,
+                    "total_recipients":total_recipients,
+                    "limit":limit,
+                    "next_cursor":cursor,
+                    "scan_limit":2000
+                }))
+            }
 
+            "messages" => {
+                let states = list_filters(
+                    d,
+                    "states",
+                    &[
+                        "queued",
+                        "quarantined",
+                        "release-queued",
+                        "delivered",
+                        "discarded",
+                        "expired",
+                    ],
+                )?;
+                let query = list_query(d)?;
+                let reason = d["reason"].as_str().unwrap_or("").to_lowercase();
+                ensure!(reason.len() <= 100, "Reason filter is too long");
+                let node = d["node"].as_str().unwrap_or("");
+                ensure!(
+                    node.is_empty() || node.len() <= 100,
+                    "Node filter is too long"
+                );
+                let hold = d["hold"].as_bool();
+                ensure!(
+                    hold.is_some() || d["hold"].is_null(),
+                    "Hold filter must be boolean"
+                );
+                let releasable = d["releasable"].as_bool();
+                ensure!(
+                    releasable.is_some() || d["releasable"].is_null(),
+                    "Release eligibility filter must be boolean"
+                );
+                let limit = list_limit(d)?;
+                let mut rows = list(t, "message/")?;
                 rows.sort_by(|a, b| {
                     (b["arrived"].as_i64(), b["id"].as_str())
                         .cmp(&(a["arrived"].as_i64(), a["id"].as_str()))
                 });
-
-                let before = d["cursor"]["at"]
-                    .as_i64()
-                    .or(d["before"].as_i64())
-                    .unwrap_or(now() + 1);
-
-                let last = d["cursor"]["id"].as_str().unwrap_or("");
-
-                let query = d["search"].as_str().unwrap_or("").to_lowercase();
-
+                let (mut before, last) = list_cursor(d, true)?;
+                if d["cursor"].is_null() {
+                    before = d["before"].as_i64().unwrap_or(now()? + 1);
+                }
                 let mut result = Vec::new();
-
                 let mut cursor = Value::Null;
-
                 let mut scanned = 0;
-
                 let candidates: Vec<_> = rows
                     .into_iter()
                     .filter(|m| {
                         m["arrived"].as_i64().unwrap_or(0) < before
-                            || (m["arrived"] == before && m["id"].as_str().unwrap_or("") < last)
+                            || (m["arrived"] == before
+                                && m["id"].as_str().unwrap_or("") < last.as_str())
                     })
                     .collect();
-
                 for m in &candidates {
                     scanned += 1;
-
                     cursor = json!({
                     "at":m["arrived"],"id":m["id"]}
                     );
-
-                    if a.visible(s(m, "recipient")?)
-                        && format!(
-                            "{} {} {}",
-                            s(m, "subject")?,
-                            s(m, "sender")?,
-                            s(m, "recipient")?
-                        )
-                        .to_lowercase()
-                        .contains(&query)
+                    let visible = a.visible(s(m, "recipient")?);
+                    let state_match = states.is_empty() || states.contains(s(m, "state")?);
+                    let query_match = format!(
+                        "{} {} {}",
+                        s(m, "subject")?,
+                        s(m, "sender")?,
+                        s(m, "recipient")?
+                    )
+                    .to_lowercase()
+                    .contains(&query);
+                    let reason_match = reason.is_empty()
+                        || m["verdict"]["matches"].as_array().is_some_and(|matches| {
+                            matches.iter().any(|matched| {
+                                matched["reason"]
+                                    .as_str()
+                                    .is_some_and(|value| value.to_lowercase().contains(&reason))
+                            })
+                        });
+                    let node_match = node.is_empty()
+                        || m["origin_node"] == node
+                        || m["scan_owner"] == node
+                        || m["delivery_owner"] == node;
+                    let hold_match = hold.is_none_or(|value| m["hold"] == value);
+                    let release_match = releasable.is_none_or(|value| m["releasable"] == value);
+                    if visible
+                        && state_match
+                        && query_match
+                        && reason_match
+                        && node_match
+                        && hold_match
+                        && release_match
                     {
                         result.push(public(m));
                     }
-
-                    if result.len() == 200 || scanned == 2000 {
+                    if result.len() == limit || scanned == 2000 {
                         break;
                     }
                 }
-
                 if scanned == candidates.len() {
                     cursor = Value::Null;
                 }
-
+                let totals = if a.global(&settings).is_ok() {
+                    state_counts(t, "message")?
+                } else {
+                    let mut totals = json!({});
+                    for message in list(t, "message/")? {
+                        if a.visible(s(&message, "recipient")?) {
+                            let state = s(&message, "state")?;
+                            totals[state] = json!(totals[state].as_u64().unwrap_or(0) + 1);
+                        }
+                    }
+                    totals
+                };
                 Ok(json!({
-                "messages":result,"limit":200,"next_cursor":cursor,"scan_limit":2000}
+                "instance":self.config.instance,"messages":result,"totals":totals,"limit":limit,"next_cursor":cursor,"scan_limit":2000}
                 ))
+            }
+
+            "message-detail" => {
+                let message = message(t, s(d, "id")?)?;
+                a.require("read", Some(s(&message, "recipient")?))?;
+                let mut jobs = list(t, "job/")?
+                    .into_iter()
+                    .filter(|job| job["data"]["message"] == message["id"])
+                    .map(|job| job_public(t, &job))
+                    .collect::<Result<Vec<_>>>()?;
+                jobs.sort_by_key(|job| job["due"].as_i64());
+                let job_ids = jobs
+                    .iter()
+                    .filter_map(|job| job["id"].as_str())
+                    .collect::<BTreeSet<_>>();
+                let ingress = message["ingress_id"].as_str();
+                let id = s(&message, "id")?;
+                let mut events = list(t, "audit/")?
+                    .into_iter()
+                    .filter(|event| {
+                        event["scope"].as_str().is_some_and(|scope| {
+                            (scope.is_empty() && a.global(&settings).is_ok())
+                                || (!scope.is_empty() && a.visible(scope))
+                        }) && (event["data"]["id"] == id
+                            || event["data"]["message"] == id
+                            || ingress.is_some_and(|value| event["data"]["ingress"] == value)
+                            || event["data"]["job"]
+                                .as_str()
+                                .is_some_and(|value| job_ids.contains(value)))
+                    })
+                    .collect::<Vec<_>>();
+                if events.len() > 50 {
+                    events.drain(..events.len() - 50);
+                }
+                Ok(json!({
+                    "instance":self.config.instance,
+                    "message":public(&message),
+                    "verdict":message["verdict"],
+                    "evidence":message["engines"],
+                    "route":message["route"],
+                    "jobs":jobs,
+                    "events":events
+                }))
             }
 
             "content" => {
@@ -850,7 +1559,7 @@ Ok(())}
 
                 a.require("content", Some(s(&m, "recipient")?))?;
 
-                let parsed = scan::inspect(&body(t, &m)?)?;
+                let parsed = scan::inspect_with_settings(&body(t, &m)?, &settings)?;
 
                 event(
                     t,
@@ -925,6 +1634,8 @@ Ok(())}
                     ),
                 )?;
 
+                super::cluster::record_message_state(t, s(&m, "id")?)?;
+
                 Ok(public(&m))
             }
 
@@ -958,7 +1669,7 @@ Ok(())}
                 a.require("read", Some(&recipient))?;
 
                 ensure!(
-                    snap["expires"].as_i64().unwrap_or(0) > now(),
+                    snap["expires"].as_i64().unwrap_or(0) > now()?,
                     "Digest expired"
                 );
 
@@ -1065,6 +1776,7 @@ Ok(())}
                     m["revision"] = json!(n(&m, "revision")? + 1);
 
                     save_message(t, &m)?;
+                    super::cluster::record_message_state(t, id)?;
                 }
 
                 event(
@@ -1082,19 +1794,102 @@ Ok(())}
             }
 
             "jobs" => {
+                let states = list_filters(
+                    d,
+                    "states",
+                    &[
+                        "queued",
+                        "retrying",
+                        "running",
+                        "failed",
+                        "uncertain",
+                        "succeeded",
+                        "cancelled",
+                    ],
+                )?;
+                let kinds = list_filters(d, "kinds", &["delivery", "digest", "remediation"])?;
+                let query = list_query(d)?;
+                let node = d["node"].as_str().unwrap_or("");
+                ensure!(
+                    node.is_empty() || node.len() <= 100,
+                    "Node filter is too long"
+                );
+                let limit = list_limit(d)?;
+                let (before, last) = list_cursor(d, true)?;
                 let mut rows = list(t, "job/")?;
-
-                rows.retain(|v| {
-                    v["data"]["recipient"]
-                        .as_str()
-                        .is_some_and(|r| a.visible(r))
+                rows.sort_by(|a, b| {
+                    (b["due"].as_i64(), b["id"].as_str())
+                        .cmp(&(a["due"].as_i64(), a["id"].as_str()))
                 });
-
-                rows.sort_by_key(|v| std::cmp::Reverse(v["due"].as_i64()));
-
-                rows.truncate(200);
-
-                Ok(json!(rows))
+                let mut result = Vec::new();
+                let mut cursor = Value::Null;
+                let mut scanned = 0;
+                let candidates: Vec<_> = rows
+                    .into_iter()
+                    .filter(|job| {
+                        job["due"].as_i64().unwrap_or(0) < before
+                            || (job["due"] == before
+                                && job["id"].as_str().unwrap_or("") < last.as_str())
+                    })
+                    .collect();
+                for job in &candidates {
+                    scanned += 1;
+                    cursor = json!({"at":job["due"],"id":job["id"]});
+                    let Some(recipient) = job["data"]["recipient"].as_str() else {
+                        continue;
+                    };
+                    let state_match = states.is_empty() || states.contains(s(job, "state")?);
+                    let kind_match = kinds.is_empty() || kinds.contains(s(job, "kind")?);
+                    let node_match = node.is_empty()
+                        || job["delivery_owner"] == node
+                        || job["delivery_partition"] == node;
+                    let query_match = format!(
+                        "{} {} {} {}",
+                        s(job, "id")?,
+                        recipient,
+                        s(job, "kind")?,
+                        job["error"].as_str().unwrap_or("")
+                    )
+                    .to_lowercase()
+                    .contains(&query);
+                    if a.visible(recipient)
+                        && state_match
+                        && kind_match
+                        && node_match
+                        && query_match
+                    {
+                        result.push(job_public(t, job)?);
+                    }
+                    if result.len() == limit || scanned == 2000 {
+                        break;
+                    }
+                }
+                if scanned == candidates.len() {
+                    cursor = Value::Null;
+                }
+                let totals = if a.global(&settings).is_ok() {
+                    state_counts(t, "job")?
+                } else {
+                    let mut totals = json!({});
+                    for job in list(t, "job/")? {
+                        if job["data"]["recipient"]
+                            .as_str()
+                            .is_some_and(|recipient| a.visible(recipient))
+                        {
+                            let state = s(&job, "state")?;
+                            totals[state] = json!(totals[state].as_u64().unwrap_or(0) + 1);
+                        }
+                    }
+                    totals
+                };
+                Ok(json!({
+                    "instance":self.config.instance,
+                    "jobs":result,
+                    "totals":totals,
+                    "limit":limit,
+                    "next_cursor":cursor,
+                    "scan_limit":2000
+                }))
             }
 
             "job-retry" | "job-cancel" => {
@@ -1140,7 +1935,7 @@ Ok(())}
                     "cancelled"
                 });
 
-                j["due"] = json!(now());
+                j["due"] = json!(now()?);
 
                 j["attempts"] = json!(0);
 
@@ -1156,6 +1951,10 @@ Ok(())}
                     "job":j["id"],"state":j["state"]}
                     ),
                 )?;
+
+                if j["kind"] == "delivery" {
+                    super::cluster::record_message_state(t, s(&j["data"], "message")?)?;
+                }
 
                 Ok(json!({
                 "state":j["state"]}
@@ -1385,8 +2184,18 @@ Ok(())}
         ensure!(
             (100..=1000000).contains(&n(v, "max_messages")?)
                 && (MAX_MESSAGE as u64..=1024u64.pow(3)).contains(&n(v, "max_bytes")?)
-                && (100..=1000000).contains(&n(v, "max_jobs")?),
+                && (100..=1000000).contains(&n(v, "max_jobs")?)
+                && (64 * 1024u64.pow(2)..=1024u64.pow(4)).contains(&n(v, "min_free_bytes")?),
             "Invalid capacity"
+        );
+        ensure!(
+            (1024..=MAX_MESSAGE as u64).contains(&n(v, "scan_input_bytes")?)
+                && (1024u64.pow(2)..=256 * 1024u64.pow(2)).contains(&n(v, "scan_decoded_bytes")?)
+                && (1..=1000).contains(&n(v, "scan_parts")?)
+                && (1..=16).contains(&n(v, "scan_concurrency")?)
+                && (1..=16).contains(&n(v, "delivery_concurrency")?)
+                && v["mixed_script_check"].is_boolean(),
+            "Invalid worker limits or mixed-script policy"
         );
 
         if !s(v, "digest_sender")?.is_empty() {
@@ -1481,7 +2290,7 @@ Ok(())}
         }
 
         Ok(json!({
-        "ok":results.iter().all(|v|v["ok"]==true),"results":results,"at":now(),"fingerprint":self.connection_fingerprint(v)?}
+        "ok":results.iter().all(|v|v["ok"]==true),"results":results,"at":now()?,"fingerprint":self.connection_fingerprint(v)?}
         ))
     }
 
@@ -1493,49 +2302,21 @@ Ok(())}
         count: usize,
         jobs: usize,
     ) -> Result<()> {
-        let rows = list(t, "message/")?;
-
-        let count = rows
-            .iter()
-            .filter(|m| {
-                !["expired", "discarded", "delivered"].contains(&m["state"].as_str().unwrap_or(""))
-            })
-            .count()
-            + count;
-
-        ensure!(
-            count <= n(v, "max_messages")? as usize,
-            "Message capacity reached"
-        );
-
-        use redb::ReadableTable;
-
-        let mut used = bytes;
-
-        for entry in t.range("blob/".."blob0")? {
-            used = used.saturating_add(entry?.1.value().len());
-        }
-
-        ensure!(
-            used as u64 <= n(v, "max_bytes")?,
-            "Content capacity reached"
-        );
-
-        let pending = list(t, "job/")?
-            .iter()
-            .filter(|j| j["state"] != "succeeded" && j["state"] != "cancelled")
-            .count();
-
-        ensure!(
-            pending + jobs <= n(v, "max_jobs")? as usize,
-            "Job capacity reached"
-        );
-
-        Ok(())
+        capacity_check(t, v, bytes, count, jobs)
     }
 
     pub fn release(&self, t: &mut Table, a: &Actor, m: &mut Value, settings: &Value) -> Result<()> {
         let v = active(t)?;
+
+        if m.get("ingress_id").is_some() {
+            ensure!(
+                m["engines"]["engine"] == scan::ENGINE
+                    && m["engines"]["api_version"] == scan::ANALYSIS_API_VERSION
+                    && m["engines"]["profile_version"] == scan::ANALYSIS_PROFILE_VERSION
+                    && m["engines"]["coverage_version"] == scan::COVERAGE_VERSION,
+                "Complete the scanner/control upgrade before re-evaluating this message"
+            );
+        }
 
         let verdict = self.evaluate(t, &body(t, m)?, &v["rules"], settings, &m["engines"])?;
 
@@ -1599,7 +2380,7 @@ Ok(())}
         let id = id();
 
         let snap = json!({
-        "id":id,"recipient":recipient,"created":now(),"expires":now()+7*86400,"truncated":truncated,"ids":rows.iter().map(|m|m["id"].clone()).collect::<Vec<_>>(),"releasable":rows.iter().filter(|m|m["releasable"]==true&&m["hold"]!=true).map(|m|m["id"].clone()).collect::<Vec<_>>()}
+        "id":id,"recipient":recipient,"created":now()?,"expires":now()?+7*86400,"truncated":truncated,"ids":rows.iter().map(|m|m["id"].clone()).collect::<Vec<_>>(),"releasable":rows.iter().filter(|m|m["releasable"]==true&&m["hold"]!=true).map(|m|m["id"].clone()).collect::<Vec<_>>()}
         );
 
         put(t, &format!("digest/{id}"), &snap)?;
@@ -1634,13 +2415,17 @@ Ok(())}
         settings: &Value,
         evidence: &Value,
     ) -> Result<Value> {
+        let _permit = acquire_scan(
+            &self.scan_active,
+            usize::try_from(n(settings, "scan_concurrency")?)?,
+        )?;
         let mut evidence = if evidence.is_object() {
             evidence.clone()
         } else {
             json!({})
         };
 
-        evidence["learned_spam_score"] = json!(super::learning::score(t, raw)?);
+        evidence["learned_spam_score"] = json!(super::learning::score(t, raw, settings)?);
 
         scan::evaluate(raw, rules, settings, &evidence)
     }
@@ -1688,4 +2473,23 @@ pub fn nonspam(v: &Value) -> bool {
         a.iter()
             .any(|m| m["action"] == "quarantine" && m["type"] != "spam")
     })
+}
+
+#[cfg(test)]
+mod scanner_budget_tests {
+    use super::*;
+
+    #[test]
+    fn scan_permits_bound_concurrency_and_release_on_drop() {
+        let active = AtomicUsize::new(0);
+        let first = acquire_scan(&active, 2).unwrap();
+        let _second = acquire_scan(&active, 2).unwrap();
+        assert_eq!(active.load(Ordering::Relaxed), 2);
+        assert!(acquire_scan(&active, 2).is_err());
+        assert_eq!(active.load(Ordering::Relaxed), 2);
+        drop(first);
+        assert_eq!(active.load(Ordering::Relaxed), 1);
+        let _replacement = acquire_scan(&active, 2).unwrap();
+        assert_eq!(active.load(Ordering::Relaxed), 2);
+    }
 }

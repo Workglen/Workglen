@@ -272,3 +272,55 @@ remain unchanged. Optional cargo-fuzz tooling lives in the separate `fuzz/`
 workspace with its own pinned lockfile and 10 registry versions, documented in
 DEPENDENCY-CATALOG.md. These are development tools only, never deployed runtime
 requirements. The seed/replay workspace uses only first-party Pratique.
+
+## DEPS-20 — Lazaret archive integration (November 3, 2026)
+
+User authorization: integrate and harden Lazaret archive support in Mail
+Security, without moving Workglen ZIP into Lazaret or making Workglen-owned
+changes to Lazaret's implementation. `vendor/lazaret-archive` is the exact Rust
+source, fixtures and tests from Lazaret commit
+`a08bc1684abd29d13e726c014b9dee4d4eacfc20`. Its standalone manifest retains
+the upstream version, repository and Apache-2.0 AND Unicode-3.0 license and
+points the archive crate's one dependency at `workglen-lazaret-verify`, a narrow
+first-party compatibility facade that exposes only the existing Pratique
+inflater. Behavioral changes belong in Lazaret and are tracked separately in
+`LAZARET-ARCHIVE-BACKLOG.md`.
+
+Review: Cargo.lock grows from 22 to 24 entries, both added entries first-party.
+The 15 registry packages, versions, sources and checksums are unchanged. The
+application still has three direct external crates. All eight reusable
+first-party crates have only approved first-party path dependencies. No
+extractor executable, interpreter, scanner daemon, network call, downloaded
+decoder or additional deployed service is introduced. Lazaret's Unicode 15.1
+path-folding table retains its Unicode-3.0 license and notice.
+
+Workglen's adapter applies the configured per-message decoded/expanded-byte
+budget, 256-member and eight-level aggregate bounds, a 200x expansion-ratio
+guard after the first MiB, path/name ambiguity quarantine and recursive
+inspection of every returned file. Unsupported, encrypted, corrupt, truncated,
+conflicting, special-entry and over-budget results remain mandatory
+administrator-only quarantine and are rechecked before release. Lazaret's
+current synchronous API has no cooperative mid-decoder deadline; Workglen
+bounds input, output and concurrent calls and checks its five-second deadline
+before and after the call. A native work/cancellation budget is an upstream
+backlog item, not a hidden patch to the vendored source.
+
+## DEPS-21 — Restartable native scan role (November 4, 2026)
+
+The user-requested durable-ingress boundary separates SMTP acknowledgment from
+sender authentication and content inspection. This is a process role in the same
+native `workglen` executable, under the same dedicated account; it is not an
+installed third-party scanner daemon, interpreter, extractor, database, cloud API
+or separately distributed runtime. The registry/path dependency graph and
+allowlists do not change.
+
+`security-serve` remains the sole encrypted-redb owner and commits exact MIME
+before SMTP `250`. `security-scan-worker` receives bounded leased work over a
+mode-0600 Unix socket inside the mode-0700 data directory. Protocol, API,
+analysis-profile and coverage versions are explicit; incompatible workers are
+refused before a claim. The local protocol carries a required cancellation
+context (currently the documented no-op form), caps inspection/result/evidence
+frames and never puts decoded content in audit events. This native role may be
+restarted or replaced while ingress continues to spool within configured
+capacity. Lazaret remains in-process first-party library code inside that role;
+no Lazaret implementation change is made by this boundary.

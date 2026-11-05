@@ -1,13 +1,17 @@
 pub mod archive_zip;
+pub mod cluster;
+pub mod cluster_transport;
 pub mod db;
 pub mod model;
 pub mod scan;
+pub mod scan_worker;
 
 pub mod service;
 
 pub mod connectors;
 pub mod destinations;
 pub mod directory;
+pub mod filesystem;
 pub mod http;
 pub mod learning;
 pub mod transport;
@@ -21,7 +25,7 @@ pub fn cli(args: &[String]) -> crate::error::Result<()> {
     use std::io::Read;
     ensure!(
         args.len() >= 2,
-        "usage: workglen security-init|security-serve|security-check|security-command|security-scan|security-audit-verify CONFIG [argument]; security-generate-key ABSOLUTE_PATH"
+        "usage: workglen security-init|security-serve|security-scan-worker|security-check|security-command|security-scan|security-audit-verify CONFIG [argument]; security-generate-key ABSOLUTE_PATH"
     );
     if args[0] == "security-generate-key" {
         ensure!(
@@ -39,6 +43,7 @@ pub fn cli(args: &[String]) -> crate::error::Result<()> {
             args[0].as_str(),
             "security-init"
                 | "security-serve"
+                | "security-scan-worker"
                 | "security-check"
                 | "security-command"
                 | "security-scan"
@@ -71,6 +76,10 @@ pub fn cli(args: &[String]) -> crate::error::Result<()> {
         println!("{}", pratique::json_value::to_string_pretty(&verdict)?);
         return Ok(());
     }
+    if args[0] == "security-scan-worker" {
+        ensure!(args.len() == 2, "usage: security-scan-worker CONFIG");
+        return scan_worker::run(config);
+    }
     let svc = service::Service::open(config)?;
     match args[0].as_str() {
         "security-init" => {
@@ -87,9 +96,11 @@ pub fn cli(args: &[String]) -> crate::error::Result<()> {
                 "Initialize security administrator first"
             );
             svc.start_tls()?;
+            let _scan = scan_worker::start(svc.clone())?;
             let _http = http::start(svc.clone())?;
+            let _replication = cluster_transport::start(&svc)?;
             let _smtp = transport::start(svc.clone())?;
-            svc.work();
+            svc.work()?;
         }
         "security-command" => {
             let mut raw = Vec::new();

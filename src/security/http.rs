@@ -38,8 +38,9 @@ fn cookie(r: &Request) -> Result<String> {
 impl State {
     fn session(&self, r: &Request) -> Result<(String, Session, Actor)> {
         let id = cookie(r)?;
+        let current_time = now()?;
         let mut all = crate::resilience::reset_lock(&self.sessions);
-        all.retain(|_, s| s.expires > now());
+        all.retain(|_, s| s.expires > current_time);
         let session = all
             .get(&id)
             .ok_or_else(|| crate::error!("Sign in to continue"))?
@@ -108,6 +109,20 @@ impl State {
             "Use application/json"
         );
         let raw = r.read_body(MAX_BODY)?;
+        if path == "/replication" {
+            ensure!(
+                r.header_all("x-workglen-replication-signature").count() == 1,
+                "Replication signature required"
+            );
+            return Ok(crate::web::response(
+                200,
+                super::cluster_transport::receive(
+                    &self.service,
+                    &raw,
+                    r.header("x-workglen-replication-signature").unwrap_or(""),
+                )?,
+            ));
+        }
         if path == "/control" {
             ensure!(
                 r.header_all("x-workglen-signature").count() == 1,
@@ -156,14 +171,15 @@ impl State {
             );
             let a = self.service.local_actor(name)?;
             let id = format!("{}{}", id(), id());
+            let current_time = now()?;
             let session = Session {
                 username: name.into(),
                 csrf: super::model::id(),
                 revision: a.revision,
-                expires: now() + 1800,
+                expires: current_time + 1800,
             };
             let mut all = crate::resilience::reset_lock(&self.sessions);
-            all.retain(|_, s| s.expires > now());
+            all.retain(|_, s| s.expires > current_time);
             ensure!(all.len() < 256, "Session capacity reached");
             all.insert(id.clone(), session.clone());
             return Ok(

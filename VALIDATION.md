@@ -16,6 +16,22 @@ fallible clock conversion remain open; IDNA security additions remain deferred.
 
 ## Current and historical checks
 
+- **Mail Security synchronized-node hardening (November 4, 2026, Apple Silicon macOS):**
+  all 94 runnable Mail Security module tests passed; four explicit resource/scale
+  profiles remained ignored. The complete offline locked workspace suite passed
+  (including 210 Workglen library tests, with four explicit resource profiles
+  ignored), as did all runnable integration suites and warnings-denied Clippy for
+  all targets. A fresh same-host two-node native fixture passed all 22 checks,
+  including authenticated peer commit before SMTP success, state catch-up,
+  scanner replacement with uninterrupted acceptance, Central Admin outage,
+  remediation, encrypted storage inspection and forced encrypted restart. A
+  focused regression also proves that a strict-mode `451` item remains
+  non-runnable, is tombstoned after a late peer acknowledgement and cannot be
+  resurrected by full-log replay. This is macOS loopback evidence, not Ubuntu
+  multi-host, real disk-full/power-loss, N/N-1 compatibility or production scale
+  evidence; those gates remain open in
+  [MAIL-SECURITY-REPLICATION.md](MAIL-SECURITY-REPLICATION.md).
+
 
 - **Microsoft 365 gateway setup (October 26, 2026):** **308 workspace tests
   passed**, four optional PostgreSQL fixtures ignored. Warnings-denied workspace

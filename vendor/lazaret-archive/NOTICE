@@ -1,0 +1,135 @@
+Lazaret's native engine: notices
+================================
+
+The native engine (this directory) is Lazaret's own work, licensed under the
+Apache License 2.0 (../LICENSE). It holds Unicode data (below), distributed
+under the Unicode License v3 in LICENSE-UNICODE (SPDX: Unicode-3.0), so the
+crates' license is Apache-2.0 AND Unicode-3.0.
+
+The compiled engine ships in Lazaret's platform wheels and, compiled to
+WebAssembly, in the npm package (as native/lazaret.wasm, this file as
+native/NOTICE), each with LICENSE-UNICODE. Those packages are
+Apache-2.0 AND Unicode-3.0 too. The browser dashboard
+(python/src/lazaret/web/lazaret.html) carries the WebAssembly engine too,
+and this file and LICENSE-UNICODE in its notices.
+
+
+What was CPython's
+------------------
+
+Until P-16 (0.1.9), parts of the engine were translations into Rust of
+CPython code (https://github.com/python/cpython), distributed under
+CPython's license as well as Lazaret's:
+
+    src/pyre/                    Lib/re/_parser.py, _compiler.py and
+                                 _constants.py, and Modules/_sre (the SRE
+                                 library, whose notices allowed its
+                                 redistribution under CNRI's Python 1.6
+                                 license and asked any other use to contact
+                                 Secret Labs AB)
+    src/hooks.rs, in part        Lib/shlex.py (shlex_split)
+    src/unicode.rs, in part      Objects/unicodeobject.c
+                                 (handle_capital_sigma)
+    src/generated/unicode13.rs,  the table of Lib/re/_casefix.py
+    in part
+
+They are retired, and with them their notices. The engine's regular
+expressions are linre (src/linre/), written from re's documented and
+observed behaviour, with src/pyre.rs as re's interface to it; a command's
+words are read by rules written from shlex's documentation; the Final_Sigma
+rule of str.lower() follows the Unicode Standard's definition; and re's
+extra case equivalences are derived from Unicode's case mappings
+(scripts/make_rust_tables.py). Tests hold each to Python's own answers.
+
+
+pratique
+--------
+
+Lazaret's network layer is built on pratique
+(https://github.com/lazaret-dev/pratique; called tiny_https until October
+2026), an HTTPS/TLS library under the Apache License 2.0
+(crates/pratique/LICENSE), Lazaret's own licence. It is in crates/pratique
+as it is upstream, at the commit crates/pratique/LAZARET.md names, with the
+notices of what it holds from elsewhere in crates/pratique/NOTICE. The
+native library holds its network part (crates/lazaret-net) and its pure
+verification code (crates/lazaret-verify: the Go checksum database's check,
+npm's and PyPI's attestations); the WebAssembly build holds what the engine
+takes of the pure part (SHA-256, for the signed requests of live secret
+verification).
+
+Of crates/pratique/NOTICE, this is what the native library holds: the
+bitsliced AES S-box and the constant-time carry-less multiplication of its
+TLS code follow BearSSL (src/crypto/aes_ct.rs and src/crypto/ghash.rs in
+crates/pratique), which is under the MIT licence:
+
+    Copyright (c) 2016 Thomas Pornin <pornin@bolet.org>
+
+    Permission is hereby granted, free of charge, to any person obtaining
+    a copy of this software and associated documentation files (the
+    "Software"), to deal in the Software without restriction, including
+    without limitation the rights to use, copy, modify, merge, publish,
+    distribute, sublicense, and/or sell copies of the Software, and to
+    permit persons to whom the Software is furnished to do so, subject to
+    the following conditions:
+
+    The above copyright notice and this permission notice shall be
+    included in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+    BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+    ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+pratique's Mozilla root store (crates/pratique/roots/mozilla.pem, under the
+Mozilla Public License 2.0, as NSS is) is for a feature Lazaret does not
+use; no package of Lazaret's carries it.
+
+Gradle's wrapper checksums
+--------------------------
+
+crates/lazaret-engine/rules/lazaret-rules.json holds, as
+GRADLE_WRAPPER_CHECKSUMS, the SHA-256 of each Gradle release's wrapper jar,
+as Gradle publishes them (https://services.gradle.org, each release's
+wrapperChecksumUrl) and as gradle/actions lists them
+(https://github.com/gradle/actions,
+sources/src/wrapper-validation/wrapper-checksums.json); written by
+scripts/update_gradle_wrapper_checksums.py. A checksum is a fact computed
+from a file, not a work of authorship: the list is named here for where it
+came from, and no licence applies to it. The rule pack is compiled into the
+engine, the native library's and the WebAssembly build's alike, so both
+carry the list.
+
+
+Unicode data
+------------
+
+crates/lazaret-engine/src/generated/unicode13.rs holds data of the Unicode
+Character Database 13.0 — the code points it assigns, the properties the
+engine's regular expressions and normalization read, decompositions,
+canonical combining classes and the primary composites — written by
+scripts/make_rust_tables.py from Python 3.10's unicodedata. The Python
+parser's table, unidata.rs in crates/lazaret-engine/src/pyparse/, holds
+data of the Unicode Character Database 15.1 — the characters identifiers
+may hold, normalization data of the characters assigned since 13.0, and
+the character names and their aliases — written by
+scripts/make_pyparse_tables.py from Python 3.13's unicodedata. And
+crates/lazaret-engine/src/generated/codecs.rs holds the characters Python's
+single-byte, CJK and ISO-2022 codecs decode bytes to (with the names a
+coding cookie can give, facts about Python), written by
+scripts/make_codec_tables.py from Python's own decoders; CPython made those
+codecs' mappings for the most part from the Unicode Consortium's mapping
+tables and the vendors' published ones (Microsoft's cp932, cp936, cp949 and
+cp950). The archive readers' table, fold_table.rs in
+crates/lazaret-archive/src/, holds data of the Unicode Character Database
+15.1 — the case foldings, decompositions and canonical combining classes
+the readers use to find names that a file system writes to one path,
+taken from Python 3.13's unicodedata, and the Default_Ignorable_Code_Point
+ranges of DerivedCoreProperties.txt, which the generator lists itself —
+written by crates/lazaret-archive/tests/fixtures/generate_fold_table.py.
+All four are distributed under the Unicode License v3 (LICENSE-UNICODE):
+
+    Copyright © 1991-2026 Unicode, Inc.

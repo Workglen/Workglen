@@ -36,6 +36,8 @@ pub const PERMISSIONS: &[&str] = &[
     "security.jobs",
     "security.audit",
     "security.learn",
+    "security.cluster.operate",
+    "security.cluster.takeover",
     "system.read",
     "mail.read",
     "mail.manage",

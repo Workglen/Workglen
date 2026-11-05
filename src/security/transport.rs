@@ -10,9 +10,146 @@ use pratique::json_value::{Value, json};
 
 use std::{
     net::{IpAddr, TcpListener, TcpStream, ToSocketAddrs},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        mpsc::{Receiver, RecvTimeoutError, SyncSender, sync_channel},
+    },
     time::{Duration, Instant},
 };
+
+const ACCEPTANCE_BATCH_MAX: usize = 16;
+const ACCEPTANCE_BATCH_WAIT: Duration = Duration::from_micros(500);
+
+struct AcceptanceRequest {
+    raw: Vec<u8>,
+    sender: String,
+    recipients: Vec<String>,
+    ip: IpAddr,
+    helo: String,
+    settings: Value,
+    response: SyncSender<Result<Vec<String>>>,
+}
+
+#[derive(Default)]
+struct AcceptanceStats {
+    commits: AtomicU64,
+    messages: AtomicU64,
+    max_batch: AtomicUsize,
+}
+
+pub(super) struct AcceptanceBatcher {
+    sender: Option<SyncSender<AcceptanceRequest>>,
+    stats: Arc<AcceptanceStats>,
+    worker: Option<std::thread::JoinHandle<()>>,
+}
+
+impl AcceptanceBatcher {
+    pub(super) fn new(db: Arc<Db>) -> Result<Self> {
+        let (sender, receiver) = sync_channel(32);
+        let stats = Arc::new(AcceptanceStats::default());
+        let worker_stats = stats.clone();
+        let worker = std::thread::Builder::new()
+            .name("security-acceptance".into())
+            .spawn(move || acceptance_loop(&db, &receiver, &worker_stats))?;
+        Ok(Self {
+            sender: Some(sender),
+            stats,
+            worker: Some(worker),
+        })
+    }
+
+    fn accept(
+        &self,
+        raw: Vec<u8>,
+        sender: String,
+        recipients: Vec<String>,
+        ip: IpAddr,
+        helo: String,
+        settings: Value,
+    ) -> Result<Vec<String>> {
+        let (response, result) = sync_channel(1);
+        self.sender
+            .as_ref()
+            .ok_or_else(|| crate::error!("Acceptance writer unavailable"))?
+            .send(AcceptanceRequest {
+                raw,
+                sender,
+                recipients,
+                ip,
+                helo,
+                settings,
+                response,
+            })
+            .map_err(|_| crate::error!("Acceptance writer unavailable"))?;
+        result
+            .recv()
+            .map_err(|_| crate::error!("Acceptance writer stopped"))?
+    }
+
+    pub(super) fn status(&self) -> Value {
+        let commits = self.stats.commits.load(Ordering::Relaxed);
+        let messages = self.stats.messages.load(Ordering::Relaxed);
+        json!({
+            "durable_commits":commits,
+            "messages":messages,
+            "max_batch":self.stats.max_batch.load(Ordering::Relaxed),
+            "messages_per_commit":if commits == 0 { 0.0 } else { messages as f64 / commits as f64 }
+        })
+    }
+}
+
+impl Drop for AcceptanceBatcher {
+    fn drop(&mut self) {
+        // Disconnect first so a writer blocked in recv can exit, then wait until
+        // its database handle is gone before Service::open can reacquire the
+        // exclusive encrypted-store lock during an immediate restart.
+        self.sender.take();
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+fn acceptance_loop(db: &Db, receiver: &Receiver<AcceptanceRequest>, stats: &AcceptanceStats) {
+    while let Ok(first) = receiver.recv() {
+        let mut requests = vec![first];
+        let deadline = Instant::now() + ACCEPTANCE_BATCH_WAIT;
+        while requests.len() < ACCEPTANCE_BATCH_MAX {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            match receiver.recv_timeout(remaining) {
+                Ok(request) => requests.push(request),
+                Err(RecvTimeoutError::Timeout) => break,
+                Err(RecvTimeoutError::Disconnected) => break,
+            }
+        }
+        let results = db.write(|t| accept_batch(t, &requests));
+        match results {
+            Ok(results) => {
+                let accepted = results.iter().filter(|result| result.is_ok()).count();
+                if accepted > 0 {
+                    stats.commits.fetch_add(1, Ordering::Relaxed);
+                    stats.messages.fetch_add(accepted as u64, Ordering::Relaxed);
+                    stats.max_batch.fetch_max(accepted, Ordering::Relaxed);
+                }
+                for (request, result) in requests.into_iter().zip(results) {
+                    let _ = request
+                        .response
+                        .send(result.map_err(crate::error::Error::msg));
+                }
+            }
+            Err(error) => {
+                let error = error.to_string();
+                for request in requests {
+                    let _ = request.response.send(Err(crate::error!("{error}")));
+                }
+            }
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Uncertain;
@@ -318,6 +455,122 @@ pub(super) fn delivery_copy(raw: &[u8], message: &Value, hostname: &str) -> Resu
     Ok(copy)
 }
 
+fn accept_batch(
+    t: &mut Table,
+    requests: &[AcceptanceRequest],
+) -> Result<Vec<std::result::Result<Vec<String>, String>>> {
+    let mut results = Vec::with_capacity(requests.len());
+    for request in requests {
+        let preflight = (|| -> Result<Value> {
+            ensure!(
+                super::cluster::acceptance_eligible(t)?,
+                "Cluster node is drained or resynchronizing"
+            );
+            ensure!(
+                must(t, "settings")?["revision"] == request.settings["revision"],
+                "Configuration changed; retry"
+            );
+            let active = super::service::active(t)?;
+            super::service::capacity_check(
+                t,
+                &request.settings,
+                request.raw.len(),
+                request.recipients.len(),
+                request.recipients.len(),
+            )?;
+            Ok(active)
+        })();
+        let active = match preflight {
+            Ok(active) => active,
+            Err(error) => {
+                results.push(Err(error.to_string()));
+                continue;
+            }
+        };
+        results.push(Ok(commit_acceptance(t, request, &active)?));
+    }
+    Ok(results)
+}
+
+fn commit_acceptance(
+    t: &mut Table,
+    request: &AcceptanceRequest,
+    active: &Value,
+) -> Result<Vec<String>> {
+    let content_hash = blob(t, &request.raw)?;
+    let ingress_id = id();
+    let arrived = now()?;
+    let shadow_version = get(t, "shadow")?
+        .and_then(|version| version.as_u64())
+        .filter(|version| *version != active["id"].as_u64().unwrap_or(0))
+        .map_or(Value::Null, |version| json!(version));
+    let mut routes = json!({});
+    for recipient in &request.recipients {
+        let domain = recipient.rsplit('@').next().unwrap_or("");
+        routes[recipient] = request.settings["routes"][domain].clone();
+    }
+    let replication_enabled = super::cluster::enabled(t)?;
+    let mut record = json!({
+        "id":ingress_id,
+        "state":if replication_enabled { "awaiting-replication" } else { "queued" },
+        "due":arrived,
+        "attempts":0,
+        "lease_token":null,
+        "lease_until":0,
+        "cancel_requested":false,
+        "error":"",
+        "hash":content_hash,
+        "envelope_from":request.sender,
+        "recipients":request.recipients,
+        "source_ip":request.ip.to_string(),
+        "helo":request.helo,
+        "arrived":arrived,
+        "expires":arrived+n(&request.settings,"retention_days")? as i64*86400,
+        "routes":routes,
+        "settings_revision":request.settings["revision"],
+        "analysis_settings":super::scan_worker::analysis_settings(&request.settings)?,
+        "rule_version":active["id"],
+        "shadow_version":shadow_version,
+        "api_version":super::scan::ANALYSIS_API_VERSION,
+        "profile_version":super::scan::ANALYSIS_PROFILE_VERSION,
+        "coverage_version":super::scan::COVERAGE_VERSION
+        ,"replication_degraded":false
+        ,"replication_ready_at":if replication_enabled { Value::Null } else { json!(arrived) }
+    });
+    let ownership = super::cluster::new_ingress_metadata(t)?;
+    for field in [
+        "origin_node",
+        "origin_sequence",
+        "delivery_partition",
+        "delivery_owner",
+        "delivery_term",
+        "scan_owner",
+        "scan_generation",
+    ] {
+        record[field] = ownership[field].clone();
+    }
+    put(t, &format!("ingress/{ingress_id}"), &record)?;
+    super::cluster::record_acceptance(t, &record)?;
+    for recipient in &request.recipients {
+        audit(
+            t,
+            "smtp",
+            "accepted-pending-scan",
+            recipient,
+            json!({
+                "ingress":ingress_id,
+                "hash":content_hash,
+                "state":"pending-scan",
+                "version":active["id"],
+                "api_version":super::scan::ANALYSIS_API_VERSION,
+                "profile_version":super::scan::ANALYSIS_PROFILE_VERSION,
+                "coverage_version":super::scan::COVERAGE_VERSION
+            }),
+        )?;
+    }
+    Ok(vec![ingress_id])
+}
+
 impl Service {
     pub fn accept(
         &self,
@@ -335,6 +588,15 @@ impl Service {
         let settings = self.settings()?;
 
         ensure!(settings["enabled"] == true, "Gateway paused");
+        super::filesystem::admit(
+            std::path::Path::new(&self.config.data_dir),
+            raw.len(),
+            n(&settings, "min_free_bytes")?,
+        )?;
+        ensure!(
+            raw.len() <= super::scan::scan_limits(&settings)?.input_bytes,
+            "Message exceeds configured scanner input budget"
+        );
 
         ensure!(
             (1..=25).contains(&recipients.len())
@@ -344,74 +606,35 @@ impl Service {
             "Recipient rejected"
         );
 
-        let policy = crate::config::Policy {
-            quarantine_dmarc: true,
-            ..Default::default()
-        };
-
-        let auth = self.checker.check_context(
-            raw,
-            crate::auth::AuthContext {
-                ip,
-                helo,
-                from: sender,
-                hostname: &self.config.hostname,
-                policy: &policy,
-                seconds: 20,
-            },
+        let recipients: Vec<String> = recipients
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let ids = self.acceptance.accept(
+            raw.to_vec(),
+            sender.to_string(),
+            recipients,
+            ip,
+            helo.to_string(),
+            settings,
         )?;
-
-        ensure!(
-            auth != crate::auth::Verdict::Temporary,
-            "Temporary authentication lookup failure"
-        );
-
-        let evidence = json!({
-        "authentication_action":if matches!(auth,crate::auth::Verdict::Quarantine|crate::auth::Verdict::Reject(_)){
-        "quarantine"}
-        else{
-        "pass-policy"}
-        ,"source_ip":ip.to_string(),"helo":helo,"engine":super::scan::ENGINE}
-        );
-
-        self.db.write(|t|{
-ensure!(must(t,"settings")?["revision"]==settings["revision"],"Configuration changed; retry");
-let v=super::service::active(t)?;
-let verdict=self.evaluate(t,raw,&v["rules"],&settings,&evidence)?;
-self.capacity(t,&settings,raw.len(),recipients.len(),recipients.len())?;
-let hash=blob(t,raw)?;
-let shadow=get(t,"shadow")?.map(|id|must(t,&format!("rule/{id}"))).transpose()?;
-let mut ids=Vec::new();
-let mut seen=std::collections::BTreeSet::new();
-for recipient in recipients{
-if !seen.insert(recipient){
-continue}
-let id=id();
-let mut m=json!({
-"id":id,"recipient":recipient,"arrived":now(),"state":if verdict["action"]=="quarantine"{
-"quarantined"}
-else{
-"queued"}
-,"revision":1,"hash":hash,"envelope_from":sender,"subject":verdict["subject"],"sender":verdict["sender"],"releasable":verdict["releasable"],"verdict":verdict,"engines":evidence,"rule_version":v["id"],"expires":now()+n(&settings,"retention_days")? as i64*86400,"hold":false,"route":settings["routes"][recipient.rsplit('@').next().unwrap_or("")]}
-);
-if let Some(shadow)=&shadow&& shadow["id"]!=v["id"]{
-m["shadow"]=json!({
-"version":shadow["id"],"verdict":self.evaluate(t,raw,&shadow["rules"],&settings,&evidence)?}
-);
-}
-save_message(t,&m)?;
-if m["state"]=="queued"{
-job(t,"delivery",json!({
-"recipient":recipient,"message":id}
-),&format!("delivery-{id}"))?;
-}
-audit(t,"smtp","accepted",recipient,json!({
-"id":id,"hash":hash,"state":m["state"],"version":v["id"],"engine":super::scan::ENGINE}
-))?;
-ids.push(id);
-}
-Ok(ids)}
-)
+        if self.config.replication.is_some() {
+            let result = super::cluster_transport::wait_for_acceptance(self, &ids);
+            match result {
+                Ok(degraded) => self
+                    .db
+                    .write(|t| super::cluster::complete_acceptance(t, &ids, degraded))?,
+                Err(error) => {
+                    let reason = error.to_string();
+                    self.db
+                        .write(|t| super::cluster::defer_acceptance(t, &ids, &reason))?;
+                    return Err(error);
+                }
+            }
+        }
+        Ok(ids)
     }
 }
 
@@ -512,8 +735,9 @@ fn handle(
 
                 recipients.clear();
 
+                let message_limit = super::scan::scan_limits(&svc.settings()?)?.input_bytes;
                 w.send(&format!(
-                    "250-{}\r\n250-SIZE {MAX_MESSAGE}\r\n{}250 8BITMIME\r\n",
+                    "250-{}\r\n250-SIZE {message_limit}\r\n{}250 8BITMIME\r\n",
                     svc.config.hostname,
                     if w.secure { "" } else { "250-STARTTLS\r\n" }
                 ))?;
@@ -556,6 +780,7 @@ fn handle(
 
                 recipients.clear();
 
+                let message_limit = super::scan::scan_limits(&svc.settings()?)?.input_bytes;
                 let parsed = (|| -> Result<String> {
                     let (a, tail) = envelope(arg, "FROM")?;
 
@@ -563,7 +788,7 @@ fn handle(
                         let u = option.to_ascii_uppercase();
 
                         if let Some(size) = u.strip_prefix("SIZE=") {
-                            ensure!(size.parse::<usize>()? <= MAX_MESSAGE, "Message too large");
+                            ensure!(size.parse::<usize>()? <= message_limit, "Message too large");
                         } else {
                             ensure!(u == "BODY=8BITMIME", "Unsupported MAIL parameter");
                         }
@@ -617,6 +842,7 @@ fn handle(
             }
 
             "DATA" if sender.is_some() && !recipients.is_empty() && arg.is_empty() => {
+                let message_limit = super::scan::scan_limits(&svc.settings()?)?.input_bytes;
                 w.send("354 End with dot\r\n")?;
 
                 let mut raw = Vec::new();
@@ -638,7 +864,7 @@ fn handle(
                         &line[..]
                     };
 
-                    if raw.len() + line.len() > MAX_MESSAGE {
+                    if raw.len() + line.len() > message_limit {
                         over = true;
                     }
 
@@ -652,6 +878,8 @@ fn handle(
                 } else {
                     let result =
                         svc.accept(&raw, sender.as_deref().unwrap(), &recipients, ip, &helo);
+
+                    svc.record_smtp_result(result.is_ok());
 
                     w.send(if result.is_ok() {
                         "250 Stored securely\r\n"

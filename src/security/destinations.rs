@@ -147,7 +147,7 @@ impl Service {
             );
         }
         let mut task = json!({"id":rid,"kind":action,"actor":a.id,"domains":ds,
-            "revision":settings["revision"],"state":"queued","started":now()});
+            "revision":settings["revision"],"state":"queued","started":now()?});
         if action == "delivery-discover" {
             let domain = s(d, "domain")?;
             ensure!(
@@ -208,7 +208,7 @@ impl Service {
             "Run a successful connection test before saving this destination"
         );
         ensure!(
-            now().saturating_sub(task["completed"].as_i64().unwrap_or(0)) < 900,
+            now()?.saturating_sub(task["completed"].as_i64().unwrap_or(0)) < 900,
             "Connection test expired; test again"
         );
         let mut settings = must(t, "settings")?;
@@ -300,7 +300,7 @@ impl Service {
                     task["error"] = json!(e.to_string());
                 }
             }
-            task["completed"] = json!(now());
+            task["completed"] = json!(now()?);
             put(t, CURRENT, &task)?;
             audit(
                 t,

@@ -18,6 +18,14 @@ unrelated upstream files alone; Workglen vendors only the library subset.
 | PRA-WG-02 | `0002-workglen-async-sockets.patch` | This Tokio-removal stage: cooperative `asyncio::yield_now`, bounded nonblocking UDP/TCP sockets, cancellable TCP connect/read/write, literal-address operation and standalone socket tests. Five files: `src/asyncio/exec.rs`, `mod.rs`, `socket.rs`, `socket/connect.rs`, and `tests/async_socket.rs`. |
 | PRA-WG-03 | `0003-workglen-typed-data-json.patch` | Explicit typed record contracts, bounded JSON values/parser/writer, reuse of the existing strict parser grammar and new reusable tests. Six files: `src/data/mod.rs`, `src/data/macros.rs`, `src/json_value.rs`, `src/json.rs`, `src/lib.rs`, `tests/data_json.rs`. |
 
+The current Workglen vendor tree also contains a documented
+`PRA-WG-05-draft` change in `src/sys.rs`: a narrow Linux/macOS native
+filesystem-available-byte probe used by Mail Security admission. It is recorded
+under `local_unstaged_changes` so `verify.py --vendor` remains exact, but it is
+not in `series`, has not received the reusable upstream test work described in
+`PRATIQUE-UPSTREAM.md`, and must not be represented as part of the verified
+patch handoff.
+
 Existing `block_on`, timer/timeout futures and async I/O traits are reused, not
 new additions. Workglen keeps DNS wire parsing, validation, retry/cache policy and
 mail authentication. Those application changes are in the cumulative Workglen ZIP,

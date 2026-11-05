@@ -63,13 +63,14 @@ fn http(
         .map_err(|_| crate::error!("Mailbox provider connection unavailable"))?;
     if r.status == 429 || r.status == 503 {
         let value = r.header("retry-after").unwrap_or("60");
+        let current_time = now()?;
         let seconds = value
             .parse::<i64>()
             .ok()
             .or_else(|| {
                 crate::datetime::DateTime::parse_from_rfc2822(value)
                     .ok()
-                    .map(|t| t.timestamp() - now())
+                    .map(|t| t.timestamp() - current_time)
             })
             .unwrap_or(60);
         return Err(RetryAfter(seconds.clamp(30, 86400)).into());
@@ -539,7 +540,7 @@ pub fn command(
         let mut c = Client::new(svc, name)?;
         let limit = d["limit"].as_u64().unwrap_or(100).clamp(1, 200) as usize;
         let (items, more) = c.list(&recipient, &start.to_string(), &end.to_string(), limit)?;
-        let mut plan = json!({"id":id(),"recipient":recipient,"connector":name,"version":v["id"],"start":start.to_string(),"end":end.to_string(),"created":now(),"expires":now()+3600,"complete":!more,"state":"preview","items":[],"location":"Inbox only; end date exclusive; IMAP uses server calendar days"});
+        let mut plan = json!({"id":id(),"recipient":recipient,"connector":name,"version":v["id"],"start":start.to_string(),"end":end.to_string(),"created":now()?,"expires":now()?+3600,"complete":!more,"state":"preview","items":[],"location":"Inbox only; end date exclusive; IMAP uses server calendar days"});
         let deadline = Instant::now() + Duration::from_secs(90);
         let mut results = Vec::new();
         for mut item in items {
@@ -583,7 +584,7 @@ pub fn command(
     let mut p = must(t, &k)?;
     a.require("remediation.execute", Some(s(&p, "recipient")?))?;
     ensure!(
-        p["state"] == "preview" && p["expires"].as_i64().unwrap_or(0) > now(),
+        p["state"] == "preview" && p["expires"].as_i64().unwrap_or(0) > now()?,
         "Preview started or expired"
     );
     ensure!(
@@ -650,7 +651,7 @@ pub fn execute(svc: &Service, data: &Value) -> Result<()> {
         "Message changed; create another preview"
     );
     let id = format!("remediation-{}-{}", s(&p, "id")?, n(data, "index")?);
-    svc.db.write(|t|{let settings=must(t,"settings")?;ensure!(settings["connectors"][name]==true,"Connector disabled");let verdict=svc.evaluate(t,&raw,&v["rules"],&settings,&json!({}))?;ensure!(verdict["action"]=="quarantine","Message no longer matches");if get(t,&format!("message/{id}"))?.is_none(){svc.capacity(t,&settings,raw.len(),1,0)?;blob(t,&raw)?;let m=json!({"id":id,"recipient":recipient,"arrived":now(),"state":"quarantined","revision":1,"hash":item["hash"],"subject":verdict["subject"],"sender":verdict["sender"],"envelope_from":"","releasable":false,"verdict":verdict,"engines":{},"rule_version":p["version"],"expires":now()+n(&settings,"retention_days")? as i64*86400,"hold":true,"route":settings["routes"][recipient.rsplit('@').next().unwrap_or("")],"source":{"item":item,"connector":name}});save_message(t,&m)?;audit(t,"worker","remediation-content-preserved",recipient,json!({"id":id,"hash":item["hash"],"plan":p["id"]}))?;}Ok(())})?;
+    svc.db.write(|t|{let settings=must(t,"settings")?;ensure!(settings["connectors"][name]==true,"Connector disabled");let verdict=svc.evaluate(t,&raw,&v["rules"],&settings,&json!({}))?;ensure!(verdict["action"]=="quarantine","Message no longer matches");if get(t,&format!("message/{id}"))?.is_none(){svc.capacity(t,&settings,raw.len(),1,0)?;blob(t,&raw)?;let m=json!({"id":id,"recipient":recipient,"arrived":now()?,"state":"quarantined","revision":1,"hash":item["hash"],"subject":verdict["subject"],"sender":verdict["sender"],"envelope_from":"","releasable":false,"verdict":verdict,"engines":{},"rule_version":p["version"],"expires":now()?+n(&settings,"retention_days")? as i64*86400,"hold":true,"route":settings["routes"][recipient.rsplit('@').next().unwrap_or("")],"source":{"item":item,"connector":name}});save_message(t,&m)?;audit(t,"worker","remediation-content-preserved",recipient,json!({"id":id,"hash":item["hash"],"plan":p["id"]}))?;}Ok(())})?;
     let result = c.remove(recipient, &item)?;
     svc.db.write(|t| {
         let k = format!("plan/{}", s(&p, "id")?);

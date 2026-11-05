@@ -7,6 +7,16 @@
     "retrieval": "Pinned source for attribution and patch generation, not executed"
   },
   "gitlab_status": "Prepared for application; no GitLab repository was changed or pushed. Check file preimages for forks.",
+  "local_unstaged_changes": [
+    {
+      "id": "PRA-WG-05-draft",
+      "path": "src/sys.rs",
+      "before_sha256": "8730001289eba46edaa5474d4657963df1ab52e926422481a5e3c689abe5492e",
+      "after_sha256": "ba86ef3dea2b6078befbe91bfd8cf45b64c6a3b7cc115d3534ef6a26b358f372",
+      "status": "Local Workglen delta; not included in the verified patch series",
+      "purpose": "Native Linux/macOS filesystem available-byte probe for fail-closed Mail Security admission"
+    }
+  ],
   "stages": [
     {
       "stage": "earlier-crypto",
@@ -305,7 +315,7 @@
     "src/sign.rs": "1a6de932d68602a37c85e307b8ec1a33ee99d66668ac3a26bf58a7cfb861a31b",
     "src/sigstore.rs": "4e358f60a4a6c9699945502f150e46b249dc39c61868ac2f11e0d433dc64d6ff",
     "src/sumdb.rs": "59f19a269a40adc752b11ecfea63a16d0dde327760ce5772229e9eea26820356",
-    "src/sys.rs": "8730001289eba46edaa5474d4657963df1ab52e926422481a5e3c689abe5492e",
+    "src/sys.rs": "ba86ef3dea2b6078befbe91bfd8cf45b64c6a3b7cc115d3534ef6a26b358f372",
     "src/tlog.rs": "b5caf4c73d3281195f3822f8fb14a5a0867ec1944532aa6089074e59e4050484",
     "src/tls/certs.rs": "956fb99959db14ee4f86b4e9a22946dc3ed5d15768f5b94ed8ae9c319f5b8ec3",
     "src/tls/conn.rs": "706d94a8094f08304d0ea4da42f98b426583a764a2a7dd9d7d3e4f37c35f6789",

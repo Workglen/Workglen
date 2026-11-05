@@ -32,7 +32,7 @@ const server=http.createServer(async(req,res)=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const b=await chromium.launch({headless:true,executablePath:process.env.WORKGLEN_CHROMIUM,args:['--no-sandbox','--single-process','--no-zygote']});
  try{
   const p=await b.newPage({viewport:{width:1280,height:900}}),errors=[];p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());
-  await p.goto('http://127.0.0.1:'+server.address().port+'/mail-security');await p.getByRole('heading',{name:'Protection at a glance'}).waitFor();await p.getByRole('button',{name:'Setup',exact:true}).click();
+  await p.goto('http://127.0.0.1:'+server.address().port+'/mail-security');await p.getByRole('heading',{name:'Operations',exact:true}).waitFor();await p.getByRole('button',{name:'Setup',exact:true}).click();
   await p.getByLabel('Accepted domains',{exact:true}).fill('example.test');assert(await p.getByLabel('Default delivery destination',{exact:true}).isDisabled());
   await p.getByRole('button',{name:'Save and continue',exact:true}).click();await p.locator('#notice').filter({hasText:'Add, test and save a delivery destination'}).waitFor();assert.equal(await p.getByRole('heading',{name:'Recipients',exact:true}).count(),0);pass('empty install explains missing destination and prevents premature advance');
   await p.getByRole('button',{name:'Find Microsoft 365 hostname',exact:true}).click();await p.getByText('Microsoft 365 hostname found.',{exact:false}).waitFor();assert.equal(await p.getByLabel('Delivery hostname',{exact:true}).inputValue(),'example-com.mail.protection.outlook.com');pass('Microsoft MX discovery fills a reviewable hostname');

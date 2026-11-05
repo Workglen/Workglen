@@ -6,7 +6,7 @@ p = argparse.ArgumentParser(description=__doc__); p.add_argument('--cargo', defa
 meta = json.loads(subprocess.check_output([a.cargo, 'metadata', '--offline', '--locked', '--all-features', '--format-version', '1'], cwd=ROOT))
 packages = {v['id']: v for v in meta['packages']}
 nodes = {v['id']: v for v in meta['resolve']['nodes']}
-approved = {'pratique': 'vendor/pratique', 'lazaret-pg': 'vendor/lazaret-pg', 'workglen-mime': 'crates/native-mime', 'workglen-dns': 'crates/native-dns', 'workglen-idna': 'crates/native-idna', 'workglen-toml': 'crates/native-toml'}
+approved = {'pratique': 'vendor/pratique', 'lazaret-archive': 'vendor/lazaret-archive', 'workglen-lazaret-verify': 'crates/lazaret-verify', 'lazaret-pg': 'vendor/lazaret-pg', 'workglen-mime': 'crates/native-mime', 'workglen-dns': 'crates/native-dns', 'workglen-idna': 'crates/native-idna', 'workglen-toml': 'crates/native-toml'}
 roots = [v['id'] for v in packages.values() if v['name'] in approved]
 assert len(roots) == len(approved), 'Missing or duplicate first-party library'
 assert {v['name'] for v in packages.values() if v['source'] is None and v['id'] != meta['resolve']['root']} == set(approved), 'Unreviewed first-party library'
@@ -31,4 +31,4 @@ for start in roots:
         for dependency in nodes[item]['deps']:
             pending.append((dependency['pkg'], path + [packages[dependency['pkg']]['name']]))
     print('PASS', packages[start]['name'], 'has only first-party dependencies, including build/dev/platform edges')
-print('Application-level database/password dependencies are counted separately; this check covers six reusable libraries.')
+print('Application-level database/password dependencies are counted separately; this check covers eight reusable libraries.')

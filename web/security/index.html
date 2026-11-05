@@ -1,1 +1,42 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Workglen · Mail Security</title><link rel="stylesheet" href="/security.css"><script src="/delivery.js" defer></script><script src="/microsoft365.js" defer></script><script src="/security.js" defer></script><body><header><a id="brand-home" href="/" aria-label="Workglen Mail Security home">workglen<span>Mail Security</span></a><div class="header-actions"><a id="back-admin" class="admin-link" href="/" hidden>← Back to Admin</a><button id="logout" hidden>Sign out</button></div></header><main><div id="notice" role="status"></div><section id="login"><p class="eyebrow">SIMPLE BUT SECURE</p><h1>Protect your mail. Keep control.</h1><p>Sign in to administer protection or review your own quarantine summary.</p><form id="login-form"><label>Username or mailbox<input name="username" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button>Sign in</button></form></section><section id="workspace" hidden><nav id="navigation"></nav><div id="content"></div></section></main><dialog id="detail"><button id="close-detail">Close</button><h2 id="detail-title"></h2><pre id="detail-text"></pre></dialog><footer>Workglen 0.8 · Original content stays inert in review. Detection is evidence, not a guarantee.</footer></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Workglen · Mail Security</title>
+  <link rel="stylesheet" href="/security.css">
+  <script src="/delivery.js" defer></script>
+  <script src="/microsoft365.js" defer></script>
+  <script src="/security.js" defer></script>
+</head>
+<body>
+  <header class="security-header">
+    <a id="brand-home" class="security-brand" href="/" aria-label="Workglen Mail Security home"><span class="security-brand-mark">w</span><span class="security-brand-copy"><strong>workglen</strong><small>Mail Security</small></span></a>
+    <div class="header-actions"><a id="back-admin" class="admin-link" href="/" hidden>← Back to Admin</a><button id="security-theme" class="secondary" aria-haspopup="dialog">◈ Theme</button><button id="logout" class="secondary" hidden>Sign out</button></div>
+  </header>
+  <main>
+    <div id="notice" role="status"></div>
+    <section id="login" class="security-login">
+      <div class="login-copy"><p class="eyebrow">MAIL SECURITY</p><h1>Protect your mail.<br>Keep control.</h1><p>Native gateway protection, safe quarantine review, and auditable response in one focused workspace.</p><div class="login-assurance"><span>✓</span><span><strong>Content stays under your control</strong><small>Original messages remain inert during review.</small></span></div></div>
+      <form id="login-form" class="login-card"><p class="eyebrow">SECURE ACCESS</p><h2>Welcome back.</h2><p class="muted">Sign in to administer protection or review your own quarantine summary.</p><label>Username or mailbox<input name="username" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button>Sign in <span aria-hidden="true">→</span></button></form>
+    </section>
+    <section id="workspace" class="security-workspace" hidden>
+      <aside class="security-sidebar"><div class="workspace-label">MAIL SECURITY</div><nav id="navigation" aria-label="Mail Security navigation"></nav><div class="security-sidebar-foot"><span class="live-dot"></span><span><strong>Native protection</strong><small>Evidence, quarantine, response</small></span></div></aside>
+      <section class="security-main">
+        <div class="security-page-heading"><div><p id="security-eyebrow" class="eyebrow">PROTECTION HEALTH</p><h1 id="security-page-title">Overview</h1><p id="security-page-description">What needs attention across your mail gateway.</p></div><button id="security-refresh" class="secondary">↻ Refresh</button></div>
+        <div id="content"></div>
+      </section>
+    </section>
+  </main>
+  <dialog id="detail"><div class="dialog-heading"><div><p class="eyebrow">SAFE REVIEW</p><h2 id="detail-title"></h2></div><button id="close-detail" class="secondary">Close</button></div><pre id="detail-text"></pre></dialog>
+  <dialog id="journey" class="journey-drawer"><div class="dialog-heading"><div><p class="eyebrow">MESSAGE JOURNEY</p><h2 id="journey-title"></h2></div><button id="close-journey" class="secondary">Close</button></div><div id="journey-body"></div></dialog>
+  <dialog id="cluster-operation" aria-labelledby="cluster-operation-title"><div class="dialog-heading"><div><p class="eyebrow">CLUSTER OPERATION</p><h2 id="cluster-operation-title"></h2><p id="cluster-operation-copy" class="muted"></p></div></div><form id="cluster-operation-form"><div id="cluster-operation-body"></div><p id="cluster-operation-error" class="danger-callout" role="alert" hidden></p><div class="actions"><button type="button" id="cancel-cluster-operation" class="secondary">Cancel</button><button type="submit" id="submit-cluster-operation"></button></div></form></dialog>
+  <dialog id="theme-dialog" aria-labelledby="theme-dialog-title"><div class="dialog-heading"><div><p class="eyebrow">APPEARANCE</p><h2 id="theme-dialog-title">Choose a theme</h2><p class="muted">Saved in this browser and applied immediately.</p></div><button id="close-theme" class="secondary">Close</button></div><div class="security-theme-grid" role="group" aria-label="Choose a Mail Security theme">
+    <button type="button" class="security-theme-choice" data-theme-choice="forest" aria-pressed="false"><span class="security-theme-swatch swatch-forest" aria-hidden="true"><span></span><span></span><span></span></span><span><strong>Forest</strong><small>Natural Workglen green</small></span><span class="security-theme-check" aria-hidden="true">✓</span></button>
+    <button type="button" class="security-theme-choice" data-theme-choice="ocean" aria-pressed="false"><span class="security-theme-swatch swatch-ocean" aria-hidden="true"><span></span><span></span><span></span></span><span><strong>Ocean</strong><small>Cool blue and slate</small></span><span class="security-theme-check" aria-hidden="true">✓</span></button>
+    <button type="button" class="security-theme-choice" data-theme-choice="clay" aria-pressed="false"><span class="security-theme-swatch swatch-clay" aria-hidden="true"><span></span><span></span><span></span></span><span><strong>Clay</strong><small>Warm earth and paper</small></span><span class="security-theme-check" aria-hidden="true">✓</span></button>
+  </div></dialog>
+  <footer>Workglen 0.8 · Original content stays inert in review. Detection is evidence, not a guarantee.</footer>
+</body>
+</html>

@@ -1,0 +1,17 @@
+[package]
+name = "workglen-lazaret-verify"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+description = "Workglen compatibility facade for Lazaret archive decompression"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+pratique = { path = "../../vendor/pratique", default-features = false }
+
+[lints.rust]
+unsafe_code = "forbid"

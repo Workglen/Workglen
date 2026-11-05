@@ -17,6 +17,11 @@ the standard switches for conformance tests; application defaults check joiners
 and bidi. Strict DNS conversion allows a final root dot by default; the pure
 UTS #46 conformance tests disable that allowance explicitly.
 
+`has_mixed_script_labels` is a separate opt-in risk heuristic over validated,
+decoded labels and recognized script ranges. It is not UTS #39 confusable
+analysis: legitimate multilingual names can match and same-script lookalikes do
+not. Callers must not use it as an authorization or DNS identity decision.
+
 Bounds: 64 KiB input domains, 256 KiB mapping/normalization buffers (counted as
 bytes or scalars at the appropriate stage), and the former implementation's
 1000-scalar encoding / 2000-byte decoding Punycode label bounds. The added domain

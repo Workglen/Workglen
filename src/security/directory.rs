@@ -274,12 +274,12 @@ impl Service {
                 "Recipient discovery is already in progress"
             );
             ensure!(
-                now() - old["started"].as_i64().unwrap_or(0) >= 30,
+                now()? - old["started"].as_i64().unwrap_or(0) >= 30,
                 "Wait 30 seconds between discovery requests"
             );
         }
         let task = json!({"id":rid,"state":"queued","actor":a.id,"domains":ds,
-            "revision":settings["revision"],"started":now(),"source":"microsoft365"});
+            "revision":settings["revision"],"started":now()?,"source":"microsoft365"});
         put(t, CURRENT, &task)?;
         event(
             t,
@@ -314,7 +314,7 @@ impl Service {
             "Complete recipient discovery required"
         );
         ensure!(
-            now() - task["completed"].as_i64().unwrap_or(0) < TTL,
+            now()? - task["completed"].as_i64().unwrap_or(0) < TTL,
             "Discovery expired; discover again"
         );
         let settings = must(t, "settings")?;
@@ -388,7 +388,7 @@ impl Service {
                 }
                 Err(e) => { task["state"] = json!("failed"); task["error"] = json!(e.to_string()); }
             }
-            task["completed"] = json!(now());
+            task["completed"] = json!(now()?);
             put(t, CURRENT, &task)?;
             audit(t, s(&task,"actor")?, "recipient-discovery-result", "", json!({
                 "id":task["id"], "state":task["state"], "count":task["addresses"].as_array().map(Vec::len),
