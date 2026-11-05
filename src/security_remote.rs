@@ -81,6 +81,9 @@ pub fn permission(action: &str) -> Option<&'static str> {
         _ => return None,
     })
 }
+fn delegated_permission(action: &str) -> Option<&'static str> {
+    permission(action)?.strip_prefix("security.")
+}
 fn instance(access: &Access, id: &str) -> bool {
     access
         .security_instances
@@ -111,11 +114,10 @@ pub fn execute(app: &App, access: &Access, r: Request) -> Result<Value> {
         .iter()
         .find(|x| x.id == r.instance)
         .ok_or_else(|| crate::error!("Security instance is not registered"))?;
-    let permissions = access
-        .permissions()
-        .into_iter()
-        .filter_map(|p| p.strip_prefix("security."))
-        .collect::<Vec<_>>();
+    // Delegate only the capability needed by this command. Sending every
+    // permission held by the Central Admin actor needlessly exceeds narrower
+    // gateway ceilings and grants the remote request unrelated authority.
+    let permissions = [delegated_permission(action).ok_or(crate::rbac::Denied)?];
     let envelope = json!({"version":1,"workspace":app.config.replication.cluster_id,"audience":remote.id,"at":crate::datetime::Utc::now()?.timestamp(),"nonce":crate::store::random_id(),
         "actor":{"id":format!("central:{}",access.username),"permissions":permissions,"domains":access.security_domains,"mailboxes":access.security_mailboxes},"command":r.command});
     let bytes = pratique::json_value::to_vec(&envelope)?;
@@ -164,6 +166,12 @@ mod tests {
             Some("security.remediation.execute")
         );
         assert_ne!(permission("draft"), permission("activate"));
+        assert_eq!(delegated_permission("status"), Some("read"));
+        assert_eq!(
+            delegated_permission("cluster-takeover"),
+            Some("cluster.takeover")
+        );
+        assert_eq!(delegated_permission("new-future-command"), None);
     }
 }
 // BEGIN GENERATED RECORD CONTRACTS

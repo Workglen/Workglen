@@ -485,7 +485,9 @@ RUN
     trap - ERR
 }
 gateway() {
-    [ "$OS" = Linux ] || die "Install the gateway on Linux; run the admin command on your Mac"
+    if [ "$OS" != Linux ] && [ -z "$DESTDIR" ]; then
+        die "Install the gateway on Linux; run the admin command on your Mac"
+    fi
     absolute "$BUNDLE"
     [ -d "$BUNDLE" ] && [ ! -L "$BUNDLE" ] || die "Gateway bundle must be a real directory"
     for file in config.json control.key admin.hash; do private_file "$BUNDLE/$file"; done

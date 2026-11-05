@@ -103,12 +103,25 @@ try:
     pw = put("local.password", local_password)
     recovery = put("gateway.password", recovery_password)
     dsn = put("postgres.dsn", "host=127.0.0.1 port=1 user=workglen dbname=workglen password=fixture-db-secret")
-    cert, key = work / "gateway.pem", work / "gateway.key"
+    cert, leaf, key = work / "gateway.pem", work / "gateway-leaf.pem", work / "gateway.key"
+    ca, ca_key, csr, extensions = (work / name for name in
+                                   ["gateway-ca.pem", "gateway-ca.key", "gateway.csr", "gateway.ext"])
     run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
-         "-subj", "/CN=gateway.example.test", "-addext",
-         "subjectAltName=DNS:gateway.example.test,DNS:localhost,IP:127.0.0.1",
-         "-keyout", key, "-out", cert])
-    key.chmod(0o600)
+         "-subj", "/CN=Workglen fixture CA", "-addext", "basicConstraints=critical,CA:TRUE",
+         "-addext", "keyUsage=critical,keyCertSign,cRLSign", "-addext", "subjectKeyIdentifier=hash",
+         "-addext", "authorityKeyIdentifier=keyid:always", "-keyout", ca_key, "-out", ca])
+    run(["openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes",
+         "-subj", "/CN=gateway.example.test", "-keyout", key, "-out", csr])
+    extensions.write_text("subjectAltName=DNS:gateway.example.test,DNS:localhost,IP:127.0.0.1\n"
+                          "basicConstraints=critical,CA:FALSE\n"
+                          "keyUsage=critical,digitalSignature,keyEncipherment\n"
+                          "extendedKeyUsage=serverAuth\n"
+                          "subjectKeyIdentifier=hash\n"
+                          "authorityKeyIdentifier=keyid,issuer\n")
+    run(["openssl", "x509", "-req", "-in", csr, "-CA", ca, "-CAkey", ca_key,
+         "-CAcreateserial", "-days", "2", "-extfile", extensions, "-out", leaf])
+    cert.write_bytes(leaf.read_bytes() + ca.read_bytes())
+    key.chmod(0o600); ca_key.chmod(0o600)
     # The independent peer certificate above may use OpenSSL. All installation
     # and application operations below must work with that command unavailable.
     trapdir = work / "blocked-commands"
@@ -190,6 +203,8 @@ try:
     assert not stage.exists()
     run(stage_cmd)
     assert (stage / "etc/workglen-security/config.json").read_bytes() == (bundle / "config.json").read_bytes()
+    assert (stage / "etc/systemd/system/workglen-security.service").is_file()
+    assert (stage / "etc/systemd/system/workglen-security-scanner.service").is_file()
     assert not (stage / "etc/workglen-security/storage.key").exists()
     assert not list(stage.rglob("*.redb"))
     run(stage_cmd, ok=False)
