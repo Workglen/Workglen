@@ -2252,6 +2252,18 @@ Ok(())}
 
                 ensure!(d["enabled"].is_boolean(), "Invalid enabled value");
 
+                ensure!(
+                    a.covers(&actor),
+                    "Identity grant exceeds your effective authority"
+                );
+                if !old.is_null() {
+                    let current: Actor = pratique::json_value::from_value(old.clone())?;
+                    ensure!(
+                        a.covers(&current),
+                        "Cannot edit an identity outside your effective authority"
+                    );
+                }
+
                 let new_hash = if let Some(p) = d["password"].as_str().filter(|s| !s.is_empty()) {
                     crate::auth::hash(p)?
                 } else {

@@ -4633,6 +4633,84 @@ fn identity_changes_invalidate_sessions_revision() {
 }
 
 #[test]
+fn identity_grants_cannot_exceed_or_take_over_the_callers_authority() {
+    let f = Fixture::new();
+    f.cmd(
+        "identity-set",
+        json!({
+            "username":"admin","enabled":true,"permissions":PERMISSIONS,
+            "domains":["*"],"mailboxes":["*"],
+            "password":"synthetic-owner-password-123","expected_revision":null
+        }),
+    );
+    f.cmd(
+        "identity-set",
+        json!({
+            "username":"limited","enabled":true,"permissions":["configure"],
+            "domains":["example.test"],"mailboxes":["*"],
+            "password":"synthetic-limited-password-123","expected_revision":null
+        }),
+    );
+    let limited = f.svc.local_actor("limited").unwrap();
+    let attempt = |data| f.svc.command(&limited, f.command("identity-set", data));
+
+    assert!(
+        attempt(json!({
+            "username":"limited","enabled":true,
+            "permissions":["configure","content"],
+            "domains":["example.test"],"mailboxes":["*"],
+            "password":"","expected_revision":1
+        }))
+        .is_err()
+    );
+    assert!(
+        attempt(json!({
+            "username":"operator","enabled":true,"permissions":["release"],
+            "domains":["example.test"],"mailboxes":["*"],
+            "password":"synthetic-operator-password-123","expected_revision":null
+        }))
+        .is_err()
+    );
+    assert!(
+        attempt(json!({
+            "username":"admin","enabled":true,"permissions":PERMISSIONS,
+            "domains":["*"],"mailboxes":["*"],
+            "password":"taken-over-password-123","expected_revision":1
+        }))
+        .is_err()
+    );
+    assert!(
+        attempt(json!({
+            "username":"cluster-operator","enabled":true,
+            "permissions":["cluster.takeover"],
+            "domains":["example.test"],"mailboxes":["*"],
+            "password":"synthetic-cluster-password-123","expected_revision":null
+        }))
+        .is_err()
+    );
+    assert!(
+        attempt(json!({
+            "username":"limited","enabled":false,"permissions":["configure"],
+            "domains":["example.test"],"mailboxes":["*"],
+            "password":"","expected_revision":1
+        }))
+        .is_err()
+    );
+
+    let owner_created = f.cmd(
+        "identity-set",
+        json!({
+            "username":"operator","enabled":true,
+            "permissions":["release","cluster.takeover"],
+            "domains":["*"],"mailboxes":["*"],
+            "password":"synthetic-operator-password-123","expected_revision":null
+        }),
+    );
+    assert_eq!(owner_created["revision"], 1);
+    assert_eq!(f.svc.local_actor("admin").unwrap().revision, 1);
+}
+
+#[test]
 fn learning_requires_permission_and_deduplicates_content() {
     let f = Fixture::new();
 

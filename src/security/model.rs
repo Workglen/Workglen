@@ -380,6 +380,40 @@ impl Actor {
         }
         Ok(())
     }
+    /// Whether every authority represented by `other` is already inside this
+    /// actor's effective permission and mailbox/domain grant.
+    pub fn covers(&self, other: &Actor) -> bool {
+        let scope_covers = |ours: &[String], theirs: &[String]| {
+            ours.iter().any(|scope| scope == "*")
+                || (!theirs.iter().any(|scope| scope == "*")
+                    && theirs.iter().all(|scope| ours.contains(scope)))
+        };
+        match (&self.mailbox, &other.mailbox) {
+            (Some(ours), Some(theirs)) => ours == theirs,
+            (Some(_), None) => false,
+            (None, Some(mailbox)) => {
+                let domain = mailbox
+                    .rsplit_once('@')
+                    .map(|(_, domain)| domain)
+                    .unwrap_or("");
+                ["read", "content", "release", "discard"]
+                    .iter()
+                    .all(|permission| self.permissions.iter().any(|ours| ours == permission))
+                    && (self.domains.iter().any(|scope| scope == "*")
+                        || self.domains.iter().any(|scope| scope == domain))
+                    && (self.mailboxes.iter().any(|scope| scope == "*")
+                        || self.mailboxes.iter().any(|scope| scope == mailbox))
+            }
+            (None, None) => {
+                other
+                    .permissions
+                    .iter()
+                    .all(|permission| self.permissions.contains(permission))
+                    && scope_covers(&self.domains, &other.domains)
+                    && scope_covers(&self.mailboxes, &other.mailboxes)
+            }
+        }
+    }
     pub fn visible(&self, r: &str) -> bool {
         self.require("read", Some(r)).is_ok()
     }
