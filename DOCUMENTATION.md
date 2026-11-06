@@ -52,7 +52,7 @@ All the documents listed below, the implementation, examples, SQL schema, tests 
 
 Supporting files: `config/` contains node/witness/TLS examples; `security/*.json` contains gateway/connector examples; `deploy/` contains service/proxy examples; `schema/accounting.sql` is the complete current Accounting schema; `examples/accounting/` contains external Xero cutover data; `tools/`, `tests/` and `security/tests/` hold development fixtures. `SOURCE-SHA256` and `SOURCE-SHA256.json` inventory the packaged source files. Checksums detect changed bytes relative to the manifest, not publisher authenticity.
 
-No deployment passwords, management keys, storage keys, private certificates, database files, local installation bundles or browser screenshots belong in this archive. The public Mozilla CA bundle and its notices under the vendored source are intentional source dependencies.
+No deployment passwords, management keys, storage keys, private certificates, database files, local installation bundles or browser screenshots belong in this archive. The source packager and verifier enforce excluded and secret-like path rules before writing a package; `.env.example`, the public Mozilla CA bundle and named synthetic certificate fixtures are explicit exceptions.
 
 - [MAIL-AUTH-PRATIQUE.md](MAIL-AUTH-PRATIQUE.md): native mail-auth cryptography,
   package counts, compatibility checks and attributed upstream patch.

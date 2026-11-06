@@ -149,7 +149,17 @@ python3 tools/package-source.py --check ../workglen-source.zip
 
 The packager rebuilds both source hash manifests and verifies every ZIP entry,
 CRC and SHA-256, including exact manifest membership. Output must be outside the
-source tree. It excludes build targets and Python caches.
+source tree. In a Git checkout it packages tracked files and refuses untracked,
+non-ignored files unless `--include-untracked` is explicitly supplied. From an
+unpacked tree it applies the root ignore rules plus the built-in exclusions.
+Both modes exclude `.gitignore`, `.DS_Store`, build targets, local output and
+Python caches. Before changing either manifest, the packager refuses secret-like
+names including `.env`, private-key and certificate extensions, tokens,
+passwords, DSNs and redb databases. `.env.example`, the public Mozilla roots and
+the named synthetic certificate fixtures are explicit exceptions. `--check`
+enforces the built-in exclusions and secret-name policy without relying on an
+excluded `.gitignore` file. Run `python3 tools/package-source-test.py` for the
+stdlib-only packaging regression suite.
 
 ## Native TOML checkpoint
 
