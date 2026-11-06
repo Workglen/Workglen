@@ -254,3 +254,15 @@ fn exclusive_lock_and_bounds_fail_closed() {
     let b = open(&path, &key);
     assert_eq!(b.len().unwrap(), 0);
 }
+
+#[test]
+fn backend_failure_is_visible_to_an_independent_health_handle() {
+    let (_dir, path, key) = fixture();
+    let (backend, health) =
+        EncryptedBackend::open_with_health(&path, Key::load(&key).unwrap()).unwrap();
+
+    assert!(health.healthy());
+    assert!(backend.set_len(MAX_LEN + 1).is_err());
+    assert!(!health.healthy());
+    assert!(backend.len().is_err());
+}

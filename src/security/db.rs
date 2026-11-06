@@ -9,17 +9,23 @@ const RECEIPT_COUNT_KEY: &str = "system/receipt_count";
 pub type Table<'a> = redb::Table<'a, &'static str, &'static [u8]>;
 pub struct Db {
     db: Database,
+    health: crate::encrypted_store::StoreHealth,
 }
 impl Db {
     pub fn open(path: &Path, key: crate::encrypted_store::Key) -> Result<Self> {
         let mut builder = Database::builder();
         builder.set_cache_size(16 * 1024 * 1024);
+        let (backend, health) =
+            crate::encrypted_store::EncryptedBackend::open_with_health(path, key)?;
         let db = Self {
-            db: builder
-                .create_with_backend(crate::encrypted_store::EncryptedBackend::open(path, key)?)?,
+            db: builder.create_with_backend(backend)?,
+            health,
         };
         db.write(|_| Ok(()))?;
         Ok(db)
+    }
+    pub fn healthy(&self) -> bool {
+        self.health.healthy()
     }
     pub fn write<T>(&self, f: impl FnOnce(&mut Table) -> Result<T>) -> Result<T> {
         let tx = self.db.begin_write()?;

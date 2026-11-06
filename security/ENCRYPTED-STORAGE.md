@@ -89,6 +89,14 @@ sector updates damaging both redb commit slots. On reopening, authenticated chan
 through the last complete commit are restored; an incomplete or uncommitted crash
 tail is discarded. Complete frames with invalid authentication fail closed.
 
+Any backend read, write, resize, authentication or synchronization failure poisons
+the live backend and an independent health handle immediately. The gateway checks
+that handle on failed SMTP acceptance and with a one-second watchdog, logs one fatal
+message and exits with status 75 so systemd can restart it from committed state.
+Packaged gateway and scanner units allow only three failed starts in five minutes;
+a persistent storage fault therefore becomes a visible failed unit instead of a
+running-but-broken process or an unbounded restart loop.
+
 Journal compaction starts beyond the greater of 16 MiB or about three times the
 current indexed block footprint. It writes and syncs a complete encrypted
 replacement, atomically renames it, and syncs the parent directory while retaining

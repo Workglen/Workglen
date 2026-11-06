@@ -14,7 +14,10 @@ use std::{
     io::{self, Read, Write},
     os::unix::fs::{FileExt, MetadataExt, OpenOptionsExt},
     path::{Path, PathBuf},
-    sync::{Mutex, MutexGuard},
+    sync::{
+        Arc, Mutex, MutexGuard,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 use subtle::ConstantTimeEq;
 
@@ -171,7 +174,6 @@ struct State {
     previous: [u8; TAG],
     pending: usize,
     dirty: bool,
-    failed: bool,
 }
 impl State {
     fn fresh(path: &Path, master: &Key) -> io::Result<Self> {
@@ -202,7 +204,6 @@ impl State {
             previous: tag[..TAG].try_into().unwrap(),
             pending: 0,
             dirty: true,
-            failed: false,
         };
         s.sync()?;
         Ok(s)
@@ -258,7 +259,6 @@ impl State {
             previous: tag[..TAG].try_into().unwrap(),
             pending: 0,
             dirty: false,
-            failed: false,
         };
         let mut offset = HEADER as u64;
         let mut sequence = 0;
@@ -490,7 +490,18 @@ impl State {
 pub struct EncryptedBackend {
     state: Mutex<State>,
     master: Key,
+    health: StoreHealth,
     _lock: File,
+}
+#[derive(Clone, Debug)]
+pub struct StoreHealth(Arc<AtomicBool>);
+impl StoreHealth {
+    pub fn healthy(&self) -> bool {
+        !self.0.load(Ordering::Acquire)
+    }
+    fn fail(&self) {
+        self.0.store(true, Ordering::Release);
+    }
 }
 impl fmt::Debug for EncryptedBackend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -499,6 +510,9 @@ impl fmt::Debug for EncryptedBackend {
 }
 impl EncryptedBackend {
     pub fn open(path: &Path, key: Key) -> io::Result<Self> {
+        Self::open_with_health(path, key).map(|(backend, _)| backend)
+    }
+    pub fn open_with_health(path: &Path, key: Key) -> io::Result<(Self, StoreHealth)> {
         let lock_path = path.with_extension("redb.lock");
         let lock = OpenOptions::new()
             .read(true)
@@ -513,29 +527,33 @@ impl EncryptedBackend {
         if state.needs_compaction() {
             state.compact(&key)?;
         }
-        Ok(Self {
-            state: Mutex::new(state),
-            master: key,
-            _lock: lock,
-        })
+        let health = StoreHealth(Arc::new(AtomicBool::new(false)));
+        Ok((
+            Self {
+                state: Mutex::new(state),
+                master: key,
+                health: health.clone(),
+                _lock: lock,
+            },
+            health,
+        ))
     }
     fn state(&self) -> io::Result<MutexGuard<'_, State>> {
-        let s = self
-            .state
-            .lock()
-            .map_err(|_| invalid("Encrypted storage lock poisoned"))?;
-        if s.failed {
+        if !self.health.healthy() {
             return Err(invalid(
                 "Encrypted storage failed; stop and investigate before reopening",
             ));
         }
-        Ok(s)
+        self.state.lock().map_err(|_| {
+            self.health.fail();
+            invalid("Encrypted storage lock poisoned")
+        })
     }
     fn mutate(&self, operation: impl FnOnce(&mut State) -> io::Result<()>) -> io::Result<()> {
         let mut state = self.state()?;
         let result = operation(&mut state);
         if result.is_err() {
-            state.failed = true;
+            self.health.fail();
         }
         result
     }

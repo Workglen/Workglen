@@ -2,6 +2,8 @@
 Description=Workglen native Mail Security
 After=network-online.target
 Wants=network-online.target workglen-security-scanner.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 User=workglen-security

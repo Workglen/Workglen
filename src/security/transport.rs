@@ -881,6 +881,9 @@ fn handle(
                         svc.accept(&raw, sender.as_deref().unwrap(), &recipients, ip, &helo);
 
                     svc.record_smtp_result(result.is_ok());
+                    if result.is_err() {
+                        super::exit_if_storage_failed(svc);
+                    }
 
                     w.send(if result.is_ok() {
                         "250 Stored securely\r\n"

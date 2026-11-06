@@ -19,6 +19,26 @@ pub mod worker;
 
 pub mod xml;
 
+pub(super) fn exit_if_storage_failed(service: &service::Service) {
+    if !service.db.healthy() {
+        eprintln!("fatal: encrypted Mail Security storage failed; exiting for supervised restart");
+        std::process::exit(75);
+    }
+}
+
+fn storage_watchdog(
+    service: std::sync::Arc<service::Service>,
+) -> crate::error::Result<std::thread::JoinHandle<()>> {
+    Ok(std::thread::Builder::new()
+        .name("security-storage-watchdog".into())
+        .spawn(move || {
+            loop {
+                exit_if_storage_failed(&service);
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+        })?)
+}
+
 /// Native security process profile within the Workglen executable.
 pub fn cli(args: &[String]) -> crate::error::Result<()> {
     use crate::error::ensure;
@@ -95,6 +115,7 @@ pub fn cli(args: &[String]) -> crate::error::Result<()> {
                 svc.db.get("bootstrapped")?.is_some(),
                 "Initialize security administrator first"
             );
+            let _storage_watchdog = storage_watchdog(svc.clone())?;
             svc.start_tls()?;
             let _scan = scan_worker::start(svc.clone())?;
             let _http = http::start(svc.clone())?;

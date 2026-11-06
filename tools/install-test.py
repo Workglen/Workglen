@@ -230,10 +230,14 @@ try:
     assert (stage / "etc/workglen-security/config.json").read_bytes() == (bundle / "config.json").read_bytes()
     assert (stage / "etc/systemd/system/workglen-security.service").is_file()
     assert (stage / "etc/systemd/system/workglen-security-scanner.service").is_file()
+    for unit in ["workglen-security.service", "workglen-security-scanner.service"]:
+        text = (stage / "etc/systemd/system" / unit).read_text()
+        assert "Restart=on-failure" in text
+        assert "StartLimitIntervalSec=300" in text and "StartLimitBurst=3" in text
     assert not (stage / "etc/workglen-security/storage.key").exists()
     assert not list(stage.rglob("*.redb"))
     run(stage_cmd, ok=False)
-    passed("Linux staging preserves private files and creates no service, database or storage key")
+    passed("Linux staging preserves private files and rate-limits failed service restarts")
 
     # Relocate installation-owned paths and the synthetic DNS origin to loopback.
     ghome = work / "Running Gateway"
