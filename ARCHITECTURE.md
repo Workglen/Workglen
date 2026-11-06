@@ -34,7 +34,7 @@ Gateway rule/identity/configuration and content actions retain native append-onl
 
 ## TLS and delivery lifecycle
 
-The gateway uses native ACME HTTP-01 with Let's Encrypt, ARI renewal scheduling and live certificate replacement. Manual/private-CA certificates remain an option. Certificate state and keys stay private on their host. The Mac's private localhost endpoint uses a separately generated certificate that the operator explicitly trusts locally; it is not enrolled in public ACME. All remote management keeps hostname verification enabled.
+The gateway uses native ACME HTTP-01 with Let's Encrypt, ARI renewal scheduling and live certificate replacement. Manual/private-CA certificates remain an option. Certificate state and keys stay private on their host. The Mac's private localhost endpoint uses a separately generated one-year CA/leaf that the operator explicitly trusts locally; its critical name constraints allow only exact loopback names, and its ephemeral CA signing key is never written. It is not enrolled in public ACME. All remote management keeps hostname verification enabled.
 
 The gateway is initially paused. Operators provision domains/recipients and verified SMTP next hops, test Development/Test rules without effects, then activate a tested version and enable prospective enforcement. Retrospective mailbox remediation requires its own preview/confirmation and a supported connector. Queue delivery and uncertainty handling preserve evidence; SMTP is not described as exactly-once delivery.
 

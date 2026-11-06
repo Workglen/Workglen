@@ -71,7 +71,7 @@ Alternatively use `--initialize-accounting` during setup. The schema starts disa
 
 ## 3. Trust and launch the local console
 
-The Mac console binds only to loopback and uses its generated localhost certificate. The current gateway test procedure uses a manually provisioned private test CA; public ACME/Let's Encrypt issuance is a separately tested capability. A public CA cannot validate your private `localhost` name. In Keychain Access, import the **public** file `~/Library/Application Support/Workglen/etc/local-ca.pem` into your login keychain, open that certificate's Trust settings, and explicitly trust it for SSL. Check that it is your locally generated `Workglen Local Admin CA`. Do not import or share `local-key.pem` or `local-ca-key.pem`. Corporate-managed Macs may require an administrator's approved trust procedure.
+The Mac console binds only to loopback and uses its generated localhost certificate. The current gateway test procedure uses a manually provisioned private test CA; public ACME/Let's Encrypt issuance is a separately tested capability. A public CA cannot validate your private `localhost` name. In Keychain Access, import the **public** file `~/Library/Application Support/Workglen/etc/local-ca.pem` into your login keychain, open that certificate's Trust settings, and explicitly trust it for SSL. Check that it is your locally generated `Workglen Local Admin CA` and that its critical name constraints permit only exact `localhost`, `127.0.0.1` and `::1`. Do not import or share `local-key.pem`. There is no CA private-key file: its in-memory signing key is discarded immediately after issuance. Corporate-managed Macs may require an administrator's approved trust procedure. The installer never changes Keychain or system trust.
 
 Start:
 
@@ -79,7 +79,7 @@ Start:
 bash "$HOME/Library/Application Support/Workglen/run-admin.sh"
 ```
 
-Keep that terminal running and open `https://localhost:8443/mail-security`; sign in as `admin` using your local Admin password. Use the main console for Accounting and Access. Stop with Control+C. The local certificate expires after one year; renew it with the local CA through your certificate process and restart. The generated local CA expires after five years; replacing that CA also requires updating its trust. Local certificate trust/renewal is separate from automatic gateway ACME renewal. The SSH `.pem` used by `ssh metavero` is an SSH login key and is not a Workglen TLS or database key.
+Keep that terminal running and open `https://localhost:8443/mail-security`; sign in as `admin` using your local Admin password. Use the main console for Accounting and Access. Stop with Control+C. The local leaf and constrained CA expire together within one year; they cannot be renewed with the discarded CA key. Before expiry, run `setup-local-tls` into a fresh private directory, update `admin.toml` to its new leaf/key, import and trust the new public CA, restart Admin, confirm the new certificate in Safari and Chrome, then delete the old trusted CA. Never generate into or overwrite the active directory. Local certificate trust/renewal is separate from automatic gateway ACME renewal. The SSH `.pem` used by `ssh metavero` is an SSH login key and is not a Workglen TLS or database key.
 
 ## 4. Transfer and install on the Ubuntu test server
 

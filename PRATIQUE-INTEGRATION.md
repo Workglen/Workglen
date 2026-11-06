@@ -51,7 +51,7 @@ The generator uses OS randomness and Pratique's existing constant-time Montgomer
 
 Generation is an offline operator action. Candidate rejection and the number of attempts are variable-time; this is not an online key-generation service or a claim of independently audited/FIPS-certified cryptography. Independent key validation and DKIM signature interoperability are development checks, not a substitute for cryptographic review.
 
-Local certificates use fresh P-256 keys, a five-year private CA constrained to no intermediate CAs, and a one-year localhost leaf with DNS/IPv4/IPv6 loopback names and server-auth usage. Native generation validates the resulting chain and key match before writing it. Existing paths are refused; files are mode 0600. Keychain enrollment and local certificate renewal remain operator steps. Public gateway certificates continue through the existing ACME lifecycle.
+Local certificates use fresh P-256 keys, a one-year CA constrained to no intermediate CAs and, through a critical nameConstraints extension, only exact `localhost`, `127.0.0.1` and `::1`. The localhost leaf has those DNS/IPv4/IPv6 loopback names and server-auth usage. Native generation validates the resulting chain and key match before writing it. The CA signing key is never serialized and is dropped from zeroizing memory after signing the leaf; only the leaf private key is written. Existing paths are refused; files are mode 0600. Keychain enrollment, browser confirmation and whole-chain replacement before expiry remain operator steps. Public gateway certificates continue through the existing ACME lifecycle.
 
 ## Validation and remaining limits
 

@@ -44,7 +44,32 @@ fn extension(oid: &str, critical: bool, bytes: &[u8]) -> Vec<u8> {
     body.extend(der::octet_string(bytes));
     der::tlv(0x30, &body)
 }
-fn certificate(key: &SigningKey, issuer: &SigningKey, ca: bool, now: i64) -> Result<Vec<u8>> {
+fn local_name_constraints() -> Vec<u8> {
+    let mut ip4 = Vec::from([127, 0, 0, 1]);
+    ip4.extend([255; 4]);
+    let mut ip6 = Vec::from(std::net::Ipv6Addr::LOCALHOST.octets());
+    ip6.extend([255; 16]);
+    let permitted = [
+        der::sequence(&[&der::context(2, false, b"localhost")]),
+        der::sequence(&[&der::context(7, false, &ip4)]),
+        der::sequence(&[&der::context(7, false, &ip6)]),
+    ];
+    // A DNS constraint for "localhost" also covers subdomains under RFC 5280.
+    // Excluding ".localhost" narrows this private trust anchor to the exact name.
+    let excluded = der::sequence(&[&der::context(2, false, b".localhost")]);
+    der::sequence(&[
+        &der::context(0, true, &permitted.concat()),
+        &der::context(1, true, &excluded),
+    ])
+}
+fn certificate(
+    key: &SigningKey,
+    issuer: &SigningKey,
+    ca: bool,
+    now: i64,
+    dns_names: &[&str],
+    ip_addrs: &[std::net::IpAddr],
+) -> Result<Vec<u8>> {
     const CA: &str = "Workglen Local Admin CA";
     let public = key.public_key_spki();
     let alg = issuer.x509_algorithm();
@@ -88,32 +113,40 @@ fn certificate(key: &SigningKey, issuer: &SigningKey, ca: bool, now: i64) -> Res
             &Sha256::digest(&issuer.public_key_spki())[..20],
         )]),
     ));
+    if ca {
+        extensions.extend(extension("2.5.29.30", true, &local_name_constraints()));
+    }
     if !ca {
         extensions.extend(extension(
             "2.5.29.37",
             false,
             &der::sequence(&[&der::oid_str("1.3.6.1.5.5.7.3.1")]),
         ));
-        let ip6 = std::net::Ipv6Addr::LOCALHOST.octets();
+        let mut names = dns_names
+            .iter()
+            .map(|name| der::context(2, false, name.as_bytes()))
+            .collect::<Vec<_>>();
+        names.extend(ip_addrs.iter().map(|ip| {
+            let bytes = match ip {
+                std::net::IpAddr::V4(ip) => ip.octets().to_vec(),
+                std::net::IpAddr::V6(ip) => ip.octets().to_vec(),
+            };
+            der::context(7, false, &bytes)
+        }));
         extensions.extend(extension(
             "2.5.29.17",
             false,
-            &der::sequence(&[
-                &der::context(2, false, b"localhost"),
-                &der::context(7, false, &[127, 0, 0, 1]),
-                &der::context(7, false, &ip6),
-            ]),
+            &der::sequence(&names.iter().map(Vec::as_slice).collect::<Vec<_>>()),
         ));
     }
+    const LIFETIME: i64 = 365 * 86400;
+    let not_before = now - 300;
     let tbs = der::sequence(&[
         &der::context(0, true, &der::integer(&[2])),
         &der::integer(&serial),
         &alg,
         &name(CA),
-        &der::sequence(&[
-            &time(now - 300)?,
-            &time(now + if ca { 1825 * 86400 } else { 365 * 86400 })?,
-        ]),
+        &der::sequence(&[&time(not_before)?, &time(not_before + LIFETIME)?]),
         &name(if ca { CA } else { "localhost" }),
         &public,
         &der::context(3, true, &der::tlv(0x30, &extensions)),
@@ -123,6 +156,11 @@ fn certificate(key: &SigningKey, issuer: &SigningKey, ca: bool, now: i64) -> Res
         &alg,
         &der::bit_string(0, &issuer.sign_x509(&tbs)?),
     ]))
+}
+fn local_ca(now: i64) -> Result<(SigningKey, Vec<u8>)> {
+    let ca = SigningKey::generate_ecdsa(Curve::P256)?;
+    let root = certificate(&ca, &ca, true, now, &[], &[])?;
+    Ok((ca, root))
 }
 fn write_new(path: &Path, data: &[u8]) -> Result<()> {
     let mut file = OpenOptions::new()
@@ -140,25 +178,37 @@ pub fn local_tls(directory: &Path) -> Result<()> {
         meta.is_dir() && meta.mode() & 0o077 == 0,
         "TLS destination must be a private, real directory"
     );
-    let names = [
+    for file in [
         "local-ca.pem",
+        // Refuse even a partial legacy directory containing the retired CA key.
         "local-ca-key.pem",
         "local-leaf.pem",
         "local-cert.pem",
         "local-key.pem",
-    ];
-    for file in names {
+    ] {
         ensure!(
             fs::symlink_metadata(directory.join(file))
                 .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
             "TLS output already exists or cannot be inspected"
         );
     }
-    let ca = SigningKey::generate_ecdsa(Curve::P256)?;
     let key = SigningKey::generate_ecdsa(Curve::P256)?;
     let now = crate::datetime::Utc::now()?.timestamp();
-    let root = certificate(&ca, &ca, true, now)?;
-    let leaf = certificate(&key, &ca, false, now)?;
+    let (ca, root) = local_ca(now)?;
+    let leaf = certificate(
+        &key,
+        &ca,
+        false,
+        now,
+        &["localhost"],
+        &[
+            std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+            std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+        ],
+    )?;
+    // The signing key's secret scalar is zeroizing memory. Drop the only CA
+    // handle before writing any output; no CA private key is ever serialized.
+    drop(ca);
     let mut trust = TrustStore::empty();
     trust.add_der(&root)?;
     for host in ["localhost", "127.0.0.1", "::1"] {
@@ -167,15 +217,13 @@ pub fn local_tls(directory: &Path) -> Result<()> {
     let ca_pem = pem("CERTIFICATE", &root);
     let leaf_pem = pem("CERTIFICATE", &leaf);
     let chain = format!("{leaf_pem}{ca_pem}");
-    let ca_key = ca.to_pkcs8_pem()?;
     let leaf_key = key.to_pkcs8_pem()?;
     CertifiedKey::from_pem(&chain, std::str::from_utf8(&leaf_key)?)?;
     for (file, data) in [
-        (names[0], ca_pem.as_bytes()),
-        (names[1], &ca_key),
-        (names[2], leaf_pem.as_bytes()),
-        (names[3], chain.as_bytes()),
-        (names[4], &leaf_key),
+        ("local-ca.pem", ca_pem.as_bytes()),
+        ("local-leaf.pem", leaf_pem.as_bytes()),
+        ("local-cert.pem", chain.as_bytes()),
+        ("local-key.pem", &leaf_key),
     ] {
         write_new(&directory.join(file), data)?;
     }
@@ -257,5 +305,72 @@ mod tests {
         assert!(local_tls(dir.path()).is_err());
         assert_eq!(before, fs::read(&key).unwrap());
         assert_eq!(fs::metadata(key).unwrap().mode() & 0o777, 0o600);
+        assert!(!dir.path().join("local-ca-key.pem").exists());
+        let private_keys = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|entry| {
+                let path = entry.unwrap().path();
+                fs::read(&path)
+                    .unwrap()
+                    .windows(b"PRIVATE KEY".len())
+                    .any(|window| window == b"PRIVATE KEY")
+                    .then(|| path.file_name().unwrap().to_string_lossy().into_owned())
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(private_keys, ["local-key.pem"]);
+    }
+
+    #[test]
+    fn local_ca_is_one_year_and_enforces_exact_loopback_names() {
+        const YEAR: i64 = 365 * 86400;
+        let now = 1_800_000_000;
+        let (ca, root) = local_ca(now).unwrap();
+        let parsed = Certificate::from_der(&root).unwrap();
+        assert!(parsed.not_after - parsed.not_before <= YEAR);
+        let constraint = parsed
+            .extensions()
+            .iter()
+            .find(|extension| extension.oid_string() == "2.5.29.30")
+            .expect("nameConstraints extension");
+        assert!(constraint.critical);
+
+        let mut trust = TrustStore::empty();
+        trust.add_der(&root).unwrap();
+        let issue = |dns: &[&str], ips: &[std::net::IpAddr]| {
+            let key = SigningKey::generate_ecdsa(Curve::P256).unwrap();
+            certificate(&key, &ca, false, now, dns, ips).unwrap()
+        };
+        for (leaf, host) in [
+            (issue(&["localhost"], &[]), "localhost"),
+            (
+                issue(&[], &[std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)]),
+                "127.0.0.1",
+            ),
+            (
+                issue(&[], &[std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST)]),
+                "::1",
+            ),
+        ] {
+            trust
+                .verify_server_chain(&[leaf, root.clone()], host, now)
+                .unwrap();
+        }
+        for (leaf, host) in [
+            (issue(&["evil.example"], &[]), "evil.example"),
+            (
+                issue(
+                    &[],
+                    &[std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 0, 1))],
+                ),
+                "10.0.0.1",
+            ),
+            (issue(&["sub.localhost"], &[]), "sub.localhost"),
+        ] {
+            assert!(
+                trust
+                    .verify_server_chain(&[leaf, root.clone()], host, now)
+                    .is_err()
+            );
+        }
     }
 }

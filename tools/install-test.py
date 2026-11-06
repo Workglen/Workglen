@@ -144,6 +144,13 @@ try:
     parsed = tomllib.loads(cfg.read_text())
     gateway = json.loads((bundle / "config.json").read_text())
     assert parsed["admin_only"] and parsed["accounting"]["transport"] == "local"
+    assert not (local / "etc/local-ca-key.pem").exists()
+    private_key_pems = sorted(
+        path.name
+        for path in (local / "etc").iterdir()
+        if path.is_file() and b"PRIVATE KEY" in path.read_bytes()
+    )
+    assert private_key_pems == ["local-key.pem"]
     admin_key = Path(parsed["admin_storage_key_file"])
     assert admin_key == local / "etc/admin-storage.key"
     assert admin_key.stat().st_mode & 0o077 == 0

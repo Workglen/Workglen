@@ -479,6 +479,7 @@ RUN
     cp "$SOURCE/MAC-ADMIN-LIGHTSAIL.md" "$BUNDLE/README.md"
     say "Local Admin installed. Start: bash \"$ADMIN_HOME/run-admin.sh\""
     say "Open https://localhost:$WEB_PORT/mail-security after trusting the local certificate as documented."
+    say "The one-year CA is constrained to exact loopback names; its signing key was discarded. Renew into a fresh directory and replace the manually trusted CA before expiry."
     say "Pairing bundle: $BUNDLE — contains a management secret; transfer it privately to Lightsail."
     say "Back up $etc/admin-storage.key separately from encrypted Admin database backups; neither can recover the other."
     say "On Lightsail: sudo bash install.sh gateway --bundle /absolute/path/to/bundle --start"

@@ -166,7 +166,7 @@ normally supplied by the supported Lightsail Linux images.
 `bash install.sh admin` runs interactively. Default local installation: `~/Library/Application Support/Workglen`; default pairing bundle: `./workglen-gateway-bundle`. Both must be new paths. The helper creates:
 
 - A native executable and `run-admin.sh`, with local HTTPS on 127.0.0.1:8443 and the token-authenticated CLI on 127.0.0.1:8025.
-- A private P-256 local CA and one-year localhost certificate/key, local Admin password hash, CLI token and gateway management key.
+- A public P-256 local CA certificate with critical constraints limited to exact `localhost`, `127.0.0.1` and `::1`, plus a one-year localhost certificate/key, local Admin password hash, CLI token and gateway management key. The CA signing key is held only in zeroizing memory while the leaf is signed and is never written.
 - A fresh encrypted `admin.redb` store and separate owner-only `admin-storage.key`, with Mail and Webmail disabled. The `admin_only` profile cannot start SMTP, submission, IMAP, Webmail, relay, replication or witness workers and never creates `mail.redb`.
 - Optional protected Accounting DSN and base64-encoded bank-feed encryption key. `--initialize-accounting` explicitly creates the Workglen schema in the selected database; it does not create a PostgreSQL server, database or role.
 - A separately protected gateway bundle carrying its own configuration, shared management key and recovery administrator hash. It never includes the Mac's PostgreSQL DSN, local private TLS key, local CLI token or local Admin password hash.
@@ -185,7 +185,7 @@ both passwords have been accepted.
 
 See `bash install.sh --help` for ports, manual certificates, staging, paths and noninteractive options. `--tls manual` requires a matching existing certificate/key; the configured public gateway DNS name must appear on the certificate. Native TLS hostname verification remains enabled when the Admin connects. For private CA deployments, supply a trust chain that contains the appropriate issuer; preserve that trust bundle across certificate renewals.
 
-The wizard performs no CA issuance and no mailbox operations. Native `check` parses configuration and credentials offline. Initialization of local redb also stays offline. A requested Accounting initialization contacts only the configured PostgreSQL endpoint. In a separately and explicitly authorized ACME test, the Linux `--start` operation may initiate Let's Encrypt issuance because it starts an ACME-configured service. ACME is not part of the current private-test-CA procedure; use manual private test certificates for that procedure.
+The wizard issues only its constrained, host-local Admin CA/leaf and performs no public or gateway CA issuance and no mailbox operations. Native `check` parses configuration and credentials offline. Initialization of local redb also stays offline. A requested Accounting initialization contacts only the configured PostgreSQL endpoint. In a separately and explicitly authorized ACME test, the Linux `--start` operation may initiate Let's Encrypt issuance because it starts an ACME-configured service. ACME is not part of the current private-test-CA procedure; use manual private test certificates for that procedure.
 
 ### Local Admin backup and recovery
 
