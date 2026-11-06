@@ -358,6 +358,21 @@ impl Actor {
             revision: 0,
         }
     }
+    /// Conservative authority for a paired Central Admin whose requests are
+    /// authenticated by the installation-wide shared management key.
+    pub fn paired_admin_ceiling() -> Self {
+        Self {
+            id: "central".into(),
+            permissions: ["read", "rules.write", "rules.test"]
+                .iter()
+                .map(|permission| permission.to_string())
+                .collect(),
+            domains: vec!["*".into()],
+            mailboxes: vec!["*".into()],
+            mailbox: None,
+            revision: 0,
+        }
+    }
     pub fn require(&self, p: &str, recipient: Option<&str>) -> Result<()> {
         if let Some(m) = &self.mailbox {
             ensure!(

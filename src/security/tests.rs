@@ -4763,9 +4763,10 @@ fn management_signature_nonce_and_audience() {
     let f = Fixture::new();
 
     let command = f.command("status", json!({}));
+    let central = Actor::paired_admin_ceiling();
 
     let mut e = json!({
-    "version":1,"workspace":"test-workspace","audience":"gateway","at":now().unwrap(),"nonce":id(),"actor":f.owner,"command":command}
+    "version":1,"workspace":"test-workspace","audience":"gateway","at":now().unwrap(),"nonce":id(),"actor":central,"command":command}
     );
 
     let signed = |e: &Value| {
@@ -4792,6 +4793,38 @@ fn management_signature_nonce_and_audience() {
     let (raw, sig) = signed(&e);
 
     assert!(f.svc.control(&raw, &sig).is_err());
+
+    e["audience"] = json!("gateway");
+    e["nonce"] = json!(id());
+    e["actor"] = pratique::json_value::to_value(Actor::owner("central")).unwrap();
+
+    let (raw, sig) = signed(&e);
+
+    assert!(f.svc.control(&raw, &sig).is_err());
+}
+
+#[test]
+fn paired_admin_default_ceiling_is_narrow() {
+    let actor = Actor::paired_admin_ceiling();
+
+    assert_eq!(actor.permissions, ["read", "rules.write", "rules.test"]);
+    assert!(actor.require("read", None).is_ok());
+    for permission in [
+        "configure",
+        "rules.activate",
+        "content",
+        "release",
+        "discard",
+        "remediation.execute",
+        "retention",
+        "jobs",
+        "audit",
+        "learn",
+        "cluster.operate",
+        "cluster.takeover",
+    ] {
+        assert!(actor.require(permission, None).is_err(), "{permission}");
+    }
 }
 
 #[test]

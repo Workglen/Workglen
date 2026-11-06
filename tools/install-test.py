@@ -160,6 +160,11 @@ try:
     assert not (local / "data/mail.redb").exists()
     assert parsed["replication"]["cluster_id"] == gateway["workspace"]
     assert (local / "etc/gateway-control.key").read_bytes() == (bundle / "control.key").read_bytes()
+    assert gateway["trusted_admin"] == {
+        "permissions": ["read", "rules.write", "rules.test"],
+        "domains": ["*"],
+        "mailboxes": ["*"],
+    }
     assert len(base64.b64decode((local / "etc/feed.key").read_text())) == 32
     assert not (bundle / "storage.key").exists()
     assert not (bundle / "admin-storage.key").exists()
@@ -169,7 +174,7 @@ try:
             assert "fixture-db-secret" not in path.read_text()
     assert "postgres.dsn" not in [x.name for x in bundle.iterdir()]
     assert all((local / "docs" / doc).is_file() for doc in ["START-HERE.md", "ARCHITECTURE.md", "DOCUMENTATION.md", "MAC-ADMIN-LIGHTSAIL.md"])
-    passed("private paired bundles share workspace/key and exclude local database/admin secrets")
+    passed("private pairing uses a narrow gateway ceiling and excludes local database/admin secrets")
     wrong_key = work / "wrong-admin.key"
     run([binary, "security-generate-key", wrong_key])
     wrong_config = put("wrong-admin-key.toml", cfg.read_text().replace(str(admin_key), str(wrong_key)))
@@ -266,7 +271,7 @@ try:
     result = admin.call("/api/security", {"instance": gateway["instance"], "command": {"action": "status", "request_id": str(uuid.uuid4()), "data": {}}})
     assert result["workspace"] == gateway["workspace"] and result["storage_encryption"]["enabled"]
     assert not result["enabled"]
-    passed("generated pairing performs verified TLS and authenticated remote gateway control")
+    passed("generated pairing performs verified TLS and narrow authenticated gateway status")
     if args.browser:
         browser_cfg = put("browser.json", json.dumps({"url": f"https://localhost:{web_port}", "password": local_password, "work": str(work)}))
         run([os.environ["CODEX_PRIMARY_RUNTIME_NODE"], source / "tools/install-browser.cjs", browser_cfg])

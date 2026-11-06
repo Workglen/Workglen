@@ -767,7 +767,7 @@ Ok(())}
             .config
             .trusted_admin
             .clone()
-            .unwrap_or_else(|| Actor::owner("central"));
+            .unwrap_or_else(Actor::paired_admin_ceiling);
 
         ensure!(
             a.permissions.iter().all(|p| trust.permissions.contains(p)),

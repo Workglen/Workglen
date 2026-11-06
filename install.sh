@@ -454,7 +454,7 @@ admin() {
         printf '"data_dir":"/var/lib/workglen-security","storage_key_file":"/etc/workglen-security/storage.key","control_key_file":"/etc/workglen-security/control.key",'
         printf '"smtp_listen":["0.0.0.0",%s],"https_listen":["0.0.0.0",%s],"connectors":{},"routes":{' "$SMTP_PORT" "$GATEWAY_PORT"
         if [ -n "$DOWNSTREAM" ]; then printf '"downstream":{"host":"%s","port":25,"implicit_tls":false}' "$DOWNSTREAM"; fi
-        printf '},"trusted_admin":{"permissions":["read","rules.write","rules.test","rules.activate","content","release","discard","remediation.preview","remediation.execute","configure","retention","jobs","audit","learn"],"domains":["*"],"mailboxes":["*"]},'
+        printf '},"trusted_admin":{"permissions":["read","rules.write","rules.test"],"domains":["*"],"mailboxes":["*"]},'
         if [ "$TLS" = manual ]; then
             printf '"tls_cert":"/etc/workglen-security/fullchain.pem","tls_key":"/etc/workglen-security/privkey.pem"'
         else
