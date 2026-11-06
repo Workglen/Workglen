@@ -717,11 +717,17 @@ impl Service {
 
     fn finalize_incomplete(&self, id: &str, token: &str, code: &str) -> Result<()> {
         ensure!(
-            ["inspection-error", "worker-cancelled"].contains(&code),
+            [
+                "authentication-invalid",
+                "inspection-error",
+                "worker-cancelled",
+            ]
+            .contains(&code),
             "Invalid incomplete code"
         );
         let record = self.db.write(|t| scan_record(t, id, token))?;
         let reason = match code {
+            "authentication-invalid" => "Message structure prevented sender authentication",
             "worker-cancelled" => "Analysis was cancelled before the supplied profile completed",
             _ => "Message inspection could not complete under the supplied analysis profile",
         };
@@ -1112,8 +1118,12 @@ fn scan_stream_inner(
         return Ok(true);
     }
     let auth = match auth_result {
-        Ok(crate::auth::Verdict::Temporary) | Err(_) => {
+        Ok(crate::auth::Verdict::Temporary) => {
             send_state(&mut stream, &job, "retry", "authentication-temporary")?;
+            return Ok(true);
+        }
+        Err(_) => {
+            send_state(&mut stream, &job, "incomplete", "authentication-invalid")?;
             return Ok(true);
         }
         Ok(verdict) => verdict,

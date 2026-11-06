@@ -2136,6 +2136,82 @@ fn local_scanner_protocol_drains_mail_while_ingress_stays_owned_by_service() {
 }
 
 #[test]
+fn invalid_authentication_structure_is_terminal_incomplete_quarantine() {
+    for (case, raw) in [
+        (
+            "two-from-fields",
+            b"From: first@example.invalid\r\nFrom: second@example.invalid\r\nSubject: duplicate\r\n\r\nbody"
+                .to_vec(),
+        ),
+        (
+            "missing-header-separator",
+            b"From: sender@example.invalid\r\nSubject: incomplete".to_vec(),
+        ),
+        (
+            "invalid-from-address",
+            b"From: not-an-address\r\nSubject: invalid author\r\n\r\nbody".to_vec(),
+        ),
+    ] {
+        let f = Fixture::new();
+        f.activate();
+        f.svc
+            .db
+            .write(|t| {
+                let mut settings = must(t, "settings")?;
+                settings["enabled"] = json!(true);
+                put(t, "settings", &settings)
+            })
+            .unwrap();
+        let ingress = f
+            .svc
+            .accept(
+                &raw,
+                "sender@example.invalid",
+                &["owner@example.test".into()],
+                "192.0.2.16".parse().unwrap(),
+                "sender.example.invalid",
+            )
+            .unwrap()
+            .remove(0);
+
+        let checker = crate::auth::Checker::new(None).unwrap();
+        let (server_stream, worker_stream) = std::os::unix::net::UnixStream::pair().unwrap();
+        let service = f.svc.clone();
+        let server = std::thread::spawn(move || {
+            super::scan_worker::handle(&service, server_stream).unwrap()
+        });
+        assert!(
+            super::scan_worker::scan_stream(&checker, worker_stream).unwrap(),
+            "{case}"
+        );
+        server.join().unwrap();
+
+        assert!(
+            f.svc
+                .db
+                .get(&format!("ingress/{ingress}"))
+                .unwrap()
+                .is_none(),
+            "{case}"
+        );
+        let messages = f.svc.db.write(|t| list(t, "message/")).unwrap();
+        assert_eq!(messages.len(), 1, "{case}");
+        assert_eq!(messages[0]["state"], "quarantined", "{case}");
+        assert_eq!(messages[0]["releasable"], false, "{case}");
+        assert_eq!(
+            messages[0]["verdict"]["coverage"]["complete"],
+            false,
+            "{case}"
+        );
+        assert_eq!(
+            messages[0]["verdict"]["coverage"]["incompleteness_reasons"][0],
+            "Message structure prevented sender authentication",
+            "{case}"
+        );
+    }
+}
+
+#[test]
 fn cancellation_after_inspection_is_stored_as_incomplete_quarantine() {
     use std::io::{Read, Write};
 
