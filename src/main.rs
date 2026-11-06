@@ -34,7 +34,7 @@ fn run() -> Result<()> {
     }
     ensure!(
         a.len() >= 3,
-        "usage: workglen <check|init|serve|admin-serve|dkim-generate|dkim-dns|witness|add-user|set-password|status|users|policy|queue|backup|backups|modules|module-enable|module-disable|demote-single|add-user-offline> CONFIG [address] [--bootstrap]"
+        "usage: workglen <check|init|serve|admin-serve|admin-restore|dkim-generate|dkim-dns|witness|add-user|set-password|status|users|policy|queue|backup|backups|modules|module-enable|module-disable|demote-single|add-user-offline> CONFIG [address] [--bootstrap]"
     );
     if a[1] == "witness" {
         return workglen_mail::witness::serve(&a[2]);
@@ -59,6 +59,11 @@ fn run() -> Result<()> {
         }
         if let Some(accounting) = &c.accounting {
             workglen_mail::accounting::db::connection_config(accounting)?;
+        }
+        if c.admin_only {
+            let key_path = Path::new(c.admin_storage_key_file.as_deref().unwrap());
+            workglen_mail::encrypted_store::Key::load(key_path)?;
+            workglen_mail::encrypted_store::separate_key(Path::new(&c.data_dir), key_path)?;
         }
         println!(
             "Configuration and credentials validated offline; no database or CA connection attempted"
@@ -157,6 +162,46 @@ fn run() -> Result<()> {
 
     fs::create_dir_all(&c.data_dir)?;
     fs::set_permissions(&c.data_dir, fs::Permissions::from_mode(0o700))?;
+    if a[1] == "admin-restore" {
+        ensure!(
+            c.admin_only && a.len() == 4,
+            "usage: workglen admin-restore CONFIG ENCRYPTED_BACKUP"
+        );
+        let lock = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(Path::new(&c.data_dir).join("server.lock"))?;
+        lock.try_lock()?;
+        let data = Path::new(&c.data_dir);
+        let target = data.join("admin.redb");
+        ensure!(
+            !target.exists(),
+            "refusing to overwrite an existing Admin store"
+        );
+        let partial = data.join(".admin-restore.partial");
+        ensure!(
+            !partial.exists(),
+            "an incomplete Admin restore already exists"
+        );
+        let key_path = Path::new(c.admin_storage_key_file.as_deref().unwrap());
+        workglen_mail::encrypted_store::separate_key(data, key_path)?;
+        workglen_mail::backup::restore_admin(
+            Path::new(&a[3]),
+            &partial,
+            &c.replication.cluster_id,
+            key_path,
+        )?;
+        let partial_lock = partial.with_extension("redb.lock");
+        if partial_lock.exists() {
+            fs::remove_file(partial_lock)?;
+        }
+        fs::rename(&partial, &target)?;
+        fs::File::open(data)?.sync_all()?;
+        println!("Restored encrypted Admin store to {}", target.display());
+        return Ok(());
+    }
     if matches!(
         a[1].as_str(),
         "add-user"
@@ -204,9 +249,23 @@ fn run() -> Result<()> {
         .truncate(false)
         .open(Path::new(&c.data_dir).join("server.lock"))?;
     lock.try_lock()?;
-    let dbpath = Path::new(&c.data_dir).join("mail.redb");
+    let dbpath = Path::new(&c.data_dir).join(if c.admin_only {
+        "admin.redb"
+    } else {
+        "mail.redb"
+    });
     let existed = dbpath.exists();
-    let store = Store::open(&dbpath, &c.replication.cluster_id)?;
+    let store = if c.admin_only {
+        let key_path = Path::new(c.admin_storage_key_file.as_deref().unwrap());
+        workglen_mail::encrypted_store::separate_key(Path::new(&c.data_dir), key_path)?;
+        Store::open_admin(
+            &dbpath,
+            &c.replication.cluster_id,
+            workglen_mail::encrypted_store::Key::load(key_path)?,
+        )?
+    } else {
+        Store::open(&dbpath, &c.replication.cluster_id)?
+    };
     match a[1].as_str() {
         "init" => {
             if c.admin_only && !existed {
@@ -239,6 +298,10 @@ fn run() -> Result<()> {
             Ok(())
         }
         "demote-single" => {
+            ensure!(
+                !c.admin_only,
+                "demote-single is a Mail/Core recovery operation"
+            );
             ensure!(
                 c.mode == Mode::Single,
                 "use a single-mode configuration for the retained node"

@@ -1,5 +1,8 @@
-use crate::config::{Folder, Limits, Message, QueueItem, User};
 use crate::error::{Result, ensure};
+use crate::{
+    config::{Folder, Limits, Message, QueueItem, User},
+    encrypted_store::{EncryptedBackend, Key},
+};
 use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
 use std::{path::Path, sync::Arc};
 
@@ -130,6 +133,16 @@ impl Store {
         let mut builder = Database::builder();
         builder.set_cache_size(16 * 1024 * 1024);
         let db = Arc::new(builder.create(path)?);
+        Self::initialize(db, cluster, None)
+    }
+    pub fn open_admin(path: &Path, cluster: &str, key: Key) -> Result<Self> {
+        let existed = path.exists();
+        let mut builder = Database::builder();
+        builder.set_cache_size(16 * 1024 * 1024);
+        let db = Arc::new(builder.create_with_backend(EncryptedBackend::open(path, key)?)?);
+        Self::initialize(db, cluster, Some(existed))
+    }
+    fn initialize(db: Arc<Database>, cluster: &str, admin_existed: Option<bool>) -> Result<Self> {
         {
             let tx = db.begin_write()?;
             {
@@ -141,6 +154,19 @@ impl Store {
                     );
                 }
                 t.insert("cluster", cluster.as_bytes())?;
+                if let Some(existed) = admin_existed {
+                    let kind_is_admin = t
+                        .get("system/store-kind")?
+                        .as_ref()
+                        .is_some_and(|v| v.value() == b"admin");
+                    if existed {
+                        ensure!(
+                            kind_is_admin,
+                            "encrypted database is not a Workglen Admin store"
+                        );
+                    }
+                    t.insert("system/store-kind", b"admin".as_slice())?;
+                }
                 let _ = tx.open_table(LOG)?;
                 let mut m = tx.open_table(META)?;
                 if m.get("seq")?.is_none() {

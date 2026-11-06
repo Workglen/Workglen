@@ -13,11 +13,26 @@ fn shipped_node_and_witness_configs_deserialize() {
         let c: Config = workglen_toml::from_str(source).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert!(!c.hostname.is_empty());
         assert!(c.limits.connections > 0);
+        assert!(c.admin_storage_key_file.is_none());
     }
     let c: crate::witness::WitnessConfig =
         workglen_toml::from_str(include_str!("../config/witness.toml")).unwrap();
     assert!(c.lease_seconds > 0);
     assert!(!c.cluster_id.is_empty());
+}
+
+#[test]
+fn admin_storage_key_field_decodes_without_changing_mail_defaults() {
+    let source = include_str!("../config/single.toml").replacen(
+        "mode = \"single\"",
+        "admin_storage_key_file = \"/private/workglen-admin.key\"\nmode = \"single\"",
+        1,
+    );
+    let c: Config = workglen_toml::from_str(&source).unwrap();
+    assert_eq!(
+        c.admin_storage_key_file.as_deref(),
+        Some("/private/workglen-admin.key")
+    );
 }
 
 #[test]

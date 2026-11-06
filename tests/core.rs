@@ -211,6 +211,68 @@ fn backup_has_consistent_metadata_and_read_only_export() {
 }
 
 #[test]
+fn admin_store_backup_and_fresh_restore_stay_encrypted() {
+    use std::fs;
+    use workglen_mail::encrypted_store::{Key, generate_key};
+
+    let root = support::tempdir().unwrap();
+    let data = root.path().join("data");
+    fs::create_dir(&data).unwrap();
+    let key = root.path().join("admin.key");
+    let wrong = root.path().join("wrong.key");
+    generate_key(&key).unwrap();
+    generate_key(&wrong).unwrap();
+    let database = data.join("admin.redb");
+    let store = Store::open_admin(&database, "admin-cluster", Key::load(&key).unwrap()).unwrap();
+    store
+        .write(|_| {
+            Ok((
+                vec![Op::json(
+                    "admin/sentinel".into(),
+                    &"plaintext-must-not-appear-in-the-database",
+                )?],
+                (),
+            ))
+        })
+        .unwrap();
+    let backup = data.join("backup-test.redb");
+    workglen_mail::backup::create_encrypted(
+        &store,
+        "admin-cluster",
+        &backup,
+        Key::load(&key).unwrap(),
+    )
+    .unwrap();
+    drop(store);
+
+    for path in [&database, &backup] {
+        let bytes = fs::read(path).unwrap();
+        assert_eq!(&bytes[..8], b"WGCRYPT1");
+        assert!(!bytes.windows(14).any(|w| w == b"admin/sentinel"));
+        assert!(!bytes.windows(14).any(|w| w == b"admin-cluster"));
+    }
+    assert!(Store::open_admin(&backup, "admin-cluster", Key::load(&wrong).unwrap()).is_err());
+    let reopened = Store::open_admin(&backup, "admin-cluster", Key::load(&key).unwrap()).unwrap();
+    assert_eq!(
+        reopened.get::<String>("admin/sentinel").unwrap().as_deref(),
+        Some("plaintext-must-not-appear-in-the-database")
+    );
+    drop(reopened);
+
+    let restored = data.join("restore.partial");
+    workglen_mail::backup::restore_admin(&backup, &restored, "admin-cluster", &key).unwrap();
+    let restored_store =
+        Store::open_admin(&restored, "admin-cluster", Key::load(&key).unwrap()).unwrap();
+    assert_eq!(
+        restored_store
+            .get::<String>("admin/sentinel")
+            .unwrap()
+            .as_deref(),
+        Some("plaintext-must-not-appear-in-the-database")
+    );
+}
+
+#[test]
 fn deployment_transitions_require_seeded_data_and_explicit_demotion() {
     use config::Mode;
     let d = support::tempdir().unwrap();

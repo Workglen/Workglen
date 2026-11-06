@@ -419,6 +419,7 @@ admin() {
     workspace=$("$BINARY" setup-random hex 16)
     "$BINARY" setup-random hex 32 > "$etc/admin.token"
     "$BINARY" setup-random hex 32 > "$etc/gateway-control.key"
+    "$BINARY" security-generate-key "$etc/admin-storage.key"
     cp -- "$etc/gateway-control.key" "$BUNDLE/control.key"
     printf '%s' "$local_password" | "$BINARY" hash-password > "$etc/admin.hash"
     printf '%s' "$gateway_password" | "$BINARY" hash-password > "$BUNDLE/admin.hash"
@@ -433,6 +434,7 @@ admin() {
     {
         printf 'admin_only = true\nmode = "single"\nnode_id = "local-admin"\nhostname = "localhost"\nrole = "primary"\ndomain = '; q "$DOMAIN"
         printf '\ndata_dir = '; q "$data"
+        printf '\nadmin_storage_key_file = '; q "$etc/admin-storage.key"
         printf '\nadmin_listen = "127.0.0.1:%s"\nadmin_token_file = ' "$CLI_PORT"; q "$etc/admin.token"
         printf '\ntls_cert = '; q "$etc/local-cert.pem"; printf '\ntls_key = '; q "$etc/local-key.pem"
         printf '\n# Placeholders are never bound in the admin_only process profile.\nsmtp_listen = "127.0.0.1:0"\nsubmission_listen = "127.0.0.1:0"\nimap_listen = "127.0.0.1:0"\n'
@@ -478,6 +480,7 @@ RUN
     say "Local Admin installed. Start: bash \"$ADMIN_HOME/run-admin.sh\""
     say "Open https://localhost:$WEB_PORT/mail-security after trusting the local certificate as documented."
     say "Pairing bundle: $BUNDLE — contains a management secret; transfer it privately to Lightsail."
+    say "Back up $etc/admin-storage.key separately from encrypted Admin database backups; neither can recover the other."
     say "On Lightsail: sudo bash install.sh gateway --bundle /absolute/path/to/bundle --start"
     say "Gateway mail acceptance remains paused until guided setup, route tests and rule activation."
     if [ -n "$PG_DSN" ] && ! $INIT_ACCOUNTING; then say "Accounting connection saved. Initialize its dedicated database with: \"$ADMIN_HOME/bin/workglen\" accounting-init \"$etc/admin.toml\""; fi

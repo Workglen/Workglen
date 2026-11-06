@@ -9,6 +9,8 @@ mod toml_tests;
 pub struct Config {
     /// Local administration and optional Accounting, without mail listeners.
     pub admin_only: bool,
+    /// Owner-only key for the dedicated encrypted local Admin store.
+    pub admin_storage_key_file: Option<String>,
     pub mode: Mode,
     pub node_id: String,
     pub security_remotes: Vec<crate::security_remote::Remote>,
@@ -36,7 +38,8 @@ pub struct Config {
     pub direct: Option<Direct>,
     pub dkim: Option<Dkim>,
 }
-pratique::data_decode!(Config, deny_unknown=true, { admin_only = Default::default(), mode = Default::default(), node_id = default_node_id(), security_remotes = Default::default(), web, webmail, accounting, hostname, dns_server, domain, data_dir, admin_listen, admin_token_file, role, tls_cert = Default::default(), tls_key = Default::default(), acme, smtp_listen, submission_listen, imap_listen, limits = Default::default(), policy = Default::default(), replication, witness, relay, direct, dkim });
+// Keep new optional fields at the end so legacy positional fixtures remain decodable.
+pratique::data_decode!(Config, deny_unknown=true, { admin_only = Default::default(), mode = Default::default(), node_id = default_node_id(), security_remotes = Default::default(), web, webmail, accounting, hostname, dns_server, domain, data_dir, admin_listen, admin_token_file, role, tls_cert = Default::default(), tls_key = Default::default(), acme, smtp_listen, submission_listen, imap_listen, limits = Default::default(), policy = Default::default(), replication, witness, relay, direct, dkim, admin_storage_key_file = Default::default() });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Mode {
@@ -309,6 +312,12 @@ impl Config {
         if c.admin_only {
             ensure!(c.mode == Mode::Single, "admin_only requires single mode");
             ensure!(
+                c.admin_storage_key_file
+                    .as_deref()
+                    .is_some_and(|path| Path::new(path).is_absolute()),
+                "admin_only requires an absolute admin_storage_key_file"
+            );
+            ensure!(
                 c.web.as_ref().is_some_and(|w| w.listen.ip().is_loopback()),
                 "admin_only requires a loopback HTTPS administration listener"
             );
@@ -319,6 +328,11 @@ impl Config {
             ensure!(
                 c.acme.is_none(),
                 "Use a local certificate for the loopback Admin console"
+            );
+        } else {
+            ensure!(
+                c.admin_storage_key_file.is_none(),
+                "admin_storage_key_file is only valid with admin_only=true"
             );
         }
         let mut names = vec![c.hostname.clone()];
@@ -645,6 +659,9 @@ mod record_contracts {
     use super::*;
     pratique::data_encode!(Config {
         admin_only,
+        // Test-only legacy encoder: decoding the optional key field is covered
+        // separately and existing serialized Config fixtures stay stable.
+        admin_storage_key_file => |_| true,
         mode,
         node_id,
         security_remotes,

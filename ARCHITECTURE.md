@@ -8,7 +8,7 @@ The test topology uses an Apple Silicon M5 developer laptop and Ubuntu server te
 flowchart TD
     Browser["M5 Mac browser"] -->|"Loopback HTTPS"| Admin["Native local Admin"]
     Admin -->|"Local transport or verified TLS"| PG["Local PostgreSQL: Accounting"]
-    Admin --> Local["Local redb: identities and administration"]
+    Admin --> Local["Encrypted local redb: identities and administration"]
     Admin -->|"Verified HTTPS and signed scoped commands"| Gateway["Ubuntu test Mail Security"]
     Senders["SMTP senders"] --> Gateway
     Gateway --> Security["Encrypted redb: rules, queues, quarantine, audit"]
@@ -22,7 +22,7 @@ flowchart TD
 - **Mail Security:** `security-serve` is the sole owner of encrypted redb plus SMTP/HTTPS and delivery. It durably records exact MIME as `pending-scan` before SMTP acknowledgment. A separately restartable `security-scan-worker` role from the same native executable performs authentication and bounded inspection over an owner-only, versioned Unix-socket protocol; it never opens the database. Scanner replacement therefore does not stop SMTP acceptance, and expired scan leases are reclaimed. Native spam heuristics, rule lifecycle, quarantine, queues, digests and optional mailbox connectors continue independently of Admin availability. The gateway neither stores Accounting data nor connects to the Mac's PostgreSQL.
 - **Mail/Core:** the ordinary Mail profile remains available for mailbox hosting, direct delivery/DKIM, Webmail and cluster replication. The split installer intentionally targets local Admin plus standalone Mail Security. Use the existing Mail configuration/deployment guides for mailbox hosting or dual-node setups.
 
-The local Admin redb is not encrypted by the Mail Security encrypted backend. It contains administration/RBAC state and audit metadata; protect the Mac user account and filesystem. Gateway whole-database encryption, BYOK/generated keys, crash recovery and key-loss behavior are specified in [security/ENCRYPTED-STORAGE.md](security/ENCRYPTED-STORAGE.md). Quarantine originals remain in the gateway store unless an authorized inspection/response explicitly retrieves them.
+The local Admin uses a dedicated encrypted `admin.redb` store for administration/RBAC state and audit metadata. It cannot open a plaintext store, and its owner-only key must be outside the Admin data directory. Online Admin backups are encrypted logical copies under the same key; the key must be backed up separately. This store contains no gateway quarantine originals or Accounting journals. The ordinary Mail/Core `mail.redb` remains a separate storage boundary. Encryption, crash recovery and key-loss behavior are specified in [security/ENCRYPTED-STORAGE.md](security/ENCRYPTED-STORAGE.md). Quarantine originals remain in the gateway store unless an authorized inspection/response explicitly retrieves them.
 
 ## Remote trust, roles and audit
 

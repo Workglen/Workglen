@@ -144,10 +144,18 @@ try:
     parsed = tomllib.loads(cfg.read_text())
     gateway = json.loads((bundle / "config.json").read_text())
     assert parsed["admin_only"] and parsed["accounting"]["transport"] == "local"
+    admin_key = Path(parsed["admin_storage_key_file"])
+    assert admin_key == local / "etc/admin-storage.key"
+    assert admin_key.stat().st_mode & 0o077 == 0
+    admin_db = local / "data/admin.redb"
+    assert admin_db.read_bytes()[:8] == b"WGCRYPT1"
+    assert b"local-admin" not in admin_db.read_bytes()
+    assert not (local / "data/mail.redb").exists()
     assert parsed["replication"]["cluster_id"] == gateway["workspace"]
     assert (local / "etc/gateway-control.key").read_bytes() == (bundle / "control.key").read_bytes()
     assert len(base64.b64decode((local / "etc/feed.key").read_text())) == 32
     assert not (bundle / "storage.key").exists()
+    assert not (bundle / "admin-storage.key").exists()
     for path in bundle.rglob("*"):
         if path.is_file():
             assert path.stat().st_mode & 0o077 == 0
@@ -155,6 +163,11 @@ try:
     assert "postgres.dsn" not in [x.name for x in bundle.iterdir()]
     assert all((local / "docs" / doc).is_file() for doc in ["START-HERE.md", "ARCHITECTURE.md", "DOCUMENTATION.md", "MAC-ADMIN-LIGHTSAIL.md"])
     passed("private paired bundles share workspace/key and exclude local database/admin secrets")
+    wrong_key = work / "wrong-admin.key"
+    run([binary, "security-generate-key", wrong_key])
+    wrong_config = put("wrong-admin-key.toml", cfg.read_text().replace(str(admin_key), str(wrong_key)))
+    run([binary, "init", wrong_config], ok=False)
+    passed("encrypted Admin store rejects the wrong key and never creates a plaintext mail database")
     before = hashlib.sha256(cfg.read_bytes()).digest()
     run(command, ok=False)
     assert hashlib.sha256(cfg.read_bytes()).digest() == before
@@ -237,6 +250,10 @@ try:
     assert overview["admin_only"] and not overview["modules"]["mail_enabled"]
     assert not overview["modules"]["webmail_enabled"]
     assert json.loads(run([binary, "status", cfg]).stdout)["admin_only"]
+    backup_path = Path(run([binary, "backup", cfg]).stdout.strip())
+    assert backup_path.read_bytes()[:8] == b"WGCRYPT1"
+    assert b"local-admin" not in backup_path.read_bytes()
+    passed("online Admin backup is an encrypted logical copy")
     run([binary, "module-enable", cfg, "mail"], ok=False)
     passed("native Admin serves HTTPS/CLI with Mail disabled and never binds occupied SMTP/IMAP ports")
     result = admin.call("/api/security", {"instance": gateway["instance"], "command": {"action": "status", "request_id": str(uuid.uuid4()), "data": {}}})
@@ -248,6 +265,17 @@ try:
         run([os.environ["CODEX_PRIMARY_RUNTIME_NODE"], source / "tools/install-browser.cjs", browser_cfg])
         passed("browser displays local Admin profile, remote gateway and no mail-enable controls")
     ap.terminate(); ap.wait(timeout=10)
+    restored_data = work / "Restored Admin Data"
+    restored_config = put(
+        "restored-admin.toml",
+        cfg.read_text().replace(str(local / "data"), str(restored_data)),
+    )
+    run([binary, "admin-restore", restored_config, backup_path])
+    assert (restored_data / "admin.redb").read_bytes()[:8] == b"WGCRYPT1"
+    assert not (restored_data / "mail.redb").exists()
+    run([binary, "init", restored_config])
+    run([binary, "admin-restore", restored_config, backup_path], ok=False)
+    passed("fresh-only Admin restore authenticates an encrypted backup and refuses overwrite")
     direct = Api(gateway_port, cert); direct.login(recovery_password)
     assert direct.call("/api/command", {"action": "status", "request_id": str(uuid.uuid4()), "data": {}})["instance"] == gateway["instance"]
     passed("gateway recovery access and gateway process survive local Admin shutdown")

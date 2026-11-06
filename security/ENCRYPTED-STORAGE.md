@@ -1,10 +1,17 @@
-# Mail Security encrypted storage
+# Encrypted redb storage
 
 Mail Security requires encryption for its entire native redb store. Original MIME,
 attachments, recipient and identity records, rules, configuration, quarantine,
 queues, learning data and audit events are encrypted before they reach the database
 file. Database journals and compaction files contain ciphertext too. The service
 does not create a plaintext working database or fall back to plaintext storage.
+
+The local `admin_only` profile also requires this backend for its separate
+`admin.redb`. That store contains local administration identities, scopes,
+module state and audit metadata, not gateway message content or Accounting
+journals. It has its own `admin_storage_key_file` and an authenticated Admin-store
+marker. Workglen refuses plaintext Admin databases and encrypted databases that
+do not carry that marker.
 
 ## Choose and protect a key
 
@@ -58,6 +65,12 @@ it. This release has no operator-facing rekey/rotation command. Keep the current
 key until a separately tested rotation facility is available. Backups made before
 any future rotation will still need the corresponding original key.
 
+For the local Admin, use the online `backup` command rather than copying a live
+file. It creates a consistent encrypted logical copy under the same Admin key.
+The fresh-only `admin-restore` command authenticates and copies that backup into
+a new `admin.redb`; it refuses to overwrite an existing store. Keep the Admin key
+outside its data directory and back it up separately from every encrypted copy.
+
 ## Storage implementation and limits
 
 The reusable `encrypted_store` backend implements the pinned redb 3.1.3 storage
@@ -95,10 +108,11 @@ checks.
 
 ## Other modules and follow-up work
 
-Mail Security uses this backend now. Workglen Mail's separate redb store, mailbox
-backups and replicated snapshots are not encrypted by this change. Webmail uses
-that Mail store. Accounting remains in PostgreSQL; its storage encryption is a
-database-provider/deployment responsibility.
+Mail Security and the local Admin use this backend now, with separate keys and
+databases. Workglen Mail's separate redb store, mailbox backups and replicated
+snapshots are not encrypted by this change. Webmail uses that Mail store.
+Accounting remains in PostgreSQL; its storage encryption is a database-provider/
+deployment responsibility.
 
 Follow-up requirements:
 

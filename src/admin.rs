@@ -134,11 +134,26 @@ pub fn execute(app: &App, r: Request) -> Result<String> {
             let path = std::path::Path::new(&app.config.data_dir)
                 .join(format!("backup-{}.redb", store::random_id()));
             let partial = path.with_extension("partial");
-            crate::backup::create(
-                &*app.read_store()?,
-                &app.config.replication.cluster_id,
-                &partial,
-            )?;
+            if app.config.admin_only {
+                let key_path = std::path::Path::new(
+                    app.config
+                        .admin_storage_key_file
+                        .as_deref()
+                        .ok_or_else(|| crate::error!("Admin storage key is not configured"))?,
+                );
+                crate::backup::create_encrypted(
+                    &*app.read_store()?,
+                    &app.config.replication.cluster_id,
+                    &partial,
+                    crate::encrypted_store::Key::load(key_path)?,
+                )?;
+            } else {
+                crate::backup::create(
+                    &*app.read_store()?,
+                    &app.config.replication.cluster_id,
+                    &partial,
+                )?;
+            }
             std::fs::rename(&partial, &path)?;
             std::fs::File::open(&app.config.data_dir)?.sync_all()?;
             Ok(path.display().to_string())

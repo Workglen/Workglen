@@ -167,11 +167,11 @@ normally supplied by the supported Lightsail Linux images.
 
 - A native executable and `run-admin.sh`, with local HTTPS on 127.0.0.1:8443 and the token-authenticated CLI on 127.0.0.1:8025.
 - A private P-256 local CA and one-year localhost certificate/key, local Admin password hash, CLI token and gateway management key.
-- A fresh administration redb store with Mail and Webmail disabled. The `admin_only` profile cannot start SMTP, submission, IMAP, Webmail, relay, replication or witness workers.
+- A fresh encrypted `admin.redb` store and separate owner-only `admin-storage.key`, with Mail and Webmail disabled. The `admin_only` profile cannot start SMTP, submission, IMAP, Webmail, relay, replication or witness workers and never creates `mail.redb`.
 - Optional protected Accounting DSN and base64-encoded bank-feed encryption key. `--initialize-accounting` explicitly creates the Workglen schema in the selected database; it does not create a PostgreSQL server, database or role.
 - A separately protected gateway bundle carrying its own configuration, shared management key and recovery administrator hash. It never includes the Mac's PostgreSQL DSN, local private TLS key, local CLI token or local Admin password hash.
 
-Passwords are prompted without echo, confirmed and hashed immediately; raw passwords are not saved. Automation uses `--password-file` and `--gateway-password-file` with owner-only regular files; passwords are never command-line values. Generated storage keys are created on the gateway, while `--storage-key-file` selects BYOK. The gateway bundle therefore contains a database key only when you explicitly supplied one.
+Passwords are prompted without echo, confirmed and hashed immediately; raw passwords are not saved. Automation uses `--password-file` and `--gateway-password-file` with owner-only regular files; passwords are never command-line values. The local Admin key is always generated into its own private `etc` directory and is never copied into the gateway bundle. Generated gateway storage keys are created on the gateway, while `--storage-key-file` selects gateway BYOK. The gateway bundle therefore contains a gateway database key only when you explicitly supplied one.
 
 Interactive password errors keep your earlier setup answers. A confirmation
 mismatch, invalid length or multiline entry displays an explanation and asks
@@ -186,6 +186,12 @@ both passwords have been accepted.
 See `bash install.sh --help` for ports, manual certificates, staging, paths and noninteractive options. `--tls manual` requires a matching existing certificate/key; the configured public gateway DNS name must appear on the certificate. Native TLS hostname verification remains enabled when the Admin connects. For private CA deployments, supply a trust chain that contains the appropriate issuer; preserve that trust bundle across certificate renewals.
 
 The wizard performs no CA issuance and no mailbox operations. Native `check` parses configuration and credentials offline. Initialization of local redb also stays offline. A requested Accounting initialization contacts only the configured PostgreSQL endpoint. In a separately and explicitly authorized ACME test, the Linux `--start` operation may initiate Let's Encrypt issuance because it starts an ACME-configured service. ACME is not part of the current private-test-CA procedure; use manual private test certificates for that procedure.
+
+### Local Admin backup and recovery
+
+With Admin running, `workglen backup ADMIN_CONFIG` creates an encrypted logical backup in the Admin data directory. It never places the storage key in the backup. Preserve a protected copy of `admin-storage.key` separately; losing either the key or every valid database/backup is unrecoverable.
+
+`workglen admin-restore ADMIN_CONFIG ENCRYPTED_BACKUP` validates the key, encryption authentication, Admin-store marker and workspace binding, writes a new encrypted database, and atomically installs it. The command is fresh-only: Admin must be stopped and the configured data directory must not already contain `admin.redb`. It refuses to overwrite a live or preserved store. A wrong key, plaintext input, damaged header, different workspace or non-Admin encrypted store fails closed.
 
 ## Ubuntu test gateway install
 

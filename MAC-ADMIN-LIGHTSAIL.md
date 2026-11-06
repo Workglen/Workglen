@@ -6,7 +6,7 @@ This guide targets the TBD 0.1.1 development/test release. There are no current 
 
 | Machine | Component | State |
 |---|---|---|
-| Apple Silicon M5 developer laptop | Native Admin with browser interface at `https://localhost:8443` | Local redb for identities, scopes and administration records |
+| Apple Silicon M5 developer laptop | Native Admin with browser interface at `https://localhost:8443` | Encrypted local redb for identities, scopes and administration records |
 | Apple Silicon M5 developer laptop | Accounting within the Admin process | Local PostgreSQL, in a dedicated Workglen test database/schema |
 | Ubuntu server test machine | Native Mail Security gateway | Encrypted redb for quarantine, queues, rules and security audit |
 
@@ -42,7 +42,7 @@ host=127.0.0.1 port=5432 dbname=workglen user=workglen password='replace-with-yo
 
 `transport = "local"` explicitly permits unencrypted **host-local** communication over a literal loopback IP or an absolute Unix socket directory, such as `host=/tmp` if that is where your PostgreSQL listens. Network hostnames, remote IP addresses, multiple endpoints and `hostaddr` overrides are refused in this mode. Prefer a socket directory accessible only to the database owner where your PostgreSQL setup supports it. PostgreSQL authentication still applies; Workglen does not modify `pg_hba.conf` or enable trust authentication. If your local server already has TLS, select `--postgres-transport verified-tls` and its CA file instead. Remote PostgreSQL continues to require verified TLS by default.
 
-Passwords containing single quotes or backslashes need libpq connection-string escaping; see [PostgreSQL's connection parameters](https://www.postgresql.org/docs/current/libpq-connect.html). DSN contents stay in mode-0600 files and are excluded from the gateway bundle and logs. Local PostgreSQL disk encryption/backups remain your responsibility; Mail Security's encrypted redb does not encrypt Accounting or the local Admin store.
+Passwords containing single quotes or backslashes need libpq connection-string escaping; see [PostgreSQL's connection parameters](https://www.postgresql.org/docs/current/libpq-connect.html). DSN contents stay in mode-0600 files and are excluded from the gateway bundle and logs. Local PostgreSQL disk encryption/backups remain your responsibility. The encrypted local Admin redb protects its own administration state, not Accounting data.
 
 ## 2. Build and configure on your Mac
 
@@ -57,6 +57,8 @@ bash install.sh admin --postgres-dsn-file "$HOME/workglen-postgres.dsn"
 Use a test gateway hostname, such as `security.test.example`, and the test mail domain it will protect. For end-to-end testing, use a manually provisioned private test CA and configure its trust chain as described in [INSTALL.md](INSTALL.md). Public Let's Encrypt issuance, including staging, is not part of the current development test procedure. Enter separate local Admin and gateway recovery passwords.
 
 The wizard creates `workglen-gateway-bundle` in the current directory. It contains a management secret, so keep its directory 0700 and files 0600. It is a deployment artifact for your hosts, not part of the distributable source ZIP. BYOK storage keys should be transferred only if explicitly selected.
+
+The wizard also creates `etc/admin-storage.key` outside the local Admin data directory. It is not included in the gateway bundle. Back it up separately from `data/admin.redb` and encrypted `backup-*.redb` files; all of those database files require the same key, and the key alone contains no recoverable administration data.
 
 Initialize Accounting in the dedicated database when ready:
 
