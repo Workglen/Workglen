@@ -71,7 +71,11 @@ Alternatively use `--initialize-accounting` during setup. The schema starts disa
 
 ## 3. Trust and launch the local console
 
-The Mac console binds only to loopback and uses its generated localhost certificate. The current gateway test procedure uses a manually provisioned private test CA; public ACME/Let's Encrypt issuance is a separately tested capability. A public CA cannot validate your private `localhost` name. In Keychain Access, import the **public** file `~/Library/Application Support/Workglen/etc/local-ca.pem` into your login keychain, open that certificate's Trust settings, and explicitly trust it for SSL. Check that it is your locally generated `Workglen Local Admin CA` and that its critical name constraints permit only exact `localhost`, `127.0.0.1` and `::1`. Do not import or share `local-key.pem`. There is no CA private-key file: its in-memory signing key is discarded immediately after issuance. Corporate-managed Macs may require an administrator's approved trust procedure. The installer never changes Keychain or system trust.
+The Mac console binds only to loopback and uses its generated localhost certificate. The current gateway test procedure uses a manually provisioned private test CA; public ACME/Let's Encrypt issuance is a separately tested capability. A public CA cannot validate your private `localhost` name.
+
+For the guided path, open `~/Library/Application Support/Workglen` in Finder and double-click `install-local-ca.command`. It opens only the public `etc/local-ca.cer` in Keychain Access, shows the exact approval clicks, and opens the Admin URL after you confirm completion. Add the certificate to the Login keychain for the current user or System for all users, double-click `Workglen Local Admin CA`, expand Trust, set **When using this certificate** to **Always Trust**, close the window, and approve the macOS prompt. Quit and reopen Safari and Chrome. See [LOCAL-CA-TRUST.md](LOCAL-CA-TRUST.md) for the fallback import path and troubleshooting.
+
+Check that the CA's critical name constraints permit only exact `localhost`, `127.0.0.1` and `::1`. Do not import or share `local-key.pem`. There is no CA private-key file: its in-memory signing key is discarded immediately after issuance. Corporate-managed Macs may require an administrator's approved trust procedure. The installer may open Keychain Access but never changes trust; macOS always requires explicit operator approval.
 
 Start:
 

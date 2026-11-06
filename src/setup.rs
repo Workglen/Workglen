@@ -1,6 +1,6 @@
 //! Native provisioning helpers. All key material is local; existing files are refused.
 use crate::encoding::STANDARD;
-use crate::error::{Result, ensure};
+use crate::error::{ensure, Result};
 use pratique::{
     asn1::write as der,
     crypto::{
@@ -180,6 +180,7 @@ pub fn local_tls(directory: &Path) -> Result<()> {
     );
     for file in [
         "local-ca.pem",
+        "local-ca.cer",
         // Refuse even a partial legacy directory containing the retired CA key.
         "local-ca-key.pem",
         "local-leaf.pem",
@@ -221,6 +222,8 @@ pub fn local_tls(directory: &Path) -> Result<()> {
     CertifiedKey::from_pem(&chain, std::str::from_utf8(&leaf_key)?)?;
     for (file, data) in [
         ("local-ca.pem", ca_pem.as_bytes()),
+        // DER with a .cer extension gives macOS a direct Keychain import path.
+        ("local-ca.cer", root.as_slice()),
         ("local-leaf.pem", leaf_pem.as_bytes()),
         ("local-cert.pem", chain.as_bytes()),
         ("local-key.pem", &leaf_key),
@@ -293,19 +296,24 @@ mod tests {
         let cert = dir.path().join("local-cert.pem");
         let key = dir.path().join("local-key.pem");
         check_tls(cert.to_str().unwrap(), key.to_str().unwrap(), "localhost").unwrap();
-        assert!(
-            check_tls(
-                cert.to_str().unwrap(),
-                key.to_str().unwrap(),
-                "other.example"
-            )
-            .is_err()
-        );
+        assert!(check_tls(
+            cert.to_str().unwrap(),
+            key.to_str().unwrap(),
+            "other.example"
+        )
+        .is_err());
         let before = fs::read(&key).unwrap();
         assert!(local_tls(dir.path()).is_err());
         assert_eq!(before, fs::read(&key).unwrap());
         assert_eq!(fs::metadata(key).unwrap().mode() & 0o777, 0o600);
         assert!(!dir.path().join("local-ca-key.pem").exists());
+        let root_pem = fs::read_to_string(dir.path().join("local-ca.pem")).unwrap();
+        let root_der = pratique::pem::parse(&root_pem)
+            .into_iter()
+            .find(|block| block.label == "CERTIFICATE")
+            .expect("public root certificate")
+            .data;
+        assert_eq!(fs::read(dir.path().join("local-ca.cer")).unwrap(), root_der);
         let private_keys = fs::read_dir(dir.path())
             .unwrap()
             .filter_map(|entry| {
@@ -366,11 +374,9 @@ mod tests {
             ),
             (issue(&["sub.localhost"], &[]), "sub.localhost"),
         ] {
-            assert!(
-                trust
-                    .verify_server_chain(&[leaf, root.clone()], host, now)
-                    .is_err()
-            );
+            assert!(trust
+                .verify_server_chain(&[leaf, root.clone()], host, now)
+                .is_err());
         }
     }
 }

@@ -145,6 +145,14 @@ try:
     gateway = json.loads((bundle / "config.json").read_text())
     assert parsed["admin_only"] and parsed["accounting"]["transport"] == "local"
     assert not (local / "etc/local-ca-key.pem").exists()
+    ca_pem = (local / "etc/local-ca.pem").read_text()
+    ca_der = ssl.PEM_cert_to_DER_cert(ca_pem)
+    assert (local / "etc/local-ca.cer").read_bytes() == ca_der
+    trust_helper = local / "install-local-ca.command"
+    assert trust_helper.stat().st_mode & 0o077 == 0
+    helper_text = trust_helper.read_text()
+    assert "local-ca.cer" in helper_text and "Keychain Access" in helper_text
+    assert "local-key.pem" not in helper_text and "PRIVATE KEY" not in helper_text
     private_key_pems = sorted(
         path.name
         for path in (local / "etc").iterdir()

@@ -475,10 +475,39 @@ HERE=$(cd -- "$(dirname -- "$0")" && pwd -P)
 exec "$HERE/bin/workglen" admin-serve "$HERE/etc/admin.toml"
 RUN
     chmod 700 "$ADMIN_HOME/run-admin.sh"
+    {
+        printf '#!/usr/bin/env bash\nset -eu\nWEB_PORT=%s\n' "$WEB_PORT"
+        cat <<'RUN'
+HERE=$(cd -- "$(dirname -- "$0")" && pwd -P)
+CA="$HERE/etc/local-ca.cer"
+if [ "$(uname -s)" != Darwin ]; then
+    printf '%s\n' 'This guided trust helper is for macOS. See docs/LOCAL-CA-TRUST.md.' >&2
+    exit 1
+fi
+[ -f "$CA" ] || { printf 'Missing public CA certificate: %s\n' "$CA" >&2; exit 1; }
+printf '%s\n' \
+    'Opening the public Workglen Local Admin CA in Keychain Access.' \
+    'No private key is opened or installed.' \
+    '' \
+    'In Keychain Access:' \
+    '  1. Add the certificate to Login for this user, or System for all users.' \
+    '  2. Find and double-click "Workglen Local Admin CA".' \
+    '  3. Expand Trust and set "When using this certificate" to "Always Trust".' \
+    '  4. Close the certificate window and approve the macOS prompt.' \
+    '  5. Quit and reopen Safari and Chrome.'
+/usr/bin/open -a "Keychain Access" "$CA"
+printf '\nPress Return after completing those clicks to open the Admin console: '
+IFS= read -r _
+/usr/bin/open "https://localhost:${WEB_PORT}/mail-security"
+RUN
+    } > "$ADMIN_HOME/install-local-ca.command"
+    chmod 700 "$ADMIN_HOME/install-local-ca.command"
     copy_docs "$ADMIN_HOME/docs"
     cp "$SOURCE/MAC-ADMIN-LIGHTSAIL.md" "$BUNDLE/README.md"
     say "Local Admin installed. Start: bash \"$ADMIN_HOME/run-admin.sh\""
-    say "Open https://localhost:$WEB_PORT/mail-security after trusting the local certificate as documented."
+    say "macOS certificate helper: double-click \"$ADMIN_HOME/install-local-ca.command\""
+    say "It opens only the public CA and shows the remaining approval clicks; it never changes trust silently."
+    say "Open https://localhost:$WEB_PORT/mail-security after trusting the local certificate."
     say "The one-year CA is constrained to exact loopback names; its signing key was discarded. Renew into a fresh directory and replace the manually trusted CA before expiry."
     say "Pairing bundle: $BUNDLE — contains a management secret; transfer it privately to Lightsail."
     say "Back up $etc/admin-storage.key separately from encrypted Admin database backups; neither can recover the other."
@@ -486,6 +515,12 @@ RUN
     say "Gateway mail acceptance remains paused until guided setup, route tests and rule activation."
     if [ -n "$PG_DSN" ] && ! $INIT_ACCOUNTING; then say "Accounting connection saved. Initialize its dedicated database with: \"$ADMIN_HOME/bin/workglen\" accounting-init \"$etc/admin.toml\""; fi
     if [ "$TLS" = staging ]; then say "Staging TLS is untrusted. Switch the gateway to production before connecting the local console; do not disable TLS verification."; fi
+    if [ "$OS" = Darwin ] && ! $NONINTERACTIVE; then
+        say "Opening the public Workglen CA in Keychain Access now. macOS still requires your explicit trust approval."
+        if ! /usr/bin/open -a "Keychain Access" "$etc/local-ca.cer"; then
+            say "Keychain Access did not open. Double-click the certificate helper shown above."
+        fi
+    fi
     trap - ERR
 }
 gateway() {
