@@ -1,14 +1,17 @@
-# Mail Security Ubuntu/systemd campaign
+# Mail Security Debian/systemd campaign
 
 This campaign turns the remaining target-host acceptance/upgrade work into a
-repeatable evidence run. It is intentionally limited to a disposable Ubuntu
+repeatable evidence run. It is intentionally limited to a disposable Debian
 gateway configured with reserved `.test` or `.invalid` sender and recipient
 domains and a disposable downstream sink. It does not change DNS, MX records,
 firewalls, public certificates or provider configuration.
 
-The runner defaults to a read-only plan. It refuses a non-Ubuntu host, a host
-without a running systemd, non-test addresses, missing files and an existing
-evidence directory. Mutation requires both `--execute` and
+The runner defaults to a read-only plan. It accepts Debian and Debian-family
+systemd hosts (including Ubuntu for portability testing), but only a retained
+run from the intended Debian deployment class qualifies the live target. It
+refuses other operating-system families, a host without a running systemd,
+non-test addresses, missing files and an existing evidence directory. Mutation
+requires both `--execute` and
 `--confirm-disposable-host`; execute mode additionally requires root. The only
 service the runner intentionally stops is the separately restartable scanner.
 It continuously verifies that the ingress/control unit stays active.
@@ -33,7 +36,7 @@ It continuously verifies that the ingress/control unit stays active.
 Run the read-only preflight first:
 
 ```sh
-python3 tools/gateway-ubuntu-campaign.py \
+python3 tools/gateway-systemd-campaign.py \
   --binary /usr/local/bin/workglen \
   --config /etc/workglen-security/security.json \
   --ca-file /etc/workglen-security/test-ca.pem \
@@ -45,7 +48,7 @@ python3 tools/gateway-ubuntu-campaign.py \
   --output /var/tmp/workglen-campaign-plan
 ```
 
-The plan records Ubuntu/host identity, CPU count, filesystem capacity, binary
+The plan records exact operating-system/host identity, CPU count, filesystem capacity, binary
 hash, selected systemd hardening/resource properties, queue/capacity status and
 the proposed 10k/25k/50k workload. It sends no mail and changes no service.
 
@@ -68,7 +71,7 @@ After reviewing that file on a disposable host, run the scanner-replacement
 campaign:
 
 ```sh
-sudo python3 tools/gateway-ubuntu-campaign.py \
+sudo python3 tools/gateway-systemd-campaign.py \
   --execute --confirm-disposable-host \
   --binary /usr/local/bin/workglen \
   --config /etc/workglen-security/security.json \

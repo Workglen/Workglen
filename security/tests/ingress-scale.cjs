@@ -138,7 +138,7 @@ function timedRun(messages, threads) {
       max_node_spool_reserve_mib: Math.max(...perNodeSpoolReserveMiB),
       sustained_acceptance_per_second: profile.acceptance_per_second / 2,
       factor: 1.5,
-      note: 'Synthetic single-process/single-host planning floors. Memory is combined across in-process nodes; disk reserves are separated by node. Validate on distinct target Ubuntu hosts with representative MIME sizes, peer networking, and scanner concurrency.',
+      note: 'Synthetic single-process/single-host planning floors. Memory is combined across in-process nodes; disk reserves are separated by node. Validate on distinct target Debian hosts with representative MIME sizes, peer networking, and scanner concurrency.',
     },
   };
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused tests for the guarded Ubuntu campaign's pure helpers."""
+"""Focused tests for the guarded Debian-family systemd campaign helpers."""
 
 from __future__ import annotations
 
@@ -8,14 +8,20 @@ import unittest
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).with_name("gateway-ubuntu-campaign.py")
-SPEC = importlib.util.spec_from_file_location("gateway_ubuntu_campaign", SCRIPT)
+SCRIPT = Path(__file__).with_name("gateway-systemd-campaign.py")
+SPEC = importlib.util.spec_from_file_location("gateway_systemd_campaign", SCRIPT)
 assert SPEC and SPEC.loader
 CAMPAIGN = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CAMPAIGN)
 
 
 class CampaignHelpers(unittest.TestCase):
+    def test_supported_systemd_release_is_debian_family_only(self) -> None:
+        self.assertTrue(CAMPAIGN.supported_systemd_release({"ID": "debian"}))
+        self.assertTrue(CAMPAIGN.supported_systemd_release({"ID": "ubuntu"}))
+        self.assertTrue(CAMPAIGN.supported_systemd_release({"ID": "custom", "ID_LIKE": "debian"}))
+        self.assertFalse(CAMPAIGN.supported_systemd_release({"ID": "fedora"}))
+
     def test_message_counts_are_bounded(self) -> None:
         self.assertEqual(CAMPAIGN.parse_counts("100,10000,100000"), [100, 10000, 100000])
         for value in ("99", "100001", "100,nope"):

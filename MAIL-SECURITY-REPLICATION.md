@@ -148,7 +148,7 @@ The current Admin implementation enumerates every registered gateway remote and 
 - Deliberate partition without fencing; prove a replica never starts delivery for another owner's partition automatically.
 - Downstream acknowledgement loss before state replication; preserve `uncertain` and require explicit reconciliation.
 - Disk-full, storage corruption, snapshot interruption, power-loss simulation and retention/tombstone safety.
-- Measure healthy replicated acceptance, degraded local acceptance, catch-up, handoff time, peak RSS/CPU/disk/network and status latency on the intended Ubuntu hosts.
+- Measure healthy replicated acceptance, degraded local acceptance, catch-up, handoff time, peak RSS/CPU/disk/network and status latency on the intended Debian hosts.
 
 ## Delivery order
 

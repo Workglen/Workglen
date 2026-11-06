@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Target-host Mail Security acceptance and scanner-upgrade campaign.
+"""Debian-family Mail Security acceptance and scanner-upgrade campaign.
 
 The default mode is a read-only plan. --execute stops and starts only the
 configured scanner unit, injects synthetic mail into a .test/.invalid domain,
@@ -242,6 +242,12 @@ def os_release() -> dict[str, str]:
     return values
 
 
+def supported_systemd_release(release: dict[str, str]) -> bool:
+    release_id = release.get("ID", "").lower()
+    id_like = {item.lower() for item in release.get("ID_LIKE", "").split()}
+    return release_id in {"debian", "ubuntu"} or "debian" in id_like
+
+
 def unit_state(unit: str) -> dict[str, str]:
     properties = [
         "Id", "LoadState", "ActiveState", "SubState", "FragmentPath", "ExecMainPID",
@@ -290,7 +296,7 @@ def message(
     variant = message_variant(index, profile)
     headers = (
         f"From: {sender}\r\nTo: {recipient}\r\n"
-        f"Subject: Workglen Ubuntu campaign {campaign} {index}\r\n"
+        f"Subject: Workglen systemd campaign {campaign} {index}\r\n"
         f"Message-ID: <{campaign}-{index}@sender.invalid>\r\n"
         f"X-Workglen-Campaign-Profile: {variant}\r\n"
         "MIME-Version: 1.0\r\n"
@@ -470,8 +476,11 @@ def wait_for_ha_readiness(local_api: SecurityApi, peer_api: SecurityApi, timeout
 def main() -> int:
     args = arguments()
     release = os_release()
-    if release.get("ID") != "ubuntu":
-        raise RuntimeError(f"campaign requires Ubuntu; detected {release.get('ID', 'unknown')}")
+    if not supported_systemd_release(release):
+        raise RuntimeError(
+            "campaign requires a Debian-family systemd host; detected "
+            f"{release.get('ID', 'unknown')}"
+        )
     if not Path("/run/systemd/system").is_dir() or shutil.which("systemctl") is None:
         raise RuntimeError("campaign requires a running systemd host")
     test_address(args.sender, "sender")
@@ -513,14 +522,19 @@ def main() -> int:
     peer_status = peer_api.status() if peer_api else None
 
     preflight = {
-        "schema": 1,
+        "schema": 2,
         "mode": "execute" if args.execute else "plan",
         "started_at": int(time.time()),
         "host": {
             "hostname": platform.node(),
             "platform": platform.platform(),
             "cpu_count": os.cpu_count(),
-            "ubuntu": release.get("PRETTY_NAME"),
+            "operating_system": {
+                "id": release.get("ID"),
+                "id_like": release.get("ID_LIKE"),
+                "pretty_name": release.get("PRETTY_NAME"),
+                "version_id": release.get("VERSION_ID"),
+            },
             "filesystem": shutil.disk_usage(args.config.parent)._asdict(),
         },
         "binary_sha256": hashlib.sha256(args.binary.read_bytes()).hexdigest(),
@@ -642,13 +656,13 @@ def main() -> int:
         "passed": all(phase["passed"] for phase in phases),
         "completed_at": int(time.time()),
         "qualification": (
-            "dual-node Ubuntu/systemd scanner replacement with an explicit package-upgrade driver"
+            "dual-node Debian-family/systemd scanner replacement with an explicit package-upgrade driver"
             if args.upgrade_executable and peer_api
-            else "Ubuntu/systemd scanner replacement with an explicit package-upgrade driver"
+            else "Debian-family/systemd scanner replacement with an explicit package-upgrade driver"
             if args.upgrade_executable
-            else "dual-node-observed Ubuntu/systemd scanner stop/start campaign; no package upgrade driver was supplied"
+            else "dual-node-observed Debian-family/systemd scanner stop/start campaign; no package upgrade driver was supplied"
             if peer_api
-            else "Ubuntu/systemd scanner stop/start campaign; no package upgrade driver was supplied"
+            else "Debian-family/systemd scanner stop/start campaign; no package upgrade driver was supplied"
         ),
         "excluded": [
             "host power-loss injection",

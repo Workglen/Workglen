@@ -105,7 +105,14 @@ The explicit mixed-lane benchmark used 160 archive-heavy messages (351,991 raw M
 | 4 | Shared oldest-first | 4 any | 67.5/s | 2.388 s | 2.936 s | 46.7 ms |
 | 4 | Priority lanes | 1 light / 3 heavy | 68.7/s | 44 ms | 2.155 s | 54.9 ms |
 
-At two workers the strict reservation improved light p95 3.12x but cost 15.5% total throughput after the light queue drained. The corrected three-worker allocation recovered that throughput completely (1.007 priority/shared ratio) while retaining a 1.76x light-p95 improvement and moving the first light completion ahead by about 2.36 seconds. Four workers also recovered throughput (1.018 ratio), but the light-p95 advantage narrowed to 1.36x because more heavy work completes concurrently through the serialized finalization path. Three workers are the next target-host candidate; two remains the default until representative Ubuntu CPU, RSS and service-unit measurements establish a safe resource envelope.
+At two workers the strict reservation improved light p95 3.12x but cost 15.5% total throughput after the light queue drained. The corrected three-worker allocation recovered that throughput completely (1.007 priority/shared ratio) while retaining a 1.76x light-p95 improvement and moving the first light completion ahead by about 2.36 seconds. Four workers also recovered throughput (1.018 ratio), but the light-p95 advantage narrowed to 1.36x because more heavy work completes concurrently through the serialized finalization path. Three workers are the next target-host candidate; two remains the default until representative Debian CPU, RSS and service-unit measurements establish a safe resource envelope.
+
+Contained Linux ARM64 job `5fd15c85-41e4-4658-ba0e-73d34c663ac3`
+verified the submitted source and tree hashes and passed all 108 active
+mail-security tests in 5.61 seconds with zero failures or errors. Five explicit
+benchmark/stress profiles were intentionally skipped. This cross-platform run
+does not execute the ignored mixed-lane benchmark and is not Debian/systemd,
+package-upgrade, or resource-sizing evidence.
 
 The following older backlog rows predate bounded group commit and remain useful as conservative backlog/RSS/storage evidence, not current peak-throughput results:
 
@@ -139,7 +146,7 @@ The 20k run created 40,000 durable copies. Per-node disk growth was 288.7, 388.4
 
 The 5k regression includes the newer cumulative acknowledgement/debt accounting. Each origin finished with its final peer acknowledgement durably recorded; all three nodes reported zero operation/byte debt, one expected outbound peer and one expected inbound origin. Per-node measured-workload reserves at 1.5x were 154, 171 and 169 MiB.
 
-This is a conservative storage-path baseline, not synchronized-HA evidence. Synchronous per-origin application kept ordering simple but materially reduced throughput and increased p95 latency. The implemented authenticated peer batching preserves commit/order in focused and native loopback tests; its throughput, tail latency and catch-up behavior still require measurement on separate Ubuntu hosts.
+This is a conservative storage-path baseline, not synchronized-HA evidence. Synchronous per-origin application kept ordering simple but materially reduced throughput and increased p95 latency. The implemented authenticated peer batching preserves commit/order in focused and native loopback tests; its throughput, tail latency and catch-up behavior still require measurement on separate Debian hosts.
 
 Before the ledger/index change, the 5,000 × 4 KiB point managed 34.5 accepts/s with 1.21-second p95 and a 105 ms status query. After the acceptance/index change, the same point managed 205.8 accepts/s with 134 ms p95; the subsequent status-counter change reduced 10k/25k global status to 3–4 ms while keeping acceptance above 200/s. The 25k row is the final post-hardening rerun after malformed-derived-record recovery was added.
 
@@ -149,20 +156,20 @@ The real-process test now supports bounded connection reuse. A 5,000-message run
 
 ## Initial resource envelope
 
-Use these as test-host starting points, then rerun the matrix on the intended Ubuntu instance with representative MIME distributions.
+Use these as test-host starting points, then rerun the matrix on the intended Debian instance with representative MIME distributions.
 
 The target-host acceptance/upgrade campaign is now scripted in
-[MAIL-SECURITY-UBUNTU-CAMPAIGN.md](MAIL-SECURITY-UBUNTU-CAMPAIGN.md). Its default
+[MAIL-SECURITY-DEBIAN-CAMPAIGN.md](MAIL-SECURITY-DEBIAN-CAMPAIGN.md). Its default
 mode is a read-only systemd/host/capacity plan; its explicitly acknowledged
 execute mode measures 10k/25k/50k verified-STARTTLS acceptance while the scanner
 is replaced, records systemd memory properties and waits for the queue to drain.
 An optional reviewed executable makes the same run an actual package-upgrade
-campaign. The source runner is not Ubuntu evidence until its generated report is
+campaign. The source runner is not Debian evidence until its generated report is
 retained and reviewed from the intended disposable host.
 
 | Intended envelope | `security-serve` | `security-scan-worker` | Host RAM | Notes |
 |---|---|---|---|---|
-| Up to 10k small queued messages, scan concurrency 2 | 2 vCPU / 512 MiB | 2 vCPU / 512 MiB | 2 GiB | Suitable next Ubuntu validation tier. |
+| Up to 10k small queued messages, scan concurrency 2 | 2 vCPU / 512 MiB | 2 vCPU / 512 MiB | 2 GiB | Suitable next Debian validation tier. |
 | Up to 25k small queued messages, scan concurrency 2–4 | 4 vCPU / 1 GiB | 4 vCPU / 1 GiB | 4 GiB | Validate large/hostile MIME and recovery soak before use. |
 | More than 25k or scan concurrency above 4 | Not yet prescribed | Not yet prescribed | Not yet prescribed | Run 50k plus representative scanner matrix first. |
 
@@ -170,7 +177,7 @@ The observed service RSS is far below these floors. The extra margin is delibera
 
 ### Disk sizing
 
-Logical MIME bytes and physical encrypted-store growth are different. The 64 KiB calibration consumed about 196 KiB of durable space per message after ingress metadata, indexes, audit and storage allocation. Until Ubuntu measurements provide a better workload-specific factor, use:
+Logical MIME bytes and physical encrypted-store growth are different. The 64 KiB calibration consumed about 196 KiB of durable space per message after ingress metadata, indexes, audit and storage allocation. Until Debian measurements provide a better workload-specific factor, use:
 
 ```text
 receive-spool reserve >= 1.5 × backlog × (3 × p95 raw MIME bytes + 16 KiB)
@@ -186,7 +193,7 @@ The current configured logical content ceiling is at most 1 GiB. Tens of thousan
 
 ### Planning rates and alerts
 
-Do not provision to the observed peak. The loopback slim-acceptance path sustained 1,877.6 small messages/s while scanning was offline; use at most 900/s as a synthetic burst-planning ceiling on this host class. Sustainable no-growth traffic is governed by the slower scanner/delivery path: use at most 35 small messages/s per node until representative archive, DNS-authentication and target-Ubuntu results supersede the 75–76/s scanner measurements. For the current synchronous three-node acceptance-replication slice, use at most 37 original messages/s aggregate until a separate-host network test supersedes it.
+Do not provision to the observed peak. The loopback slim-acceptance path sustained 1,877.6 small messages/s while scanning was offline; use at most 900/s as a synthetic burst-planning ceiling on this host class. Sustainable no-growth traffic is governed by the slower scanner/delivery path: use at most 35 small messages/s per node until representative archive, DNS-authentication and target-Debian results supersede the 75–76/s scanner measurements. For the current synchronous three-node acceptance-replication slice, use at most 37 original messages/s aggregate until a separate-host network test supersedes it.
 
 Initial alerts:
 
@@ -198,10 +205,10 @@ Initial alerts:
 
 ## Remaining gates
 
-- Validate the three-worker one-light/two-heavy candidate against two and four workers on the intended Ubuntu host, including CPU, `MemoryPeak`, light p95 and total throughput; keep two as the default until that evidence exists.
-- Execute the guarded 10k/25k/50k campaign on the intended Ubuntu filesystem and systemd units, including a reviewed package upgrade, restart during the backlog and derived-state rebuild timing.
+- Validate the three-worker one-light/two-heavy candidate against two and four workers on the intended Debian host, including CPU, `MemoryPeak`, light p95 and total throughput; keep two as the default until that evidence exists.
+- Execute the guarded 10k/25k/50k campaign on the intended Debian filesystem and systemd units, including a reviewed package upgrade, restart during the backlog and derived-state rebuild timing.
 - Run the campaign's deterministic `mixed` profile at 64 KiB, 1 MiB and near-limit sizes; its exact plain/attachment/GZIP/nested/malformed distribution is recorded in every phase.
-- Repeat the 5k persistent-session SMTP test across a real network on the target Ubuntu host and a disposable downstream service; current evidence is loopback only.
+- Repeat the 5k persistent-session SMTP test across a real network on the target Debian host and a disposable downstream service; current evidence is loopback only.
 - Extend scanner concurrency testing to benign, nested, malformed and compression-heavy attachment mixes; the completed 1/2/4/8 matrix uses benign 64 KiB text.
 - Run real filesystem-full/power-loss injection; native host free-space admission is implemented, but does not replace those fault campaigns.
 - Profile startup rebuild and retention garbage collection at 25k/50k; they remain linear maintenance operations.

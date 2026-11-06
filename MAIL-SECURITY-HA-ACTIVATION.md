@@ -2,7 +2,7 @@
 
 This is the controlled activation sequence for the pre-production synchronized
 two-node source slice. It is not authorization to publish production MX records.
-Use two disposable Ubuntu hosts in separate failure domains, a reserved test
+Use two disposable Debian hosts in separate failure domains, a reserved test
 mail domain, a private management/replication network and a disposable verified
 TLS downstream sink.
 
@@ -24,11 +24,11 @@ TLS downstream sink.
 
 ## Read-only gate
 
-Run [the Ubuntu campaign](MAIL-SECURITY-UBUNTU-CAMPAIGN.md) on node A with the
+Run [the Debian campaign](MAIL-SECURITY-DEBIAN-CAMPAIGN.md) on node A with the
 peer admin options:
 
 ```sh
-python3 tools/gateway-ubuntu-campaign.py \
+python3 tools/gateway-systemd-campaign.py \
   --binary /usr/local/bin/workglen \
   --config /etc/workglen-security/security.json \
   --ca-file /etc/workglen-security/test-ca.pem \

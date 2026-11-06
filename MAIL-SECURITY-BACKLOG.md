@@ -7,7 +7,7 @@ This backlog records future work. An item here is not a claim that the saved rel
 ## SEC-INGRESS-01 — Durable acceptance during scanner upgrades
 
 **Priority:** P0 availability and loss-prevention boundary.
-**Status:** Implemented in source. A guarded target-host campaign runner and runbook now cover Ubuntu/systemd preflight, 10k/25k/50k SMTP injection, scanner replacement, optional actual package-upgrade execution, evidence capture and backlog drain; external execution, soak, physical disk-full and power-loss validation remain required before production readiness.
+**Status:** Implemented in source. A guarded target-host campaign runner and runbook now cover Debian/systemd preflight, 10k/25k/50k SMTP injection, scanner replacement, optional actual package-upgrade execution, evidence capture and backlog drain; external execution, soak, physical disk-full and power-loss validation remain required before production readiness.
 
 - SMTP now performs bounded protocol, enabled-recipient and configured-capacity checks, then commits exact original MIME, envelope, observed peer, active immutable rule version and a versioned analysis-settings snapshot as `pending-scan` before returning `250`.
 - `security-serve` remains the sole encrypted-store owner. The same native executable provides a separately restartable `security-scan-worker` role using an owner-only bounded Unix socket, version handshake and renewable token-bound claims. The worker renews active leases every 30 seconds; stale tokens are refused, cancellation is checked at bounded analysis phase boundaries, and a control-service restart immediately invalidates and requeues its orphaned leases. No external scanner/runtime/database was added.
@@ -26,24 +26,25 @@ Synthetic local evidence recorded 2026-11-04 (not production sizing):
 
 Remaining hardening/operations work:
 
-- Execute [the guarded Ubuntu campaign](MAIL-SECURITY-UBUNTU-CAMPAIGN.md) on the intended disposable systemd host, including its optional reviewed package-upgrade driver, then add longer outage/soak periods, real filesystem-full behavior, host power-loss fault injection and startup rebuild/retention measurements. The runner is source capability, not completed external evidence. The local macOS simulations cover actual scanner `SIGKILL`, state-machine lease replacement, logical quota exhaustion and encrypted-store interrupted-write recovery, not those host-specific behaviors.
-- Versioned status now derives critical/warning alerts for scanner unavailability, old receive work, uncertain/failed delivery, replication debt, stale/failed bidirectional peer contact and host free-space reserve, and Central Admin renders them as a high-contrast cluster-wide action panel. External alert delivery, acknowledgement/deduplication policy and Ubuntu delivery validation remain required. SMTP admission reserves a configurable host-filesystem floor and fails closed.
+- Execute [the guarded Debian campaign](MAIL-SECURITY-DEBIAN-CAMPAIGN.md) on the intended disposable systemd host, including its optional reviewed package-upgrade driver, then add longer outage/soak periods, real filesystem-full behavior, host power-loss fault injection and startup rebuild/retention measurements. The runner is source capability, not completed external evidence. The local macOS simulations cover actual scanner `SIGKILL`, state-machine lease replacement, logical quota exhaustion and encrypted-store interrupted-write recovery, not those host-specific behaviors.
+- Versioned status now derives critical/warning alerts for scanner unavailability, old receive work, uncertain/failed delivery, replication debt, stale/failed bidirectional peer contact and host free-space reserve, and Central Admin renders them as a high-contrast cluster-wide action panel. External alert delivery, acknowledgement/deduplication policy and Debian delivery validation remain required. SMTP admission reserves a configurable host-filesystem floor and fails closed.
 - Worker and peer-replication protocol 2 now negotiate an explicit version 1–2 window. Current workers begin with a version-1-compatible hello and pin the highest mutually supported version for the connection; current services accept real legacy version-1 frames, while disjoint windows fail before work is claimed or state is applied. Focused current/legacy pair regressions pass; a packaged rolling two-host campaign remains an activation gate.
 - A restart of `security-serve` itself still relies on ordinary SMTP sender retry. Listener-FD handoff or independently spooling dual ingress nodes remains a later availability increment; no shared multi-gateway spool is claimed.
 
 ## SEC-SCALE-01 — High-backlog gateway scaling
 
 **Priority:** P0 capacity validation for large gateway deployments.
-**Status:** Indexed/constant-time source paths are implemented and locally exercised through 25,000 queued messages per store and 50,000 aggregate across two independent stores; Ubuntu, representative-content, replication and larger network sign-off remain required.
+**Status:** Indexed/constant-time source paths are implemented and locally exercised through 25,000 queued messages per store and 50,000 aggregate across two independent stores; Debian, representative-content, replication and larger network sign-off remain required.
 
 - Admission uses a transactionally maintained durable capacity ledger rather than enumerating every message, receive record, job and blob. Scanner claims use ordered due and active-lease indexes. Global status uses durable state counters and an oldest-arrival index. Authoritative records and their derived updates commit in the same redb transaction.
 - Service startup rebuilds the ledger, counters and indexes from authoritative encrypted records, so missing or damaged derived data cannot silently change capacity or queue order. Startup rebuild and retention garbage collection remain linear maintenance operations; scoped status also remains linear because it enforces arbitrary mailbox/domain visibility.
 - The release scaling harness parameterizes backlog, writer concurrency, exact MIME size and optional drain, then reports acceptance latency/throughput, status latency, disk growth, peak RSS and CPU. A separate process test exercises verified STARTTLS, scanner kills/replacements, capacity refusal and delivery.
 - Local bounded group commit raised 4 KiB direct-ingress throughput from 201.5/s with one caller to 2,550.4/s with 16 callers while reducing 2,000 messages to 125 encrypted durable commits; p95 was 7.3 ms. Thirty-two callers added no throughput and doubled p95, confirming the deliberate 16-message/session ceiling. Status exposes commits, messages, largest batch and messages per commit. The wrapper accepts comma-separated concurrency points plus host-calibrated throughput/latency ceilings and exits unsuccessfully on regression. This is development-Mac storage-path evidence, not production capacity or malware-analysis throughput.
 - Delivery selection now uses a durable partition/term/owner/due index and a configurable bounded 1–16 worker pool (default four), replacing the single O(n) list-and-sort loop. Rebuild and eight-worker concurrent-claim tests prove 100 indexed jobs are claimed exactly once. The 5k loopback run exercised the pool through downstream delivery.
-- A scanner matrix over 500 benign 64 KiB messages measured 71.0/s at one worker, 75.6/s at two, 76.2/s at four and 75.7/s at eight. Two remains the default because higher concurrency added negligible throughput and sharply increased p95. Archive-heavy Ubuntu sizing remains required.
+- A scanner matrix over 500 benign 64 KiB messages measured 71.0/s at one worker, 75.6/s at two, 76.2/s at four and 75.7/s at eight. Two remains the default because higher concurrency added negligible throughput and sharply increased p95. Archive-heavy Debian sizing remains required.
 - The scanner reserves exactly one indexed latency worker for small, clearly single-part mail; all additional workers increase resource-capped heavy capacity for multipart, attachments, encoded bodies, large or ambiguous input. Light workers never take heavy work; an idle heavy worker may assist the light queue. Classification changes scheduling only—both lanes run the same pinned analysis profile and fail-closed coverage rules. Status and the receive queue expose the actual lane depth and allocation. The default remains two workers pending target-host resource evidence.
-- The original two-worker, three-run benchmark reduced light-message p95 completion from 2.854 s to 0.915 s (3.12x), but its strict one-light/one-heavy reservation reduced total throughput from 69.4/s to 58.6/s (15.5%). With the corrected scalable allocation, three workers (one light/two heavy) restored total throughput to 67.8/s versus 67.4/s shared while retaining a 1.76x light-p95 advantage (1.667 s versus 2.941 s). Four workers (one light/three heavy) reached 68.7/s versus 67.5/s shared but narrowed the light-p95 advantage to 1.36x. Three workers are therefore the target-host candidate, not yet the production default or an Ubuntu SLO.
+- The original two-worker, three-run benchmark reduced light-message p95 completion from 2.854 s to 0.915 s (3.12x), but its strict one-light/one-heavy reservation reduced total throughput from 69.4/s to 58.6/s (15.5%). With the corrected scalable allocation, three workers (one light/two heavy) restored total throughput to 67.8/s versus 67.4/s shared while retaining a 1.76x light-p95 advantage (1.667 s versus 2.941 s). Four workers (one light/three heavy) reached 68.7/s versus 67.5/s shared but narrowed the light-p95 advantage to 1.36x. Three workers are therefore the target-host candidate, not yet the production default or a Debian SLO.
+- Contained Linux ARM64 job `5fd15c85-41e4-4658-ba0e-73d34c663ac3` verified the exact adapted commit/tree and passed all 108 active mail-security tests with zero failures or errors; five explicit scale/stress profiles remained intentionally skipped. This is portability/regression evidence, not a Debian/systemd load, package-upgrade or resource-sizing result.
 - A same-host two-store baseline accepted 50,000 messages at an exact 25k/25k split with 40 writers: 229.0 aggregate accepts/s, 350 ms p95, 339 ms last-quarter p95, 8 ms combined status, 74.3 MiB peak RSS and 1,025.2 MiB aggregate disk growth. It intentionally excludes peer replication and is the ceiling against which SEC-HA-02 overhead will be measured.
 - The actual-process test queued 1,000 messages over separate verified-STARTTLS connections with 16 concurrent clients while the scanner was unavailable, killed/replaced the scanner four times, observed the deliberate capacity refusal and delivered all 1,076 accepted messages.
 - A persistent-session real-process campaign accepted 5,000 messages while the scanner was offline through 16 verified-STARTTLS clients and 48 total connections (up to 150 messages each). Acceptance sustained 1,877.6/s; four scanner `SIGKILL`/replacement cycles, one deliberate refusal and delivery of all 5,076 accepted messages completed in 145.864 seconds.
@@ -52,17 +53,17 @@ Detailed results, repeatable commands, conservative initial resource envelopes, 
 
 Remaining before production sizing:
 
-- Validate the three-worker one-light/two-heavy candidate against two and four workers on the intended Ubuntu host. Pin host-calibrated light-p95, total-throughput and peak-memory regression guards before changing the default.
-- Execute the guarded 10k/25k/50k scanner-replacement and reviewed package-upgrade campaign on the intended Ubuntu filesystem and systemd units; measure restart rebuild and retention collection time.
+- Validate the three-worker one-light/two-heavy candidate against two and four workers on the intended Debian host. Pin host-calibrated light-p95, total-throughput and peak-memory regression guards before changing the default.
+- Execute the guarded 10k/25k/50k scanner-replacement and reviewed package-upgrade campaign on the intended Debian filesystem and systemd units; measure restart rebuild and retention collection time.
 - Run the campaign's deterministic mixed profile at 64 KiB, 1 MiB and near-limit sizes. It now cycles plain, benign attachment, compression-heavy GZIP, nested message and malformed-transfer-encoding inputs and records exact accepted variant counts; contained/local validation is not target-host evidence.
-- Repeat the completed 5k persistent-session SMTP campaign across a real network on the target Ubuntu host and disposable downstream service.
-- Run real disk-full/power-loss injection on Ubuntu. Native host-free-space admission now reserves a configurable floor and fails closed, but the local macOS probe is not a disk-exhaustion campaign.
+- Repeat the completed 5k persistent-session SMTP campaign across a real network on the target Debian host and disposable downstream service.
+- Run real disk-full/power-loss injection on Debian. Native host-free-space admission now reserves a configurable floor and fails closed, but the local macOS probe is not a disk-exhaustion campaign.
 - Use the independent two-store results only as a distribution baseline. Implement and fault-test SEC-HA-02 before making any synchronized-HA claim; no shared multi-owner spool is currently claimed.
 
 ## SEC-HA-02 — Synchronized dual-node acceptance with fenced delivery ownership
 
 **Priority:** P0 availability and accepted-mail durability.
-**Status:** Implemented in source as a pre-production two-node availability slice: authenticated verified-TLS/HMAC peer transport, durable peer acknowledgement before SMTP `250`, bounded explicit degraded acceptance, ordered acceptance and later-state logs, immutable replay receipts with gap/conflict checks, version-1/2 rolling compatibility, full retained-log or checkpoint-tail resync, bounded checksummed compaction, fenced planned handoff with exact-state cancellation and automatic scan-generation reassignment, guarded exclusion/takeover and Admin controls. A strict-mode message returned with SMTP `451` stays non-runnable and is automatically tombstoned on every replica if a peer acknowledgement arrives late. A complete native two-node loopback fixture passes acceptance, state catch-up, delivery, scanner upgrade, central outage and encrypted restart. Production synchronized HA is still not claimed: Ubuntu multi-host fault/scale work, interrupted handoff/takeover/cancellation/compaction campaigns, real disk-full/power-loss tests and packaged rolling-upgrade evidence remain open. Recovery before a compaction frontier requires the retained encrypted database snapshot; fresh-node snapshot streaming is not implemented.
+**Status:** Implemented in source as a pre-production two-node availability slice: authenticated verified-TLS/HMAC peer transport, durable peer acknowledgement before SMTP `250`, bounded explicit degraded acceptance, ordered acceptance and later-state logs, immutable replay receipts with gap/conflict checks, version-1/2 rolling compatibility, full retained-log or checkpoint-tail resync, bounded checksummed compaction, fenced planned handoff with exact-state cancellation and automatic scan-generation reassignment, guarded exclusion/takeover and Admin controls. A strict-mode message returned with SMTP `451` stays non-runnable and is automatically tombstoned on every replica if a peer acknowledgement arrives late. A complete native two-node loopback fixture passes acceptance, state catch-up, delivery, scanner upgrade, central outage and encrypted restart. Production synchronized HA is still not claimed: Debian multi-host fault/scale work, interrupted handoff/takeover/cancellation/compaction campaigns, real disk-full/power-loss tests and packaged rolling-upgrade evidence remain open. Recovery before a compaction frontier requires the retained encrypted database snapshot; fresh-node snapshot streaming is not implemented.
 
 - Publish two MX receivers. Both durably accept, spool, scan and deliver the messages they own. Every message/ownership partition has exactly one fenced delivery owner, normally its accepting node; placement peers hold non-delivering replicas.
 - Healthy acceptance requires local plus peer durable commit before `250`. Explicit maintenance-only degraded acceptance may use one durable copy with bounded, visible replication debt.
@@ -75,7 +76,7 @@ The complete protocol, state, security, observability, handoff and fault-test re
 The guarded [two-host activation campaign](MAIL-SECURITY-HA-ACTIVATION.md) now
 defines the physical-host preflight, balanced/skew traffic, strict peer-loss,
 drain/cancel/handoff, fenced takeover, resync, rolling-upgrade and destructive
-fault order. The Ubuntu runner can authenticate to both nodes and refuses an
+fault order. The Debian runner can authenticate to both nodes and refuses an
 execute run unless identities, protocol windows, reciprocal membership, fresh
 bidirectional contact and both debt counters are healthy. This is executable
 source and a runbook, not completed multi-host evidence.
@@ -102,10 +103,10 @@ Remaining operations work:
 - Add a bounded fresh-node encrypted snapshot/bootstrap stream. Current compaction checkpoints are checksummed, prune no more than 10,000 fully acknowledged operations per log per transaction and safely replay retained tails for an intact replica, but recovery before the frontier requires a retained encrypted database snapshot.
 - Run the expanded synthetic fixture in the supported Playwright/Chromium lane. Its 25k aggregate queue, accessibility, keyboard and responsive checks are implemented and source-checked but have not been browser-executed in this environment.
 
-## SEC-RELAY-03 — Ubuntu test deployment sign-off
+## SEC-RELAY-03 — Debian test deployment sign-off
 
 **Priority:** Operational P0 before treating any future gateway as production-ready.
-**Status:** Source controls reviewed and synthetic checks passed; external Ubuntu
+**Status:** Source controls reviewed and synthetic checks passed; external Debian
 test-host verification pending. See [GATEWAY-RELAY-SECURITY.md](GATEWAY-RELAY-SECURITY.md).
 
 - Confirm the disposable test binary/service, accepted test domains, enabled
@@ -211,7 +212,7 @@ and exact evidence. Remaining work:
   recursor in the actual deployment. Passive endpoint health failover is now
   implemented; a single resolver VIP still hides backend health.
 - F4 follow-up: measure peak RSS and load behavior with representative
-  concurrent messages and selected budgets on the Ubuntu test host. The M5 Mac
+  concurrent messages and selected budgets on the Debian test host. The M5 Mac
   synthetic probe passed at 41.0 MiB maximum RSS for two overlapping 4 MiB
   attachment scans, three iterations each; this is not service or production
   capacity evidence. Parser budgets are not process RSS limits. Any host swap
@@ -225,7 +226,7 @@ F4, F5 and F8 are implemented with synthetic regressions. F4 adds operator
 scanner budgets and concurrency admission; F5 adds the mixed-script signal;
 F8 propagates UTC clock failures without an epoch fallback or altered token/lease
 validity semantics. On October 26, 2026, the M5 Mac passed the focused and full
-workspace tests, both Clippy configurations and release build. Ubuntu execution
+workspace tests, both Clippy configurations and release build. Debian execution
 and the separate vendored Pratique formatting issue remain open.
 
 Persisted relay `sending` items still need operator reconciliation. Security
