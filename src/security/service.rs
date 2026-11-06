@@ -15,6 +15,33 @@ use std::{
     },
 };
 
+const RECEIPT_CAPACITY: u64 = 100_000;
+const RECEIPT_RESULT_BYTES: usize = 64 * 1024;
+const RECEIPT_COMMAND_PRUNE: usize = 100;
+
+fn keeps_receipt(action: &str) -> bool {
+    ![
+        "status",
+        "setup",
+        "recipient-discovery",
+        "delivery-status",
+        "rules",
+        "ingress",
+        "messages",
+        "message-detail",
+        "content",
+        "digests",
+        "digest-review",
+        "jobs",
+        "audit",
+        "identities",
+        "remediation-review",
+        "learning",
+        "cluster-reconcile",
+    ]
+    .contains(&action)
+}
+
 pub struct Service {
     pub config: Config,
     pub db: Arc<Db>,
@@ -401,6 +428,11 @@ put(t,"active",&Value::Null)?;
 audit(t,"bootstrap","initialize","",json!({
 "schema":2,"engine":scan::ENGINE}
 ))?;
+}
+let mut current_settings=must(t,"settings")?;
+if current_settings.get("receipt_ttl_hours").is_none(){
+current_settings["receipt_ttl_hours"]=json!(168);
+put(t,"settings",&current_settings)?;
 }
 super::cluster::initialize(t,&config)?;
 for mut j in list(t,"job/")?{
@@ -832,50 +864,56 @@ Ok(())}
 
         self.db.write(|t| {
             let receipt_key = format!("receipt/{}", c.request_id);
+            let current = now()?;
+            let ttl_seconds =
+                i64::try_from(n(&must(t, "settings")?, "receipt_ttl_hours")?)?.saturating_mul(3600);
+            let cutoff = current.saturating_sub(ttl_seconds);
+            prune_receipts(t, cutoff, RECEIPT_COMMAND_PRUNE)?;
 
             if let Some(r) = get(t, &receipt_key)? {
-                ensure!(
-                    r["hash"] == fingerprint,
-                    "Request ID reused for a different command"
-                );
+                let at = r["at"]
+                    .as_i64()
+                    .ok_or_else(|| crate::error!("Invalid command receipt timestamp"))?;
+                if at <= cutoff {
+                    remove(t, &receipt_key)?;
+                    t.remove(receipt_index_key(at, &c.request_id).as_str())?;
+                } else {
+                    ensure!(
+                        r["hash"] == fingerprint,
+                        "Request ID reused for a different command"
+                    );
 
-                return Ok(r["result"].clone());
+                    return Ok(r["result"].clone());
+                }
+            }
+
+            let retained = keeps_receipt(&c.action);
+            if retained {
+                ensure!(
+                    receipt_count(t)? < RECEIPT_CAPACITY || expired_receipts(t, cutoff)?,
+                    "Command receipt capacity reached; maintenance required"
+                );
             }
 
             let result = self.execute(t, a, &c.action, &c.data, &c.request_id)?;
 
-            if ![
-                "status",
-                "setup",
-                "recipient-discovery",
-                "delivery-status",
-                "rules",
-                "ingress",
-                "messages",
-                "message-detail",
-                "content",
-                "digests",
-                "digest-review",
-                "jobs",
-                "audit",
-                "identities",
-                "remediation-review",
-                "learning",
-                "cluster-reconcile",
-            ]
-            .contains(&c.action.as_str())
-            {
+            if retained {
                 ensure!(
-                    list(t, "receipt/")?.len() < 100000,
-                    "Command receipt capacity reached; maintenance required"
+                    pratique::json_value::to_vec(&result)?.len() <= RECEIPT_RESULT_BYTES,
+                    "Command result too large for idempotency receipt"
                 );
 
                 put(
                     t,
                     &receipt_key,
                     &json!({
-                    "hash":fingerprint,"result":result,"at":now()?}
+                    "hash":fingerprint,"result":result,"at":current}
                     ),
+                )?;
+                put(
+                    t,
+                    &receipt_index_key(current, &c.request_id),
+                    &json!(c.request_id),
                 )?;
             }
 
@@ -2381,8 +2419,10 @@ Ok(())}
         }
 
         ensure!(
-            (1..=365).contains(&n(v, "retention_days")?) && n(v, "digest_hours")? <= 168,
-            "Invalid retention or digest interval"
+            (1..=365).contains(&n(v, "retention_days")?)
+                && n(v, "digest_hours")? <= 168
+                && (1..=720).contains(&n(v, "receipt_ttl_hours")?),
+            "Invalid retention, digest or command receipt interval"
         );
 
         ensure!(

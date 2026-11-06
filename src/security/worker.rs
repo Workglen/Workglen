@@ -107,6 +107,10 @@ impl Service {
                     remove(t, &k)?;
                 }
             }
+            let receipt_cutoff = current_time.saturating_sub(
+                i64::try_from(n(&settings, "receipt_ttl_hours")?)?.saturating_mul(3600),
+            );
+            prune_receipts(t, receipt_cutoff, 10_000)?;
             Ok(())
         })
     }

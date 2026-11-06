@@ -5,6 +5,7 @@ use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
 use std::path::Path;
 pub const DATA: TableDefinition<&str, &[u8]> = TableDefinition::new("security");
 const CAPACITY_KEY: &str = "system/capacity";
+const RECEIPT_COUNT_KEY: &str = "system/receipt_count";
 pub type Table<'a> = redb::Table<'a, &'static str, &'static [u8]>;
 pub struct Db {
     db: Database,
@@ -140,6 +141,64 @@ fn adjust_status(t: &mut Table, key: &str, value: &Value, change: i128) -> Resul
 fn ordered_time(value: i64) -> u64 {
     (value as u64) ^ (1u64 << 63)
 }
+pub fn receipt_index_key(at: i64, request_id: &str) -> String {
+    format!("receipt_at/{:020}/{request_id}", ordered_time(at))
+}
+fn receipt_range_end(at: i64) -> String {
+    format!("receipt_at/{:020}0", ordered_time(at))
+}
+pub fn receipt_count(t: &impl ReadableTable<&'static str, &'static [u8]>) -> Result<u64> {
+    match get(t, RECEIPT_COUNT_KEY)? {
+        Some(value) => value
+            .as_u64()
+            .ok_or_else(|| crate::error!("Invalid durable receipt counter")),
+        None => Ok(0),
+    }
+}
+pub fn expired_receipts(
+    t: &impl ReadableTable<&'static str, &'static [u8]>,
+    cutoff: i64,
+) -> Result<bool> {
+    Ok(t.range("receipt_at/"..receipt_range_end(cutoff).as_str())?
+        .next()
+        .transpose()?
+        .is_some())
+}
+pub fn prune_receipts(t: &mut Table, cutoff: i64, limit: usize) -> Result<usize> {
+    if limit == 0 {
+        return Ok(0);
+    }
+    let end = receipt_range_end(cutoff);
+    let candidates = t
+        .range("receipt_at/"..end.as_str())?
+        .take(limit)
+        .map(|entry| {
+            let (key, value) = entry?;
+            Ok((
+                key.value().to_string(),
+                pratique::json_value::from_slice::<Value>(value.value())?,
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut removed = 0;
+    for (index_key, request_id) in candidates {
+        let request_id = request_id
+            .as_str()
+            .ok_or_else(|| crate::error!("Invalid receipt time index"))?;
+        let receipt_key = format!("receipt/{request_id}");
+        if let Some(receipt) = get(t, &receipt_key)?
+            && receipt["at"]
+                .as_i64()
+                .ok_or_else(|| crate::error!("Invalid command receipt timestamp"))?
+                <= cutoff
+        {
+            remove(t, &receipt_key)?;
+            removed += 1;
+        }
+        t.remove(index_key.as_str())?;
+    }
+    Ok(removed)
+}
 fn ingress_due_key(value: &Value) -> Result<Option<String>> {
     let state = s(value, "state")?;
     if !["queued", "retrying", "leased"].contains(&state) {
@@ -244,6 +303,7 @@ pub fn put(t: &mut Table, key: &str, value: &Value) -> Result<()> {
         t.insert(key, pratique::json_value::to_vec(value)?.as_slice())?;
         return Ok(());
     }
+    let new_receipt = key.starts_with("receipt/") && t.get(key)?.is_none();
     let old =
         if key.starts_with("message/") || key.starts_with("job/") || key.starts_with("ingress/") {
             get(t, key)?
@@ -274,6 +334,9 @@ pub fn put(t: &mut Table, key: &str, value: &Value) -> Result<()> {
     let old_usage = old.as_ref().map_or((0, 0), |old| record_usage(key, old));
     let new_usage = record_usage(key, value);
     adjust_capacity(t, new_usage.0 - old_usage.0, new_usage.1 - old_usage.1, 0)?;
+    if new_receipt {
+        adjust_counter(t, RECEIPT_COUNT_KEY, 1)?;
+    }
     Ok(())
 }
 pub fn remove(t: &mut Table, key: &str) -> Result<()> {
@@ -284,6 +347,7 @@ pub fn remove(t: &mut Table, key: &str) -> Result<()> {
         adjust_capacity(t, 0, 0, -(bytes as i128))?;
         return Ok(());
     }
+    let old_receipt = key.starts_with("receipt/") && t.get(key)?.is_some();
     let old =
         if key.starts_with("message/") || key.starts_with("job/") || key.starts_with("ingress/") {
             get(t, key)?
@@ -306,6 +370,9 @@ pub fn remove(t: &mut Table, key: &str) -> Result<()> {
     }
     let old_usage = old.as_ref().map_or((0, 0), |old| record_usage(key, old));
     adjust_capacity(t, -old_usage.0, -old_usage.1, 0)?;
+    if old_receipt {
+        adjust_counter(t, RECEIPT_COUNT_KEY, -1)?;
+    }
     Ok(())
 }
 pub fn list(
@@ -485,12 +552,15 @@ pub fn rebuild_derived(t: &mut Table) -> Result<()> {
         CAPACITY_KEY,
         &json!({"messages":total_messages,"jobs":total_jobs,"bytes":bytes}),
     )?;
+    let receipts = keyed(t, "receipt/")?;
+    put(t, RECEIPT_COUNT_KEY, &json!(receipts.len() as u64))?;
     for prefix in [
         "ingress_due/",
         "ingress_lease/",
         "ingress_arrival/",
         "job_due/",
         "status/",
+        "receipt_at/",
     ] {
         for key in raw_keys(t, prefix)? {
             t.remove(key.as_str())?;
@@ -506,6 +576,16 @@ pub fn rebuild_derived(t: &mut Table) -> Result<()> {
     for value in &ingress {
         adjust_status(t, "ingress/", value, 1)?;
         insert_ingress_indexes(t, value)?;
+    }
+    for (receipt_key, receipt) in receipts {
+        let request_id = receipt_key
+            .strip_prefix("receipt/")
+            .ok_or_else(|| crate::error!("Invalid command receipt key"))?;
+        key(request_id)?;
+        let at = receipt["at"]
+            .as_i64()
+            .ok_or_else(|| crate::error!("Invalid command receipt timestamp"))?;
+        put(t, &receipt_index_key(at, request_id), &json!(request_id))?;
     }
     Ok(())
 }

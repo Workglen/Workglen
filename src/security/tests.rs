@@ -574,6 +574,8 @@ fn scanner_budget_configuration_bounds_are_enforced() {
         ("scan_concurrency", 17),
         ("delivery_concurrency", 0),
         ("delivery_concurrency", 17),
+        ("receipt_ttl_hours", 0),
+        ("receipt_ttl_hours", 721),
     ] {
         let mut invalid = valid.clone();
         invalid[key] = json!(value);
@@ -4373,6 +4375,78 @@ fn command_idempotency_and_collision() {
     bad.data["based_on"] = json!(5);
 
     assert!(f.svc.command(&f.owner, bad).is_err());
+}
+
+#[test]
+fn expired_command_receipt_is_pruned_and_request_id_can_run_again() {
+    let f = Fixture::new();
+    let baseline = f
+        .svc
+        .db
+        .write(|t| receipt_count(t))
+        .unwrap();
+    let command = f.command("draft", json!({"rules":rules()}));
+    let first = f.svc.command(&f.owner, command.clone()).unwrap();
+    let receipt_key = format!("receipt/{}", command.request_id);
+
+    f.svc
+        .db
+        .write(|t| {
+            let mut receipt = must(t, &receipt_key)?;
+            let previous = receipt["at"]
+                .as_i64()
+                .ok_or_else(|| crate::error!("Missing receipt time"))?;
+            remove(t, &receipt_index_key(previous, &command.request_id))?;
+            let expired = now()?.saturating_sub(169 * 3600);
+            receipt["at"] = json!(expired);
+            put(t, &receipt_key, &receipt)?;
+            put(
+                t,
+                &receipt_index_key(expired, &command.request_id),
+                &json!(command.request_id),
+            )?;
+            assert_eq!(receipt_count(t)?, baseline + 1);
+            Ok(())
+        })
+        .unwrap();
+
+    let second = f.svc.command(&f.owner, command).unwrap();
+
+    assert_eq!(second["id"].as_u64(), first["id"].as_u64().map(|id| id + 1));
+    f.svc
+        .db
+        .write(|t| {
+            assert_eq!(receipt_count(t)?, baseline + 1);
+            assert_eq!(list(t, "receipt_at/")?.len() as u64, baseline + 1);
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[test]
+fn receipt_derived_state_rebuilds_count_and_time_index() {
+    let f = Fixture::new();
+    let baseline = f
+        .svc
+        .db
+        .write(|t| receipt_count(t))
+        .unwrap();
+    let command = f.command("draft", json!({"rules":rules()}));
+    f.svc.command(&f.owner, command).unwrap();
+
+    f.svc
+        .db
+        .write(|t| {
+            put(t, "system/receipt_count", &json!(99_999))?;
+            for (key, _) in keyed(t, "receipt_at/")? {
+                remove(t, &key)?;
+            }
+            rebuild_derived(t)?;
+            assert_eq!(receipt_count(t)?, baseline + 1);
+            assert_eq!(list(t, "receipt_at/")?.len() as u64, baseline + 1);
+            Ok(())
+        })
+        .unwrap();
 }
 
 #[test]
