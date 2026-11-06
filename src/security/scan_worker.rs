@@ -62,6 +62,14 @@ impl ScanLane {
     }
 }
 
+pub(super) fn lane_worker_counts(threads: u64) -> (u64, u64, u64) {
+    if threads == 1 {
+        (0, 0, 1)
+    } else {
+        (1, threads.saturating_sub(1), 0)
+    }
+}
+
 fn contains_ascii_case_insensitive(haystack: &[u8], needle: &[u8]) -> bool {
     haystack
         .windows(needle.len())
@@ -763,6 +771,7 @@ pub(super) fn handle(service: &Service, mut stream: UnixStream) -> Result<()> {
     if role == "capacity" {
         let settings = service.settings()?;
         let threads = n(&settings, "scan_concurrency")?;
+        let (light_threads, heavy_threads, any_threads) = lane_worker_counts(threads);
         write_json(
             &mut stream,
             &json!({
@@ -773,9 +782,9 @@ pub(super) fn handle(service: &Service, mut stream: UnixStream) -> Result<()> {
                 "profile_version":scan::ANALYSIS_PROFILE_VERSION,
                 "coverage_version":scan::COVERAGE_VERSION,
                 "threads":threads,
-                "light_threads":threads.saturating_sub(1),
-                "heavy_threads":if threads > 1 { 1 } else { 0 },
-                "any_threads":if threads == 1 { 1 } else { 0 }
+                "light_threads":light_threads,
+                "heavy_threads":heavy_threads,
+                "any_threads":any_threads
             }),
             MAX_HELLO,
         )?;
@@ -1233,13 +1242,17 @@ pub fn run(config: Config) -> Result<()> {
         }
         std::thread::sleep(Duration::from_secs(1));
     };
-    let lanes = if threads == 1 {
-        vec![ScanLane::Any]
-    } else {
-        std::iter::once(ScanLane::Heavy)
-            .chain(std::iter::repeat_n(ScanLane::Light, threads - 1))
-            .collect()
-    };
+    let (light_threads, heavy_threads, any_threads) = lane_worker_counts(u64::try_from(threads)?);
+    let lanes = std::iter::repeat_n(ScanLane::Heavy, usize::try_from(heavy_threads)?)
+        .chain(std::iter::repeat_n(
+            ScanLane::Light,
+            usize::try_from(light_threads)?,
+        ))
+        .chain(std::iter::repeat_n(
+            ScanLane::Any,
+            usize::try_from(any_threads)?,
+        ))
+        .collect::<Vec<_>>();
     let checkers = lanes
         .into_iter()
         .map(|lane| Ok((crate::auth::Checker::new(config.dns_server)?, lane)))
@@ -1267,6 +1280,15 @@ pub fn run(config: Config) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lane_allocation_reserves_one_light_worker_and_scales_heavy_work() {
+        assert_eq!(lane_worker_counts(1), (0, 0, 1));
+        assert_eq!(lane_worker_counts(2), (1, 1, 0));
+        assert_eq!(lane_worker_counts(3), (1, 2, 0));
+        assert_eq!(lane_worker_counts(4), (1, 3, 0));
+        assert_eq!(lane_worker_counts(16), (1, 15, 0));
+    }
 
     fn version(protocol: u64, minimum: Option<u64>, maximum: Option<u64>) -> Value {
         let mut value = json!({

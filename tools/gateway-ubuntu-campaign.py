@@ -10,7 +10,9 @@ the scanner is stopped. The ingress unit is never intentionally restarted.
 from __future__ import annotations
 
 import argparse
+import base64
 import concurrent.futures
+import gzip
 import hashlib
 import json
 import os
@@ -59,6 +61,12 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--sender", default="campaign@sender.invalid")
     parser.add_argument("--messages", type=parse_counts, default=parse_counts("10000,25000,50000"))
     parser.add_argument("--message-bytes", type=int, default=4096)
+    parser.add_argument(
+        "--message-profile",
+        choices=("text", "mixed"),
+        default="text",
+        help="text, or a deterministic five-part representative MIME mix",
+    )
     parser.add_argument("--concurrency", type=int, default=32)
     parser.add_argument("--messages-per-connection", type=int, default=100)
     parser.add_argument("--drain-timeout-seconds", type=int, default=1800)
@@ -74,6 +82,8 @@ def arguments() -> argparse.Namespace:
         parser.error("--smtp-port must be between 1 and 65535")
     if not 256 <= args.message_bytes <= 10 * 1024 * 1024:
         parser.error("--message-bytes must be between 256 and 10485760")
+    if args.message_profile == "mixed" and args.message_bytes < 4096:
+        parser.error("--message-profile=mixed requires --message-bytes of at least 4096")
     if not 1 <= args.concurrency <= 100:
         parser.error("--concurrency must be between 1 and 100")
     if not 1 <= args.messages_per_connection <= 500:
@@ -249,15 +259,99 @@ def percentile(values: list[float], fraction: float) -> float | None:
     return ordered[min(len(ordered) - 1, int((len(ordered) - 1) * fraction))]
 
 
-def message(index: int, size: int, sender: str, recipient: str, campaign: str) -> bytes:
+MIXED_MESSAGE_VARIANTS = (
+    "text",
+    "benign-attachment",
+    "compression-heavy",
+    "nested-message",
+    "malformed-base64",
+)
+
+
+def message_variant(index: int, profile: str) -> str:
+    return "text" if profile == "text" else MIXED_MESSAGE_VARIANTS[index % len(MIXED_MESSAGE_VARIANTS)]
+
+
+def fit_message(prefix: bytes, suffix: bytes, size: int) -> bytes:
+    minimum = len(prefix) + len(suffix)
+    if minimum > size:
+        raise RuntimeError(f"message profile needs at least {minimum} bytes; requested {size}")
+    return prefix + (b"x" * (size - minimum)) + suffix
+
+
+def message(
+    index: int,
+    size: int,
+    sender: str,
+    recipient: str,
+    campaign: str,
+    profile: str = "text",
+) -> bytes:
+    variant = message_variant(index, profile)
     headers = (
         f"From: {sender}\r\nTo: {recipient}\r\n"
         f"Subject: Workglen Ubuntu campaign {campaign} {index}\r\n"
         f"Message-ID: <{campaign}-{index}@sender.invalid>\r\n"
-        "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"
+        f"X-Workglen-Campaign-Profile: {variant}\r\n"
+        "MIME-Version: 1.0\r\n"
     ).encode()
-    body_size = max(1, size - len(headers) - 2)
-    return headers + (b"x" * body_size) + b"\r\n"
+    if variant == "text":
+        return fit_message(
+            headers + b"Content-Type: text/plain; charset=utf-8\r\n\r\n",
+            b"\r\n",
+            size,
+        )
+
+    boundary = f"workglen-{campaign}-{index}".encode()
+    multipart = headers + b'Content-Type: multipart/mixed; boundary="' + boundary + b'"\r\n\r\n'
+    first_part = (
+        b"--" + boundary + b"\r\n"
+        b"Content-Type: text/plain; charset=utf-8\r\n\r\n"
+        b"Synthetic representative campaign content.\r\n"
+    )
+    closing = b"\r\n--" + boundary + b"--\r\n"
+
+    if variant == "benign-attachment":
+        attachment = base64.b64encode((b"quarterly-ledger-row," * 24) + b"\r\n")
+        second_part = (
+            b"--" + boundary + b"\r\n"
+            b"Content-Type: text/csv; name=ledger.csv\r\n"
+            b"Content-Disposition: attachment; filename=ledger.csv\r\n"
+            b"Content-Transfer-Encoding: base64\r\n\r\n" + attachment + b"\r\n"
+        )
+    elif variant == "compression-heavy":
+        expanded_size = min(4 * 1024 * 1024, max(256 * 1024, size * 2))
+        compressed = gzip.compress(b"archive-campaign-row\n" * (expanded_size // 21), mtime=0)
+        second_part = (
+            b"--" + boundary + b"\r\n"
+            b"Content-Type: application/gzip; name=representative.txt.gz\r\n"
+            b"Content-Disposition: attachment; filename=representative.txt.gz\r\n"
+            b"Content-Transfer-Encoding: base64\r\n\r\n"
+            + base64.b64encode(compressed)
+            + b"\r\n"
+        )
+    elif variant == "nested-message":
+        nested = (
+            f"From: nested@sender.invalid\r\nTo: {recipient}\r\n"
+            f"Subject: Nested campaign message {index}\r\n"
+            "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"
+            "Nested body for parser coverage.\r\n"
+        ).encode()
+        second_part = (
+            b"--" + boundary + b"\r\n"
+            b"Content-Type: message/rfc822\r\n"
+            b"Content-Disposition: attachment; filename=nested.eml\r\n\r\n"
+            + nested
+        )
+    else:
+        second_part = (
+            b"--" + boundary + b"\r\n"
+            b"Content-Type: application/octet-stream; name=malformed.bin\r\n"
+            b"Content-Disposition: attachment; filename=malformed.bin\r\n"
+            b"Content-Transfer-Encoding: base64\r\n\r\n"
+            b"%%% deliberately-invalid-base64 %%%\r\n"
+        )
+    return fit_message(multipart + first_part + second_part, closing, size)
 
 
 def inject(args: argparse.Namespace, count: int, campaign: str) -> dict:
@@ -268,6 +362,7 @@ def inject(args: argparse.Namespace, count: int, campaign: str) -> dict:
     rejected = 0
     failures: list[str] = []
     latencies: list[float] = []
+    accepted_variants = {variant: 0 for variant in MIXED_MESSAGE_VARIANTS}
     context = ssl.create_default_context(cafile=str(args.ca_file))
 
     def worker() -> None:
@@ -290,12 +385,20 @@ def inject(args: argparse.Namespace, count: int, campaign: str) -> dict:
                             client.sendmail(
                                 args.sender,
                                 [args.recipient],
-                                message(index, args.message_bytes, args.sender, args.recipient, campaign),
+                                message(
+                                    index,
+                                    args.message_bytes,
+                                    args.sender,
+                                    args.recipient,
+                                    campaign,
+                                    args.message_profile,
+                                ),
                             )
                             elapsed = time.monotonic() - began
                             with lock:
                                 accepted += 1
                                 latencies.append(elapsed)
+                                accepted_variants[message_variant(index, args.message_profile)] += 1
                         except smtplib.SMTPResponseException as error:
                             with lock:
                                 if 400 <= error.smtp_code < 500:
@@ -321,6 +424,10 @@ def inject(args: argparse.Namespace, count: int, campaign: str) -> dict:
         "unattempted_or_connection_failed": count - accepted - deferred - rejected,
         "seconds": elapsed,
         "accepted_per_second": accepted / elapsed if elapsed else None,
+        "message_profile": args.message_profile,
+        "accepted_variants": {
+            variant: value for variant, value in accepted_variants.items() if value
+        },
         "latency_ms": {
             "p50": (percentile(latencies, 0.50) or 0) * 1000 if latencies else None,
             "p95": (percentile(latencies, 0.95) or 0) * 1000 if latencies else None,
@@ -426,6 +533,10 @@ def main() -> int:
         "campaign": {
             "message_counts": args.messages,
             "message_bytes": args.message_bytes,
+            "message_profile": args.message_profile,
+            "message_variants": (
+                list(MIXED_MESSAGE_VARIANTS) if args.message_profile == "mixed" else ["text"]
+            ),
             "concurrency": args.concurrency,
             "messages_per_connection": args.messages_per_connection,
             "package_upgrade_driver": bool(args.upgrade_executable),

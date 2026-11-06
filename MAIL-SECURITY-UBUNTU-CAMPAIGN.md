@@ -80,9 +80,23 @@ sudo python3 tools/gateway-ubuntu-campaign.py \
   --smtp-port 25 \
   --messages 10000,25000,50000 \
   --message-bytes 4096 \
+  --message-profile mixed \
   --concurrency 40 \
   --output /var/tmp/workglen-campaign-2026-11-04
 ```
+
+`--message-profile mixed` deterministically cycles five exact-size variants:
+plain text, a benign CSV attachment, a compression-heavy GZIP attachment, a
+nested `message/rfc822`, and deliberately malformed base64. The phase evidence
+records the profile and accepted count for every variant. The default remains
+`text` so existing baseline commands are reproducible. Mixed mode requires at
+least 4 KiB messages and uses only generated synthetic content.
+
+Run separate evidence directories at 64 KiB, 1 MiB and near the configured MIME
+limit; do not combine them into one claimed rate. Compare two, three and four
+scanner workers on the same host. Three workers now means one reserved light
+worker and two heavy workers; it is a candidate to validate, not a prescribed
+production default.
 
 For an actual package-upgrade rehearsal, supply a reviewed root-owned executable
 and repeat `--upgrade-arg=value` for fixed arguments. The runner invokes the
@@ -105,10 +119,10 @@ Each phase passes only when every requested SMTP transaction is accepted, none
 is deferred/rejected/unattempted, the ingress unit remains active and the
 replacement scanner drains receive depth back to the initial zero baseline.
 The phase file records acceptance throughput and p50/p95/p99/mean transaction
-latency, bounded failure diagnostics, queued/drained status, systemd resource
-properties and whether a package driver ran. `report.json` states the exact
-qualification; a scanner stop/start run is never mislabeled as a package
-upgrade.
+latency, the exact accepted profile distribution, bounded failure diagnostics,
+queued/drained status, systemd resource properties and whether a package driver
+ran. `report.json` states the exact qualification; a scanner stop/start run is
+never mislabeled as a package upgrade.
 
 Use the 10k/25k/50k phase files to derive a host-specific starting envelope:
 

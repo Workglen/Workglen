@@ -33,6 +33,8 @@ node security/tests/ingress-scale.cjs 1000 20 65536 0 1 1 0
 node security/tests/scanner-scale.cjs 500 1,2,4,8 65536
 # Three alternating shared-versus-lane runs: 160 archive-heavy plus 40 light
 cargo test --release scanner_lane_mixed_workload_profile -- --ignored --nocapture
+WORKGLEN_SCANNER_LANE_THREADS=3 cargo test --release scanner_lane_mixed_workload_profile -- --ignored --nocapture
+WORKGLEN_SCANNER_LANE_THREADS=4 cargo test --release scanner_lane_mixed_workload_profile -- --ignored --nocapture
 node security/tests/ingress-scale.cjs 50000 40 4096 0 2 1,1 0
 # Deliberate 60/40 MX/distributor-skew simulation
 node security/tests/ingress-scale.cjs 25000 40 4096 0 2 3,2 0
@@ -92,14 +94,18 @@ The scanner concurrency matrix used 500 benign 64 KiB messages and included nati
 
 Two scanner workers remain the default. Four added less than one percent throughput over two, while eight slightly regressed throughput and increased p95 3.6x. This profile is dominated by serialized durable finalization; archive-heavy target-host profiles may have a different CPU/RSS curve and must be measured before raising concurrency.
 
-The explicit mixed-lane benchmark used 160 archive-heavy messages (351,991 raw MIME bytes each, containing a 256 KiB tar/gzip payload) already queued ahead of 40 simple 4 KiB messages. It ran each configuration three times in alternating order and reports medians:
+The explicit mixed-lane benchmark used 160 archive-heavy messages (351,991 raw MIME bytes each, containing a 256 KiB tar/gzip payload) already queued ahead of 40 simple 4 KiB messages. It ran each configuration three times in alternating order and reports medians. Priority allocation reserves exactly one light worker and assigns all remaining workers to heavy work; heavy workers may assist light work when their own queue is empty.
 
-| Two-worker scheduling | Total messages/s | Light first completion | Light p50 completion | Light p95 completion | Light service p95 |
-|---|---:|---:|---:|---:|---:|
-| Shared oldest-first workers | 69.4/s | 2.319 s | 2.599 s | 2.854 s | 23.1 ms |
-| One heavy + one light lane | 58.6/s | 19 ms | 488 ms | 915 ms | 18.9 ms |
+| Workers | Scheduling | Allocation | Total messages/s | Light first | Light p95 completion | Light service p95 |
+|---:|---|---|---:|---:|---:|---:|
+| 2 | Shared oldest-first | 2 any | 69.4/s | 2.319 s | 2.854 s | 23.1 ms |
+| 2 | Priority lanes | 1 light / 1 heavy | 58.6/s | 19 ms | 915 ms | 18.9 ms |
+| 3 | Shared oldest-first | 3 any | 67.4/s | 2.396 s | 2.941 s | 35.9 ms |
+| 3 | Priority lanes | 1 light / 2 heavy | 67.8/s | 33 ms | 1.667 s | 56.1 ms |
+| 4 | Shared oldest-first | 4 any | 67.5/s | 2.388 s | 2.936 s | 46.7 ms |
+| 4 | Priority lanes | 1 light / 3 heavy | 68.7/s | 44 ms | 2.155 s | 54.9 ms |
 
-The lane split produced a clear 3.12x light-p95 improvement and moved the first simple message ahead by about 2.30 seconds. It also reduced total mixed-workload throughput by 15.5% and increased total completion time from a 2.881-second median to 3.411 seconds. That cost is expected from the strict reservation: after the 40 light messages drain, the light worker does not take the remaining heavy work. The current result supports a latency-reserve decision, not a claim of free throughput. The next optimization should measure configurable heavy/light splits and bounded weighted assistance while proving that a newly arriving light message cannot become trapped behind an unbounded archive inspection and that heavy work cannot starve.
+At two workers the strict reservation improved light p95 3.12x but cost 15.5% total throughput after the light queue drained. The corrected three-worker allocation recovered that throughput completely (1.007 priority/shared ratio) while retaining a 1.76x light-p95 improvement and moving the first light completion ahead by about 2.36 seconds. Four workers also recovered throughput (1.018 ratio), but the light-p95 advantage narrowed to 1.36x because more heavy work completes concurrently through the serialized finalization path. Three workers are the next target-host candidate; two remains the default until representative Ubuntu CPU, RSS and service-unit measurements establish a safe resource envelope.
 
 The following older backlog rows predate bounded group commit and remain useful as conservative backlog/RSS/storage evidence, not current peak-throughput results:
 
@@ -192,11 +198,11 @@ Initial alerts:
 
 ## Remaining gates
 
-- Recover more of the 15.5% heavy-dominated mixed-workload throughput cost while retaining the measured light p95 improvement; test configurable four-plus-worker lane splits and only bounded assistance that cannot weaken the latency reserve, durable leases or heavy-lane progress.
-- Repeat 10k/25k on the intended Ubuntu filesystem and service units, including restart during the backlog and derived-state rebuild timing.
-- Run representative 64 KiB, 1 MiB and near-limit MIME mixes with benign, nested, malformed and compression-heavy attachments.
+- Validate the three-worker one-light/two-heavy candidate against two and four workers on the intended Ubuntu host, including CPU, `MemoryPeak`, light p95 and total throughput; keep two as the default until that evidence exists.
+- Execute the guarded 10k/25k/50k campaign on the intended Ubuntu filesystem and systemd units, including a reviewed package upgrade, restart during the backlog and derived-state rebuild timing.
+- Run the campaign's deterministic `mixed` profile at 64 KiB, 1 MiB and near-limit sizes; its exact plain/attachment/GZIP/nested/malformed distribution is recorded in every phase.
 - Repeat the 5k persistent-session SMTP test across a real network on the target Ubuntu host and a disposable downstream service; current evidence is loopback only.
 - Extend scanner concurrency testing to benign, nested, malformed and compression-heavy attachment mixes; the completed 1/2/4/8 matrix uses benign 64 KiB text.
-- Add native host free-space admission and real filesystem-full/power-loss injection.
+- Run real filesystem-full/power-loss injection; native host free-space admission is implemented, but does not replace those fault campaigns.
 - Profile startup rebuild and retention garbage collection at 25k/50k; they remain linear maintenance operations.
 - Measure the implemented authenticated peer transport, SMTP durability acknowledgement, full-log catch-up, later-state replication and ownership operations under 10k/25k/50k multi-host campaigns. The same-host native two-node fixture proves the network path and upgrade continuity, while the three-store harness proves ordered placement mechanics; neither is production failover or sizing evidence.

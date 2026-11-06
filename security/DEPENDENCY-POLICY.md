@@ -329,6 +329,8 @@ The native scan role also has durable light and heavy scheduling lanes without
 adding a process, runtime or dependency. Only small, clearly single-part mail is
 assigned to the latency lane; multipart, attachment, encoded, large, malformed
 or legacy work is conservatively heavy. With the default two scan threads one is
-reserved for each lane. Light workers never claim heavy work, while an idle heavy
-worker may assist the light queue. Both lanes run the identical pinned analysis
-profile, rules, coverage checks and mandatory incomplete-scan quarantine.
+reserved for each lane; every additional thread increases heavy capacity while
+the single latency reservation remains bounded. Light workers never claim heavy
+work, while an idle heavy worker may assist the light queue. Both lanes run the
+identical pinned analysis profile, rules, coverage checks and mandatory
+incomplete-scan quarantine.

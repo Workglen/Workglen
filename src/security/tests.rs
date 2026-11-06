@@ -780,9 +780,16 @@ fn scanner_lane_mixed_workload_profile() {
     ) -> usize {
         let value = std::env::var(name)
             .ok()
-            .map(|value| value.parse::<usize>().expect("integer lane benchmark setting"))
+            .map(|value| {
+                value
+                    .parse::<usize>()
+                    .expect("integer lane benchmark setting")
+            })
             .unwrap_or(default);
-        assert!(range.contains(&value), "{name} is outside the safe test range");
+        assert!(
+            range.contains(&value),
+            "{name} is outside the safe test range"
+        );
         value
     }
 
@@ -844,6 +851,7 @@ fn scanner_lane_mixed_workload_profile() {
 
     fn run(
         priority_lanes: bool,
+        threads: usize,
         heavy_messages: usize,
         light_messages: usize,
         heavy_raw: &[u8],
@@ -860,7 +868,7 @@ fn scanner_lane_mixed_workload_profile() {
                 settings["max_messages"] = json!(total.max(100));
                 settings["max_jobs"] = json!(total.max(100));
                 settings["max_bytes"] = json!(1024u64.pow(3));
-                settings["scan_concurrency"] = json!(2);
+                settings["scan_concurrency"] = json!(threads);
                 put(t, "settings", &settings)
             })
             .unwrap();
@@ -907,10 +915,14 @@ fn scanner_lane_mixed_workload_profile() {
         } else {
             "shared-fifo"
         };
-        let lanes: [&str; 2] = if priority_lanes {
-            ["heavy", "light"]
+        let lanes = if priority_lanes {
+            let (light, heavy, any) = super::scan_worker::lane_worker_counts(threads as u64);
+            std::iter::repeat_n("heavy", heavy as usize)
+                .chain(std::iter::repeat_n("light", light as usize))
+                .chain(std::iter::repeat_n("any", any as usize))
+                .collect::<Vec<_>>()
         } else {
-            ["any", "any"]
+            vec!["any"; threads]
         };
         let barrier = Arc::new(Barrier::new(lanes.len() + 1));
         let completions = Arc::new(Mutex::new(Vec::with_capacity(total)));
@@ -947,10 +959,7 @@ fn scanner_lane_mixed_workload_profile() {
             worker.join().unwrap();
         }
         let elapsed = started.elapsed();
-        let completions = Arc::try_unwrap(completions)
-            .unwrap()
-            .into_inner()
-            .unwrap();
+        let completions = Arc::try_unwrap(completions).unwrap().into_inner().unwrap();
         assert_eq!(completions.len(), total);
         assert_eq!(f.cmd("status", json!({}))["scanner"]["receive_records"], 0);
         let mut light_completion: Vec<u64> = completions
@@ -970,6 +979,7 @@ fn scanner_lane_mixed_workload_profile() {
             .collect();
         json!({
             "mode":mode,
+            "threads":threads,
             "messages":total,
             "elapsed_ms":elapsed.as_millis() as u64,
             "messages_per_second":total as f64 / elapsed.as_secs_f64(),
@@ -984,6 +994,7 @@ fn scanner_lane_mixed_workload_profile() {
     }
 
     let runs = configured_usize("WORKGLEN_SCANNER_LANE_RUNS", 3, 1..=9);
+    let threads = configured_usize("WORKGLEN_SCANNER_LANE_THREADS", 2, 2..=16);
     let heavy_messages = configured_usize("WORKGLEN_SCANNER_LANE_HEAVY", 160, 10..=1_000);
     let light_messages = configured_usize("WORKGLEN_SCANNER_LANE_LIGHT", 40, 10..=10_000);
     let heavy_payload_bytes = configured_usize(
@@ -1010,6 +1021,7 @@ fn scanner_lane_mixed_workload_profile() {
         let shared = || {
             run(
                 false,
+                threads,
                 heavy_messages,
                 light_messages,
                 &heavy_raw,
@@ -1019,6 +1031,7 @@ fn scanner_lane_mixed_workload_profile() {
         let priority = || {
             run(
                 true,
+                threads,
                 heavy_messages,
                 light_messages,
                 &heavy_raw,
@@ -1040,6 +1053,7 @@ fn scanner_lane_mixed_workload_profile() {
         pratique::json_value::to_string(&json!({
             "heavy_messages":heavy_messages,
             "light_messages":light_messages,
+            "threads":threads,
             "runs":runs,
             "heavy_payload_bytes":heavy_payload_bytes,
             "heavy_message_bytes":heavy_raw.len(),

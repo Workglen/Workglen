@@ -1039,6 +1039,8 @@ Ok(())}
                 let scanner_last_seen = (scanner_seen > 0).then_some(scanner_seen);
                 let scanner_online = scanner_last_seen
                     .is_some_and(|seen| (0..=45).contains(&current.saturating_sub(seen)));
+                let (light_workers, heavy_workers, any_workers) =
+                    super::scan_worker::lane_worker_counts(n(&settings, "scan_concurrency")?);
                 let scanner = json!({
                     "online":scanner_online,
                     "last_seen":scanner_last_seen,
@@ -1050,7 +1052,7 @@ Ok(())}
                     "oldest_pending_seconds":oldest_arrival.map(|arrival| current.saturating_sub(arrival).max(0)),
                     "states":receive_states,
                     "lanes":receive_lanes,
-                    "lane_workers":{"light":n(&settings,"scan_concurrency")?.saturating_sub(1),"heavy":if n(&settings,"scan_concurrency")? > 1 { 1 } else { 0 },"any":if n(&settings,"scan_concurrency")? == 1 { 1 } else { 0 }},
+                    "lane_workers":{"light":light_workers,"heavy":heavy_workers,"any":any_workers},
                     "retries_since_start":self.scan_retries.load(Ordering::Relaxed),
                     "protocol_version":super::scan_worker::PROTOCOL_VERSION,
                     "api_version":scan::ANALYSIS_API_VERSION,
