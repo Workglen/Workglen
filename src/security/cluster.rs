@@ -688,6 +688,7 @@ fn rewrite_partition_owner(
                 }
                 ingress["lease_token"] = Value::Null;
                 ingress["lease_until"] = json!(0);
+                ingress["leased_at"] = json!(0);
                 ingress["cancel_requested"] = json!(false);
                 reassigned_scans = reassigned_scans
                     .checked_add(1)

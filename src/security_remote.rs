@@ -67,7 +67,7 @@ pub fn permission(action: &str) -> Option<&'static str> {
         "activate" | "rollback" => "security.rules.activate",
         "content" => "security.content",
         "release" => "security.release",
-        "discard" => "security.discard",
+        "discard" | "receive-quarantine" => "security.discard",
         "digest-action" => "security.read", // Receiver authorizes the specific release/discard operation.
         "hold" => "security.retention",
         "digest-create" | "job-retry" | "job-cancel" => "security.jobs",

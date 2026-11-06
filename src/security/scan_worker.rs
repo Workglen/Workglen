@@ -27,6 +27,8 @@ pub(super) const PROTOCOL_VERSION: u64 = 2;
 pub(super) const MIN_PROTOCOL_VERSION: u64 = 1;
 const COMPATIBILITY_HELLO_PROTOCOL: u64 = 1;
 const LEASE_SECONDS: i64 = 180;
+const MAX_LEASE_SECONDS: i64 = 600;
+const MAX_LEASE_EXPIRIES: u64 = 3;
 const HEARTBEAT_SECONDS: u64 = 30;
 const MAX_HELLO: usize = 4096;
 const MAX_JOB: usize = 1024 * 1024;
@@ -335,10 +337,26 @@ impl Service {
                 super::cluster::scan_owned(t, &record)?,
                 "Scan ownership changed"
             );
+            if record["state"] == "leased" {
+                let expiries = record["lease_expiries"]
+                    .as_u64()
+                    .unwrap_or(0)
+                    .checked_add(1)
+                    .ok_or_else(|| crate::error!("Scan lease expiry counter overflow"))?;
+                record["lease_expiries"] = json!(expiries);
+                if expiries >= MAX_LEASE_EXPIRIES {
+                    let token = s(&record, "lease_token")?.to_string();
+                    let result =
+                        Self::incomplete_result(&record, &token, "scan-attempts-exhausted")?;
+                    Self::finalize_locked(t, &record, &result, PROTOCOL_VERSION)?;
+                    return Ok(None);
+                }
+            }
             let token = id();
             record["state"] = json!("leased");
             record["lease_token"] = json!(token);
             record["lease_until"] = json!(current + LEASE_SECONDS);
+            record["leased_at"] = json!(current);
             record["attempts"] = json!(n(&record, "attempts")? + 1);
             record["error"] = json!("");
             put(t, &format!("ingress/{}", s(&record, "id")?), &record)?;
@@ -389,7 +407,12 @@ impl Service {
             let mut record = scan_record(t, id, token)?;
             let requested = record["cancel_requested"].as_bool().unwrap_or(false);
             let current = now()?;
-            if !requested {
+            let leased_at = record["leased_at"]
+                .as_i64()
+                .ok_or_else(|| crate::error!("Invalid scan lease start"))?;
+            let lease_expired =
+                leased_at <= 0 || current < leased_at || current - leased_at > MAX_LEASE_SECONDS;
+            if !requested && !lease_expired {
                 record["lease_until"] = json!(current + LEASE_SECONDS);
                 put(t, &format!("ingress/{id}"), &record)?;
             }
@@ -400,7 +423,7 @@ impl Service {
                 "api_version":scan::ANALYSIS_API_VERSION,
                 "profile_version":scan::ANALYSIS_PROFILE_VERSION,
                 "coverage_version":scan::COVERAGE_VERSION,
-                "renewed":!requested,
+                "renewed":!requested && !lease_expired,
                 "lease_until":record["lease_until"],
                 "cancellation":{"mode":"cooperative","requested":requested}
             }))
@@ -419,30 +442,48 @@ impl Service {
         })
     }
 
-    fn retry_scan(&self, id: &str, token: &str, code: &str) -> Result<()> {
+    pub(super) fn retry_scan(&self, id: &str, token: &str, code: &str) -> Result<()> {
         ensure!(
             ["authentication-temporary", "worker-temporary"].contains(&code),
             "Invalid retry code"
         );
-        self.db.write(|t| {
+        let retried = self.db.write(|t| {
             let mut record = scan_record(t, id, token)?;
+            let current = now()?;
+            let max_age = i64::try_from(n(&must(t, "settings")?, "scan_retry_max_seconds")?)?;
+            let arrived = record["arrived"]
+                .as_i64()
+                .ok_or_else(|| crate::error!("Invalid scan arrival time"))?;
+            if current < arrived || current - arrived >= max_age {
+                let result = Self::incomplete_result(&record, token, "authentication-unavailable")?;
+                Self::finalize_locked(t, &record, &result, PROTOCOL_VERSION)?;
+                return Ok(false);
+            }
             let attempts = n(&record, "attempts")?;
-            let delay = (30i64 * 2i64.pow(attempts.min(7) as u32)).min(3600);
+            let delay = (60i64 * 2i64.pow(attempts.saturating_sub(1).min(4) as u32)).min(900);
             record["state"] = json!("retrying");
-            record["due"] = json!(now()? + delay);
+            record["due"] = json!(current + delay);
+            if record["first_retry_at"].is_null() {
+                record["first_retry_at"] = json!(current);
+            }
             record["lease_token"] = Value::Null;
             record["lease_until"] = json!(0);
+            record["leased_at"] = json!(0);
             record["error"] = json!(code);
             put(t, &format!("ingress/{id}"), &record)?;
+            super::cluster::record_ingress_state(t, id)?;
             audit(
                 t,
                 "scanner",
                 "scan-retry",
                 "",
                 json!({"ingress":id,"reason":code,"attempt":attempts}),
-            )
+            )?;
+            Ok(true)
         })?;
-        self.record_scan_retry();
+        if retried {
+            self.record_scan_retry();
+        }
         Ok(())
     }
 
@@ -591,147 +632,168 @@ impl Service {
 
         self.db.write(|t| {
             let record = scan_record(t, id, token)?;
-            ensure!(
-                (protocol == MIN_PROTOCOL_VERSION && result["scan_generation"].is_null())
-                    || result["scan_generation"] == record["scan_generation"],
-                "Stale scan generation"
-            );
-            ensure!(record["hash"] == result["hash"], "Scan input hash mismatch");
-            let input_bytes = u64::try_from(body(t, &record)?.len())?;
-            ensure!(
-                verdict["coverage"]["complete"] != true
-                    || verdict["coverage"]["input_bytes"] == input_bytes,
-                "Scan byte view mismatch"
-            );
-            if !result["shadow"].is_null() {
-                ensure!(
-                    result["shadow"]["verdict"]["coverage"]["complete"] != true
-                        || result["shadow"]["verdict"]["coverage"]["input_bytes"] == input_bytes,
-                    "Shadow scan byte view mismatch"
-                );
-            }
-            ensure!(
-                record["rule_version"] == result["rule_version"],
-                "Scan rule version mismatch"
-            );
-            ensure!(
-                result["evidence"]["source_ip"] == record["source_ip"]
-                    && result["evidence"]["helo"] == record["helo"],
-                "Scan source evidence mismatch"
-            );
-            match record["shadow_version"].as_u64() {
-                Some(version) => ensure!(
-                    result["shadow"]["version"] == version,
-                    "Shadow rule version mismatch"
-                ),
-                None => ensure!(result["shadow"].is_null(), "Unexpected shadow verdict"),
-            }
-            ensure!(
-                record["profile_version"] == result["profile_version"]
-                    && record["api_version"] == result["api_version"]
-                    && record["coverage_version"] == result["coverage_version"],
-                "Scan profile changed"
-            );
-            let mut evidence = result["evidence"].clone();
-            evidence["api_version"] = result["api_version"].clone();
-            evidence["profile_version"] = result["profile_version"].clone();
-            evidence["coverage_version"] = result["coverage_version"].clone();
-            let mut message_ids = Vec::new();
-            for recipient in arr(&record, "recipients")? {
-                let recipient = recipient
-                    .as_str()
-                    .ok_or_else(|| crate::error!("Invalid queued recipient"))?;
-                let message_id = super::model::id();
-                let mut message = json!({
-                    "id":message_id,
-                    "ingress_id":id,
-                    "recipient":recipient,
-                    "arrived":record["arrived"],
-                    "state":if verdict["action"]=="quarantine"{"quarantined"}else{"queued"},
-                    "revision":1,
-                    "hash":record["hash"],
-                    "envelope_from":record["envelope_from"],
-                    "subject":verdict["subject"],
-                    "sender":verdict["sender"],
-                    "releasable":verdict["releasable"],
-                    "verdict":verdict,
-                    "engines":evidence,
-                    "rule_version":record["rule_version"],
-                    "expires":record["expires"],
-                    "hold":false,
-                    "route":record["routes"][recipient],
-                    "origin_node":record["origin_node"],
-                    "origin_sequence":record["origin_sequence"],
-                    "delivery_partition":record["delivery_partition"],
-                    "delivery_owner":record["delivery_owner"],
-                    "delivery_term":record["delivery_term"],
-                    "scan_owner":record["scan_owner"],
-                    "scan_generation":record["scan_generation"]
-                });
-                if !result["shadow"].is_null() {
-                    message["shadow"] = json!({
-                        "version":result["shadow"]["version"],
-                        "verdict":result["shadow"]["verdict"]
-                    });
-                }
-                save_message(t, &message)?;
-                if message["state"] == "queued" {
-                    job(
-                        t,
-                        "delivery",
-                        json!({
-                            "recipient":recipient,
-                            "message":message_id,
-                            "delivery_partition":record["delivery_partition"],
-                            "delivery_owner":record["delivery_owner"],
-                            "delivery_term":record["delivery_term"]
-                        }),
-                        &format!("delivery-{message_id}"),
-                    )?;
-                }
-                audit(
-                    t,
-                    "scanner",
-                    "scan-complete",
-                    recipient,
-                    json!({
-                        "id":message_id,
-                        "ingress":id,
-                        "hash":record["hash"],
-                        "state":message["state"],
-                        "version":record["rule_version"],
-                        "engine":verdict["engine"],
-                        "api_version":result["api_version"],
-                        "profile_version":result["profile_version"],
-                        "coverage_version":result["coverage_version"]
-                    }),
-                )?;
-                super::cluster::record_message_state(t, &message_id)?;
-                message_ids.push(message_id);
-            }
-            remove(t, &format!("ingress/{id}"))?;
-            super::cluster::record_ingress_state(t, id)?;
-            Ok(())
+            Self::finalize_locked(t, &record, result, protocol)
         })
     }
 
-    fn finalize_incomplete(&self, id: &str, token: &str, code: &str) -> Result<()> {
+    fn finalize_locked(
+        t: &mut Table<'_>,
+        record: &Value,
+        result: &Value,
+        protocol: u64,
+    ) -> Result<()> {
+        let id = s(record, "id")?;
+        let verdict = &result["verdict"];
+        ensure!(
+            (protocol == MIN_PROTOCOL_VERSION && result["scan_generation"].is_null())
+                || result["scan_generation"] == record["scan_generation"],
+            "Stale scan generation"
+        );
+        ensure!(record["hash"] == result["hash"], "Scan input hash mismatch");
+        let input_bytes = u64::try_from(body(t, record)?.len())?;
+        ensure!(
+            verdict["coverage"]["complete"] != true
+                || verdict["coverage"]["input_bytes"] == input_bytes,
+            "Scan byte view mismatch"
+        );
+        if !result["shadow"].is_null() {
+            ensure!(
+                result["shadow"]["verdict"]["coverage"]["complete"] != true
+                    || result["shadow"]["verdict"]["coverage"]["input_bytes"] == input_bytes,
+                "Shadow scan byte view mismatch"
+            );
+        }
+        ensure!(
+            record["rule_version"] == result["rule_version"],
+            "Scan rule version mismatch"
+        );
+        ensure!(
+            result["evidence"]["source_ip"] == record["source_ip"]
+                && result["evidence"]["helo"] == record["helo"],
+            "Scan source evidence mismatch"
+        );
+        match record["shadow_version"].as_u64() {
+            Some(version) => ensure!(
+                result["shadow"]["version"] == version,
+                "Shadow rule version mismatch"
+            ),
+            None => ensure!(result["shadow"].is_null(), "Unexpected shadow verdict"),
+        }
+        ensure!(
+            record["profile_version"] == result["profile_version"]
+                && record["api_version"] == result["api_version"]
+                && record["coverage_version"] == result["coverage_version"],
+            "Scan profile changed"
+        );
+        let mut evidence = result["evidence"].clone();
+        evidence["api_version"] = result["api_version"].clone();
+        evidence["profile_version"] = result["profile_version"].clone();
+        evidence["coverage_version"] = result["coverage_version"].clone();
+        let mut message_ids = Vec::new();
+        for recipient in arr(record, "recipients")? {
+            let recipient = recipient
+                .as_str()
+                .ok_or_else(|| crate::error!("Invalid queued recipient"))?;
+            let message_id = super::model::id();
+            let mut message = json!({
+                "id":message_id,
+                "ingress_id":id,
+                "recipient":recipient,
+                "arrived":record["arrived"],
+                "state":if verdict["action"]=="quarantine"{"quarantined"}else{"queued"},
+                "revision":1,
+                "hash":record["hash"],
+                "envelope_from":record["envelope_from"],
+                "subject":verdict["subject"],
+                "sender":verdict["sender"],
+                "releasable":verdict["releasable"],
+                "verdict":verdict,
+                "engines":evidence,
+                "rule_version":record["rule_version"],
+                "expires":record["expires"],
+                "hold":false,
+                "route":record["routes"][recipient],
+                "origin_node":record["origin_node"],
+                "origin_sequence":record["origin_sequence"],
+                "delivery_partition":record["delivery_partition"],
+                "delivery_owner":record["delivery_owner"],
+                "delivery_term":record["delivery_term"],
+                "scan_owner":record["scan_owner"],
+                "scan_generation":record["scan_generation"]
+            });
+            if !result["shadow"].is_null() {
+                message["shadow"] = json!({
+                    "version":result["shadow"]["version"],
+                    "verdict":result["shadow"]["verdict"]
+                });
+            }
+            save_message(t, &message)?;
+            if message["state"] == "queued" {
+                job(
+                    t,
+                    "delivery",
+                    json!({
+                        "recipient":recipient,
+                        "message":message_id,
+                        "delivery_partition":record["delivery_partition"],
+                        "delivery_owner":record["delivery_owner"],
+                        "delivery_term":record["delivery_term"]
+                    }),
+                    &format!("delivery-{message_id}"),
+                )?;
+            }
+            audit(
+                t,
+                "scanner",
+                "scan-complete",
+                recipient,
+                json!({
+                    "id":message_id,
+                    "ingress":id,
+                    "hash":record["hash"],
+                    "state":message["state"],
+                    "version":record["rule_version"],
+                    "engine":verdict["engine"],
+                    "api_version":result["api_version"],
+                    "profile_version":result["profile_version"],
+                    "coverage_version":result["coverage_version"]
+                }),
+            )?;
+            super::cluster::record_message_state(t, &message_id)?;
+            message_ids.push(message_id);
+        }
+        remove(t, &format!("ingress/{id}"))?;
+        super::cluster::record_ingress_state(t, id)?;
+        Ok(())
+    }
+
+    fn incomplete_result(record: &Value, token: &str, code: &str) -> Result<Value> {
         ensure!(
             [
                 "authentication-invalid",
+                "authentication-unavailable",
                 "inspection-error",
+                "operator-stopped",
+                "scan-attempts-exhausted",
                 "worker-cancelled",
             ]
             .contains(&code),
             "Invalid incomplete code"
         );
-        let record = self.db.write(|t| scan_record(t, id, token))?;
+        let id = s(record, "id")?;
         let reason = match code {
             "authentication-invalid" => "Message structure prevented sender authentication",
+            "authentication-unavailable" => {
+                "Sender authentication remained unavailable beyond the retry limit"
+            }
+            "operator-stopped" => "An administrator stopped analysis and required quarantine",
+            "scan-attempts-exhausted" => {
+                "Analysis repeatedly lost its worker lease and was stopped safely"
+            }
             "worker-cancelled" => "Analysis was cancelled before the supplied profile completed",
             _ => "Message inspection could not complete under the supplied analysis profile",
         };
-        let result = json!({
+        Ok(json!({
             "protocol":PROTOCOL_VERSION,
             "api_version":record["api_version"],
             "profile_version":record["profile_version"],
@@ -746,7 +808,7 @@ impl Service {
                 "action":"quarantine",
                 "releasable":false,
                 "matches":[{"rule":"mandatory-incomplete","type":"attachment_safety","action":"quarantine","reason":reason,"signals":[],"score":null}],
-                "coverage":{"engine":scan::ENGINE,"api_version":scan::ANALYSIS_API_VERSION,"profile_version":scan::ANALYSIS_PROFILE_VERSION,"coverage_version":scan::COVERAGE_VERSION,"complete":false,"incompleteness_reasons":[reason],"input_hash":record["hash"],"input_bytes":null,"cancellation":{"mode":"cooperative","requested":code=="worker-cancelled"},"text":false,"archive_formats":[],"expanded_bytes":0,"members":0,"ocr":false,"full_antivirus":false},
+                "coverage":{"engine":scan::ENGINE,"api_version":scan::ANALYSIS_API_VERSION,"profile_version":scan::ANALYSIS_PROFILE_VERSION,"coverage_version":scan::COVERAGE_VERSION,"complete":false,"incompleteness_reasons":[reason],"input_hash":record["hash"],"input_bytes":null,"cancellation":{"mode":"cooperative","requested":matches!(code,"worker-cancelled"|"operator-stopped")},"text":false,"archive_formats":[],"expanded_bytes":0,"members":0,"ocr":false,"full_antivirus":false},
                 "subject":"Inspection incomplete",
                 "sender":record["envelope_from"],
                 "spam_score":null,
@@ -757,8 +819,40 @@ impl Service {
             },
             "shadow":null,
             "evidence":{"authentication_action":"incomplete","source_ip":record["source_ip"],"helo":record["helo"],"engine":scan::ENGINE}
-        });
-        self.finalize_scan(id, token, &result)
+        }))
+    }
+
+    fn finalize_incomplete(&self, id: &str, token: &str, code: &str) -> Result<()> {
+        self.db.write(|t| {
+            let record = scan_record(t, id, token)?;
+            let result = Self::incomplete_result(&record, token, code)?;
+            Self::finalize_locked(t, &record, &result, PROTOCOL_VERSION)
+        })
+    }
+
+    pub(super) fn stop_scan_locked(t: &mut Table<'_>, id: &str) -> Result<Value> {
+        key(id)?;
+        let mut record = must(t, &format!("ingress/{id}"))?;
+        ensure!(
+            super::cluster::scan_owned(t, &record)?,
+            "Receive record is owned by another node"
+        );
+        let state = s(&record, "state")?;
+        ensure!(
+            ["queued", "retrying", "leased"].contains(&state),
+            "Receive record is not active"
+        );
+        if state == "leased" {
+            record["cancel_requested"] = json!(true);
+            record["error"] = json!("operator-stop-requested");
+            put(t, &format!("ingress/{id}"), &record)?;
+            super::cluster::record_ingress_state(t, id)?;
+            return Ok(json!({"id":id,"state":"cancellation-requested"}));
+        }
+        let token = super::model::id();
+        let result = Self::incomplete_result(&record, &token, "operator-stopped")?;
+        Self::finalize_locked(t, &record, &result, PROTOCOL_VERSION)?;
+        Ok(json!({"id":id,"state":"quarantined"}))
     }
 }
 

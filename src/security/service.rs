@@ -432,8 +432,11 @@ audit(t,"bootstrap","initialize","",json!({
 let mut current_settings=must(t,"settings")?;
 if current_settings.get("receipt_ttl_hours").is_none(){
 current_settings["receipt_ttl_hours"]=json!(168);
-put(t,"settings",&current_settings)?;
 }
+if current_settings.get("scan_retry_max_seconds").is_none(){
+current_settings["scan_retry_max_seconds"]=json!(86400);
+}
+put(t,"settings",&current_settings)?;
 super::cluster::initialize(t,&config)?;
 for mut j in list(t,"job/")?{
 if j["state"]=="running"{
@@ -447,11 +450,22 @@ audit(t,"recovery","job-uncertain",s(&j["data"],"recipient")?,json!({
 }
 for mut ingress in list(t,"ingress/")?{
 let mut changed=super::cluster::stamp_ingress(t,&mut ingress)?;
+for (field,value) in [
+    ("lease_expiries",json!(0)),
+    ("leased_at",json!(0)),
+    ("first_retry_at",Value::Null),
+]{
+if ingress.get(field).is_none(){
+ingress[field]=value;
+changed=true;
+}
+}
 if ingress["state"]=="leased"{
 ingress["state"]=json!("queued");
 ingress["due"]=json!(now()?);
 ingress["lease_token"]=Value::Null;
 ingress["lease_until"]=json!(0);
+ingress["leased_at"]=json!(0);
 ingress["cancel_requested"]=json!(false);
 ingress["error"]=json!("service-restarted");
 changed=true;
@@ -1572,7 +1586,11 @@ Ok(())}
                             "arrived":record["arrived"],
                             "due":record["due"],
                             "attempts":record["attempts"],
+                            "lease_expiries":record["lease_expiries"],
+                            "leased_at":record["leased_at"],
+                            "first_retry_at":record["first_retry_at"],
                             "lease_until":record["lease_until"],
+                            "cancel_requested":record["cancel_requested"],
                             "error":record["error"],
                             "sender":record["envelope_from"],
                             "recipients":recipients,
@@ -1624,6 +1642,33 @@ Ok(())}
                     "next_cursor":cursor,
                     "scan_limit":2000
                 }))
+            }
+
+            "receive-quarantine" => {
+                let id = s(d, "id")?;
+                let record = must(t, &format!("ingress/{id}"))?;
+                for recipient in arr(&record, "recipients")? {
+                    a.require(
+                        "discard",
+                        Some(
+                            recipient
+                                .as_str()
+                                .ok_or_else(|| crate::error!("Invalid queued recipient"))?,
+                        ),
+                    )?;
+                }
+                ensure!(d["confirm"] == true, "Confirm stop and quarantine");
+                let previous = record["state"].clone();
+                let result = Self::stop_scan_locked(t, id)?;
+                event(
+                    t,
+                    a,
+                    action,
+                    rid,
+                    "",
+                    json!({"ingress":id,"previous_state":previous,"result":result["state"]}),
+                )?;
+                Ok(result)
             }
 
             "messages" => {
@@ -2421,8 +2466,9 @@ Ok(())}
         ensure!(
             (1..=365).contains(&n(v, "retention_days")?)
                 && n(v, "digest_hours")? <= 168
-                && (1..=720).contains(&n(v, "receipt_ttl_hours")?),
-            "Invalid retention, digest or command receipt interval"
+                && (1..=720).contains(&n(v, "receipt_ttl_hours")?)
+                && (3600..=259200).contains(&n(v, "scan_retry_max_seconds")?),
+            "Invalid retention, digest, command receipt or scan retry interval"
         );
 
         ensure!(

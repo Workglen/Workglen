@@ -459,7 +459,7 @@ pratique::data_encode!(Command {
 pratique::data_decode!(Command, deny_unknown=true, { action, data = Default::default(), request_id });
 
 pub fn settings() -> Value {
-    json!({"enabled":false,"domains":[],"routes":{},"mailboxes":{},"protected_people":[],"protected_domains":[],"mixed_script_check":false,"connectors":{},"retention_days":30,"digest_hours":24,"digest_sender":"","receipt_ttl_hours":168,"max_messages":10000,"max_bytes":1073741824u64,"max_jobs":20000,"min_free_bytes":268435456u64,"scan_input_bytes":10485760,"scan_decoded_bytes":33554432,"scan_parts":200,"scan_concurrency":2,"delivery_concurrency":4,"revision":0,"retrospective_default":false})
+    json!({"enabled":false,"domains":[],"routes":{},"mailboxes":{},"protected_people":[],"protected_domains":[],"mixed_script_check":false,"connectors":{},"retention_days":30,"digest_hours":24,"digest_sender":"","receipt_ttl_hours":168,"max_messages":10000,"max_bytes":1073741824u64,"max_jobs":20000,"min_free_bytes":268435456u64,"scan_input_bytes":10485760,"scan_decoded_bytes":33554432,"scan_parts":200,"scan_concurrency":2,"scan_retry_max_seconds":86400,"delivery_concurrency":4,"revision":0,"retrospective_default":false})
 }
 pub fn rules() -> Value {
     json!([

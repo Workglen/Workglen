@@ -572,6 +572,8 @@ fn scanner_budget_configuration_bounds_are_enforced() {
         ("scan_parts", 1001),
         ("scan_concurrency", 0),
         ("scan_concurrency", 17),
+        ("scan_retry_max_seconds", 3599),
+        ("scan_retry_max_seconds", 259201),
         ("delivery_concurrency", 0),
         ("delivery_concurrency", 17),
         ("receipt_ttl_hours", 0),
@@ -1703,6 +1705,18 @@ fn scanner_lease_renews_and_stale_or_cancelled_workers_fail_closed() {
         .db
         .write(|t| {
             let mut record = must(t, &format!("ingress/{ingress}"))?;
+            record["leased_at"] = json!(now()?.saturating_sub(601));
+            put(t, &format!("ingress/{ingress}"), &record)
+        })
+        .unwrap();
+    let lifetime = f.svc.renew_scan(&ingress, token).unwrap();
+    assert_eq!(lifetime["renewed"], false);
+    assert_eq!(lifetime["cancellation"]["requested"], false);
+
+    f.svc
+        .db
+        .write(|t| {
+            let mut record = must(t, &format!("ingress/{ingress}"))?;
             record["cancel_requested"] = json!(true);
             put(t, &format!("ingress/{ingress}"), &record)
         })
@@ -1720,6 +1734,260 @@ fn scanner_lease_renews_and_stale_or_cancelled_workers_fail_closed() {
         })
         .unwrap();
     assert!(f.svc.renew_scan(&ingress, token).is_err());
+}
+
+#[test]
+fn scan_retries_back_off_and_finalize_after_the_configured_age() {
+    let retrying = Fixture::new();
+    retrying.activate();
+    retrying
+        .svc
+        .db
+        .write(|t| {
+            let mut settings = must(t, "settings")?;
+            settings["enabled"] = json!(true);
+            put(t, "settings", &settings)
+        })
+        .unwrap();
+    let ingress = retrying
+        .svc
+        .accept(
+            &mail("temporary authentication outage"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.17".parse().unwrap(),
+            "sender.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    let (job, _) = retrying.svc.claim_scan().unwrap().unwrap();
+    let before = now().unwrap();
+    retrying
+        .svc
+        .retry_scan(
+            &ingress,
+            job["token"].as_str().unwrap(),
+            "authentication-temporary",
+        )
+        .unwrap();
+    let record = retrying
+        .svc
+        .db
+        .get(&format!("ingress/{ingress}"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(record["state"], "retrying");
+    assert!((before + 60..=before + 62).contains(&record["due"].as_i64().unwrap()));
+    assert!(record["first_retry_at"].as_i64().is_some());
+    assert_eq!(record["leased_at"], 0);
+
+    let exhausted = Fixture::new();
+    exhausted.activate();
+    exhausted
+        .svc
+        .db
+        .write(|t| {
+            let mut settings = must(t, "settings")?;
+            settings["enabled"] = json!(true);
+            settings["scan_retry_max_seconds"] = json!(3600);
+            put(t, "settings", &settings)
+        })
+        .unwrap();
+    let ingress = exhausted
+        .svc
+        .accept(
+            &mail("authentication unavailable past deadline"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.18".parse().unwrap(),
+            "sender.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    let (job, _) = exhausted.svc.claim_scan().unwrap().unwrap();
+    exhausted
+        .svc
+        .db
+        .write(|t| {
+            let mut record = must(t, &format!("ingress/{ingress}"))?;
+            record["arrived"] = json!(now()?.saturating_sub(3600));
+            put(t, &format!("ingress/{ingress}"), &record)
+        })
+        .unwrap();
+    exhausted
+        .svc
+        .retry_scan(
+            &ingress,
+            job["token"].as_str().unwrap(),
+            "authentication-temporary",
+        )
+        .unwrap();
+    assert!(
+        exhausted
+            .svc
+            .db
+            .get(&format!("ingress/{ingress}"))
+            .unwrap()
+            .is_none()
+    );
+    let messages = exhausted.svc.db.write(|t| list(t, "message/")).unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["state"], "quarantined");
+    assert_eq!(messages[0]["releasable"], false);
+    assert_eq!(
+        messages[0]["verdict"]["coverage"]["incompleteness_reasons"][0],
+        "Sender authentication remained unavailable beyond the retry limit"
+    );
+}
+
+#[test]
+fn three_expired_worker_leases_finalize_in_incomplete_quarantine() {
+    let f = Fixture::new();
+    f.activate();
+    f.svc
+        .db
+        .write(|t| {
+            let mut settings = must(t, "settings")?;
+            settings["enabled"] = json!(true);
+            put(t, "settings", &settings)
+        })
+        .unwrap();
+    let ingress = f
+        .svc
+        .accept(
+            &mail("worker repeatedly disappears"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.19".parse().unwrap(),
+            "sender.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    assert!(f.svc.claim_scan().unwrap().is_some());
+    for expiry in 1..=3 {
+        f.svc
+            .db
+            .write(|t| {
+                let mut record = must(t, &format!("ingress/{ingress}"))?;
+                record["lease_until"] = json!(1);
+                put(t, &format!("ingress/{ingress}"), &record)
+            })
+            .unwrap();
+        let claim = f.svc.claim_scan().unwrap();
+        if expiry < 3 {
+            assert!(claim.is_some());
+            assert_eq!(
+                f.svc
+                    .db
+                    .get(&format!("ingress/{ingress}"))
+                    .unwrap()
+                    .unwrap()["lease_expiries"],
+                expiry
+            );
+        } else {
+            assert!(claim.is_none());
+        }
+    }
+    assert!(
+        f.svc
+            .db
+            .get(&format!("ingress/{ingress}"))
+            .unwrap()
+            .is_none()
+    );
+    let messages = f.svc.db.write(|t| list(t, "message/")).unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["state"], "quarantined");
+    assert_eq!(
+        messages[0]["verdict"]["coverage"]["incompleteness_reasons"][0],
+        "Analysis repeatedly lost its worker lease and was stopped safely"
+    );
+}
+
+#[test]
+fn operator_can_stop_queued_or_leased_receive_work_without_dropping_mail() {
+    let queued = Fixture::new();
+    queued.activate();
+    queued
+        .svc
+        .db
+        .write(|t| {
+            let mut settings = must(t, "settings")?;
+            settings["enabled"] = json!(true);
+            put(t, "settings", &settings)
+        })
+        .unwrap();
+    let ingress = queued
+        .svc
+        .accept(
+            &mail("operator stops queued work"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.20".parse().unwrap(),
+            "sender.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    let stopped = queued.cmd(
+        "receive-quarantine",
+        json!({"id":ingress,"confirm":true}),
+    );
+    assert_eq!(stopped["state"], "quarantined");
+    assert!(
+        queued
+            .svc
+            .db
+            .get(&format!("ingress/{ingress}"))
+            .unwrap()
+            .is_none()
+    );
+    let messages = queued.svc.db.write(|t| list(t, "message/")).unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["state"], "quarantined");
+
+    let leased = Fixture::new();
+    leased.activate();
+    leased
+        .svc
+        .db
+        .write(|t| {
+            let mut settings = must(t, "settings")?;
+            settings["enabled"] = json!(true);
+            put(t, "settings", &settings)
+        })
+        .unwrap();
+    let ingress = leased
+        .svc
+        .accept(
+            &mail("operator stops active work"),
+            "sender@example.invalid",
+            &["owner@example.test".into()],
+            "192.0.2.21".parse().unwrap(),
+            "sender.example.invalid",
+        )
+        .unwrap()
+        .remove(0);
+    let (job, _) = leased.svc.claim_scan().unwrap().unwrap();
+    let stopped = leased.cmd(
+        "receive-quarantine",
+        json!({"id":ingress,"confirm":true}),
+    );
+    assert_eq!(stopped["state"], "cancellation-requested");
+    let record = leased
+        .svc
+        .db
+        .get(&format!("ingress/{ingress}"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(record["cancel_requested"], true);
+    assert_eq!(record["error"], "operator-stop-requested");
+    assert_eq!(
+        leased
+            .svc
+            .renew_scan(&ingress, job["token"].as_str().unwrap())
+            .unwrap()["renewed"],
+        false
+    );
 }
 
 #[test]
@@ -1747,6 +2015,23 @@ fn service_restart_immediately_requeues_orphaned_scan_lease() {
         .remove(0);
     let (old_job, _) = f.svc.claim_scan().unwrap().unwrap();
     let old_token = old_job["token"].as_str().unwrap().to_string();
+    f.svc
+        .db
+        .write(|t| {
+            let mut settings = must(t, "settings")?;
+            settings
+                .as_object_mut()
+                .unwrap()
+                .remove("scan_retry_max_seconds");
+            put(t, "settings", &settings)?;
+            let mut record = must(t, &format!("ingress/{ingress}"))?;
+            let record_object = record.as_object_mut().unwrap();
+            record_object.remove("lease_expiries");
+            record_object.remove("leased_at");
+            record_object.remove("first_retry_at");
+            put(t, &format!("ingress/{ingress}"), &record)
+        })
+        .unwrap();
     let config = f.svc.config.clone();
     let Fixture { _dir, svc, .. } = f;
     drop(svc);
@@ -1760,7 +2045,11 @@ fn service_restart_immediately_requeues_orphaned_scan_lease() {
     assert_eq!(recovered["state"], "queued");
     assert!(recovered["lease_token"].is_null());
     assert_eq!(recovered["lease_until"], 0);
+    assert_eq!(recovered["leased_at"], 0);
+    assert_eq!(recovered["lease_expiries"], 0);
+    assert!(recovered["first_retry_at"].is_null());
     assert_eq!(recovered["error"], "service-restarted");
+    assert_eq!(reopened.settings().unwrap()["scan_retry_max_seconds"], 86400);
     assert!(reopened.renew_scan(&ingress, &old_token).is_err());
     let (new_job, _) = reopened.claim_scan().unwrap().unwrap();
     assert_ne!(new_job["token"], old_token);
